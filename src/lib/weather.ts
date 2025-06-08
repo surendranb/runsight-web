@@ -53,6 +53,26 @@ export const fetchWeatherData = async (lat: number, lon: number, date: string) =
 };
 
 export const saveWeatherToDatabase = async (weatherData: any, activityId: string) => {
+  // Skip database save if using temporary activity (RLS issue)
+  if (activityId.startsWith('temp_')) {
+    console.warn('Skipping weather save for temporary activity due to RLS policy');
+    return {
+      id: `temp_weather_${activityId}`,
+      activity_id: activityId,
+      temperature: weatherData.temp,
+      feels_like: weatherData.feels_like,
+      humidity: weatherData.humidity,
+      pressure: weatherData.pressure,
+      visibility: weatherData.visibility,
+      wind_speed: weatherData.wind_speed,
+      wind_deg: weatherData.wind_deg,
+      weather_main: weatherData.weather.main,
+      weather_description: weatherData.weather.description,
+      weather_icon: weatherData.weather.icon,
+      clouds: weatherData.clouds,
+    };
+  }
+
   const { data, error } = await supabase
     .from('weather')
     .upsert({
@@ -72,6 +92,9 @@ export const saveWeatherToDatabase = async (weatherData: any, activityId: string
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Weather save error:', error);
+    throw error;
+  }
   return data;
 };
