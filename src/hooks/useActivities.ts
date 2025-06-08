@@ -18,13 +18,10 @@ export const useActivities = (userId: string | null) => {
 
   const fetchActivities = async () => {
     try {
-      // Fetch activities from database with weather data
+      // Fetch activities from database (no weather for now)
       const { data: activitiesData, error: activitiesError } = await supabase
         .from('activities')
-        .select(`
-          *,
-          weather (*)
-        `)
+        .select('*')
         .eq('user_id', userId)
         .eq('type', 'Run')
         .order('start_date', { ascending: false });
@@ -34,7 +31,7 @@ export const useActivities = (userId: string | null) => {
         setActivities([]);
         setStats(null);
       } else {
-        console.log(`Loaded ${activitiesData?.length || 0} activities from database`);
+        console.log(`✅ Loaded ${activitiesData?.length || 0} activities from database`);
         setActivities(activitiesData || []);
         calculateStats(activitiesData || []);
       }

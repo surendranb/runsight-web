@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Activity } from 'lucide-react';
-import { exchangeCodeForToken, saveUserToDatabase, fetchStravaActivities, saveActivityToDatabase } from '../lib/strava';
-import { fetchWeatherData, saveWeatherToDatabase } from '../lib/weather';
+import { exchangeCodeForToken, saveUserToDatabase } from '../lib/strava';
 import { supabase } from '../lib/supabase';
 import { User } from '../types';
 import { DataSyncSelector } from './DataSyncSelector';

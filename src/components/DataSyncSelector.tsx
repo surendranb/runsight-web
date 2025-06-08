@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, Database, Activity, Zap } from 'lucide-react';
 import { saveActivityToDatabase } from '../lib/strava';
-import { fetchWeatherData, saveWeatherToDatabase } from '../lib/weather';
 
 interface DataSyncSelectorProps {
   accessToken: string;
@@ -158,45 +157,23 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
       setStatus(`Processing ${runningActivities.length} running activities...`);
       setProgress(50);
 
-      // Process and save activities with weather data
+      // Process and save activities (no weather for now)
       const processedActivities = [];
-      const weatherData = [];
       let savedCount = 0;
 
       for (let i = 0; i < runningActivities.length; i++) {
         const activity = runningActivities[i];
         
         setStatus(`Saving activity ${i + 1}/${runningActivities.length}: ${activity.name}`);
-        setProgress(50 + ((i / runningActivities.length) * 35));
+        setProgress(50 + ((i / runningActivities.length) * 45));
 
         try {
           // Save activity to database
           const savedActivity = await saveActivityToDatabase(activity, userId);
           processedActivities.push(savedActivity);
           savedCount++;
-
-          // Fetch and save weather data if coordinates available
-          if (activity.start_latlng && activity.start_latlng.length === 2) {
-            try {
-              setStatus(`Fetching weather for ${activity.name}...`);
-              const [lat, lon] = activity.start_latlng;
-              
-              // Use the standardized weather fetch function
-              const weatherResponse = await fetchWeatherData(lat, lon, activity.start_date);
-              
-              setStatus(`Saving weather data for ${activity.name}...`);
-              // Save weather to database using the properly formatted data
-              const savedWeather = await saveWeatherToDatabase(weatherResponse.data, savedActivity.id);
-              weatherData.push(savedWeather);
-              
-              console.log(`✅ Weather saved for ${activity.name}: ${weatherResponse.data.weather?.main || 'Unknown'}`);
-            } catch (weatherError) {
-              console.warn(`❌ Failed to fetch/save weather for activity ${activity.name}:`, weatherError);
-              // Continue with other activities - weather is optional
-            }
-          } else {
-            console.log(`⏭️ Skipping weather for ${activity.name} (no GPS coordinates)`);
-          }
+          
+          console.log(`✅ Activity saved: ${activity.name}`);
         } catch (activityError) {
           console.error('Failed to save activity:', activity.id, activityError);
           // Continue with other activities
@@ -208,7 +185,7 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
         }
       }
 
-      setStatus(`Sync complete! Saved ${savedCount} activities and ${weatherData.length} weather records to database.`);
+      setStatus(`Sync complete! Saved ${savedCount} activities to database.`);
       setProgress(100);
 
       const syncResult = {
@@ -221,12 +198,10 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
           totalActivities: allActivities.length,
           runningActivities: runningActivities.length,
           savedActivities: savedCount,
-          activitiesWithWeather: weatherData.length,
           activitiesWithCoordinates: runningActivities.filter(a => a.start_latlng).length,
           activitiesWithHeartRate: runningActivities.filter(a => a.average_heartrate).length,
         },
         activities: processedActivities,
-        weather: weatherData,
         option: option
       };
 
@@ -289,7 +264,6 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
               <h3 className="font-semibold text-green-800 mb-2">📊 Database Import Summary</h3>
               <div className="space-y-1 text-sm text-green-700">
                 <div>💾 {syncData.summary.savedActivities} activities saved to database</div>
-                <div>🌤️ {syncData.summary.activitiesWithWeather} with weather data</div>
                 <div>📍 {syncData.summary.activitiesWithCoordinates} with GPS coordinates</div>
                 <div>❤️ {syncData.summary.activitiesWithHeartRate} with heart rate data</div>
               </div>
