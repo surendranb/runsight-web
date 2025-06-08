@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Calendar, Clock, Database, Activity, Zap } from 'lucide-react';
-import { saveActivityToDatabase } from '../lib/strava';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Clock, Database, Activity, Zap, History, RefreshCw } from 'lucide-react';
+import { saveActivityToDatabase, getExistingActivitiesDateRange } from '../lib/strava';
 
 interface DataSyncSelectorProps {
   accessToken: string;
@@ -18,6 +18,7 @@ interface SyncOption {
   days: number;
   estimatedActivities: string;
   estimatedTime: string;
+  customYear?: number;
 }
 
 const syncOptions: SyncOption[] = [
@@ -80,9 +81,67 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('');
   const [syncData, setSyncData] = useState<any>(null);
+  const [existingData, setExistingData] = useState<{earliest: Date | null, latest: Date | null, count: number} | null>(null);
+  const [showHistoricOptions, setShowHistoricOptions] = useState(false);
+
+  // Load existing data on component mount
+  useEffect(() => {
+    const loadExistingData = async () => {
+      if (!isFirstRun) {
+        const data = await getExistingActivitiesDateRange(userId);
+        setExistingData(data);
+      }
+    };
+    loadExistingData();
+  }, [userId, isFirstRun]);
+
+  // Generate historic sync options based on existing data
+  const getHistoricSyncOptions = (): SyncOption[] => {
+    if (!existingData || !existingData.earliest) return [];
+
+    const historicOptions: SyncOption[] = [];
+    const earliestYear = existingData.earliest.getFullYear();
+    const currentYear = new Date().getFullYear();
+
+    // Add option to sync before earliest existing data
+    if (earliestYear > 2009) { // Strava started in 2009
+      historicOptions.push({
+        id: 'before-existing',
+        label: `Before ${earliestYear}`,
+        description: `Sync activities before your earliest data (${existingData.earliest.toLocaleDateString()})`,
+        icon: <History className="w-5 h-5" />,
+        days: -2, // Special flag for "before existing"
+        estimatedActivities: '10-100+ runs',
+        estimatedTime: '5-20 minutes'
+      });
+    }
+
+    // Add year-by-year options for gaps
+    for (let year = earliestYear - 1; year >= Math.max(2009, currentYear - 10); year--) {
+      historicOptions.push({
+        id: `year-${year}`,
+        label: `Year ${year}`,
+        description: `Sync all activities from ${year}`,
+        icon: <Calendar className="w-5 h-5" />,
+        days: -3, // Special flag for specific year
+        estimatedActivities: '20-100 runs',
+        estimatedTime: '3-10 minutes',
+        customYear: year
+      });
+    }
+
+    return historicOptions;
+  };
 
   const startSync = async () => {
-    const option = syncOptions.find(opt => opt.id === selectedOption);
+    let option = syncOptions.find(opt => opt.id === selectedOption);
+    
+    // Check if it's a historic option
+    if (!option && showHistoricOptions) {
+      const historicOptions = getHistoricSyncOptions();
+      option = historicOptions.find(opt => opt.id === selectedOption);
+    }
+    
     if (!option) return;
 
     setIsLoading(true);
@@ -93,14 +152,27 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
       setStatus('Calculating date range...');
       setProgress(10);
 
-      // Calculate date range
+      // Calculate date range based on option type
       let startDate: Date;
-      const endDate = new Date();
+      let endDate = new Date();
 
       if (option.days === -1) {
         // All time - start from a very early date
         startDate = new Date('2000-01-01');
+      } else if (option.days === -2) {
+        // Before existing data
+        if (existingData?.earliest) {
+          endDate = new Date(existingData.earliest);
+          startDate = new Date('2009-01-01'); // Strava started in 2009
+        } else {
+          throw new Error('No existing data found for historic sync');
+        }
+      } else if (option.days === -3 && option.customYear) {
+        // Specific year
+        startDate = new Date(option.customYear, 0, 1);
+        endDate = new Date(option.customYear, 11, 31);
       } else {
+        // Regular relative date range
         startDate = new Date();
         startDate.setDate(startDate.getDate() - option.days);
       }
@@ -297,7 +369,28 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
           </p>
         </div>
 
+        {/* Show existing data summary for returning users */}
+        {!isFirstRun && existingData && existingData.count > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold text-blue-800 mb-2">📊 Your Current Data</h3>
+            <div className="space-y-1 text-sm text-blue-700">
+              <div>🏃‍♂️ {existingData.count} activities in database</div>
+              <div>📅 From {existingData.earliest?.toLocaleDateString()} to {existingData.latest?.toLocaleDateString()}</div>
+            </div>
+            
+            {/* Historic sync options toggle */}
+            <button
+              onClick={() => setShowHistoricOptions(!showHistoricOptions)}
+              className="mt-3 flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium text-sm"
+            >
+              <History className="w-4 h-4" />
+              {showHistoricOptions ? 'Hide' : 'Show'} Historic Sync Options
+            </button>
+          </div>
+        )}
+
         <div className="grid gap-4 mb-8">
+          {/* Regular sync options */}
           {syncOptions.map((option) => (
             <div
               key={option.id}
@@ -340,6 +433,51 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
               </div>
             </div>
           ))}
+          
+          {/* Historic sync options */}
+          {showHistoricOptions && getHistoricSyncOptions().map((option) => (
+            <div
+              key={option.id}
+              onClick={() => setSelectedOption(option.id)}
+              className={`
+                p-6 rounded-xl border-2 cursor-pointer transition-all duration-200
+                ${selectedOption === option.id 
+                  ? 'border-orange-500 bg-orange-50 shadow-lg' 
+                  : 'border-orange-200 bg-orange-25 hover:border-orange-300 hover:shadow-md'
+                }
+              `}
+            >
+              <div className="flex items-start gap-4">
+                <div className={`
+                  p-3 rounded-lg
+                  ${selectedOption === option.id ? 'bg-orange-100 text-orange-600' : 'bg-orange-50 text-orange-500'}
+                `}>
+                  {option.icon}
+                </div>
+                
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900">{option.label}</h3>
+                    <span className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full font-medium">HISTORIC</span>
+                    {selectedOption === option.id && (
+                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                    )}
+                  </div>
+                  
+                  <p className="text-gray-600 mb-3">{option.description}</p>
+                  
+                  <div className="flex gap-6 text-sm text-gray-500">
+                    <div>
+                      <span className="font-medium">Est. Activities:</span> {option.estimatedActivities}
+                    </div>
+                    <div>
+                      <span className="font-medium">Est. Time:</span> {option.estimatedTime}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="flex gap-4 justify-center">
@@ -354,7 +492,10 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2"
           >
             <Database className="w-5 h-5" />
-            Start Sync ({syncOptions.find(opt => opt.id === selectedOption)?.label})
+            Start Sync ({
+              syncOptions.find(opt => opt.id === selectedOption)?.label || 
+              getHistoricSyncOptions().find(opt => opt.id === selectedOption)?.label
+            })
           </button>
         </div>
       </div>
