@@ -83,6 +83,7 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
   const [syncData, setSyncData] = useState<any>(null);
   const [existingData, setExistingData] = useState<{earliest: Date | null, latest: Date | null, count: number} | null>(null);
   const [showHistoricOptions, setShowHistoricOptions] = useState(false);
+  const [hasNavigated, setHasNavigated] = useState(false);
 
   // Load existing data on component mount
   useEffect(() => {
@@ -279,9 +280,13 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
 
       setSyncData(syncResult);
 
+      // Auto-navigate after 3 seconds, but user can click button immediately
       setTimeout(() => {
-        onSyncComplete(syncResult);
-      }, 1500);
+        if (!hasNavigated) {
+          setHasNavigated(true);
+          onSyncComplete(syncResult);
+        }
+      }, 3000);
 
     } catch (error) {
       console.error('Sync error:', error);
@@ -341,13 +346,26 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
               </div>
             </div>
             
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 mb-4">
               Ready to explore your running analytics!
             </p>
             
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
-            </div>
+            <p className="text-gray-500 text-sm mb-6">
+              Redirecting to dashboard in 3 seconds...
+            </p>
+            
+            <button
+              onClick={() => {
+                if (!hasNavigated) {
+                  setHasNavigated(true);
+                  onSyncComplete(syncData);
+                }
+              }}
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 mx-auto"
+            >
+              <Activity className="w-5 h-5" />
+              Continue to Dashboard
+            </button>
           </div>
         </div>
       </div>
