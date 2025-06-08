@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Activity } from 'lucide-react';
 import { exchangeCodeForToken, saveUserToDatabase, fetchStravaActivities, saveActivityToDatabase } from '../lib/strava';
 import { fetchWeatherData, saveWeatherToDatabase } from '../lib/weather';
+import { supabase } from '../lib/supabase';
 import { User } from '../types';
 import { DataSyncSelector } from './DataSyncSelector';
 
@@ -16,6 +17,7 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
   const [showDataSync, setShowDataSync] = useState(false);
   const [accessToken, setAccessToken] = useState<string>('');
   const [userId, setUserId] = useState<string>('');
+  const [isFirstRun, setIsFirstRun] = useState(true);
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -48,7 +50,24 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
         const user = await saveUserToDatabase(authResponse);
         console.log('User saved successfully');
         
-        setStatus('Ready to test data import!');
+        setStatus('Checking existing data...');
+        setProgress(80);
+
+        // Check if user has existing activities (to determine first run vs. subsequent run)
+        const { data: existingActivities, error: activitiesError } = await supabase
+          .from('activities')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1);
+
+        const hasExistingData = !activitiesError && existingActivities && existingActivities.length > 0;
+        setIsFirstRun(!hasExistingData);
+
+        if (hasExistingData) {
+          setStatus('Welcome back! Ready to sync new activities.');
+        } else {
+          setStatus('Welcome! Ready to import your running history.');
+        }
         setProgress(100);
 
         // Store access token and user ID for data sync
@@ -96,6 +115,7 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
       <DataSyncSelector 
         accessToken={accessToken} 
         userId={userId}
+        isFirstRun={isFirstRun}
         onSyncComplete={(data) => {
           console.log('Sync completed with data:', data);
           onLoginSuccess({ 
