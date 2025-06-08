@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, Database, Activity, Zap } from 'lucide-react';
 import { saveActivityToDatabase } from '../lib/strava';
-import { saveWeatherToDatabase } from '../lib/weather';
+import { fetchWeatherData, saveWeatherToDatabase } from '../lib/weather';
 
 interface DataSyncSelectorProps {
   accessToken: string;
@@ -167,7 +167,7 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
         const activity = runningActivities[i];
         
         setStatus(`Saving activity ${i + 1}/${runningActivities.length}: ${activity.name}`);
-        setProgress(50 + ((i / runningActivities.length) * 40));
+        setProgress(50 + ((i / runningActivities.length) * 35));
 
         try {
           // Save activity to database
@@ -178,25 +178,24 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
           // Fetch and save weather data if coordinates available
           if (activity.start_latlng && activity.start_latlng.length === 2) {
             try {
+              setStatus(`Fetching weather for ${activity.name}...`);
               const [lat, lon] = activity.start_latlng;
-              const activityDate = new Date(activity.start_date);
-              const weatherTimestamp = Math.floor(activityDate.getTime() / 1000);
-
-              const weatherResponse = await fetch(
-                `https://api.openweathermap.org/data/3.0/onecall/timemachine?lat=${lat}&lon=${lon}&dt=${weatherTimestamp}&appid=${import.meta.env.VITE_OPENWEATHER_API_KEY}&units=metric`
-              );
-
-              if (weatherResponse.ok) {
-                const weatherApiData = await weatherResponse.json();
-                const weather = weatherApiData.data[0];
-
-                // Save weather to database
-                const savedWeather = await saveWeatherToDatabase(weather, savedActivity.id);
-                weatherData.push(savedWeather);
-              }
+              
+              // Use the standardized weather fetch function
+              const weatherResponse = await fetchWeatherData(lat, lon, activity.start_date);
+              
+              setStatus(`Saving weather data for ${activity.name}...`);
+              // Save weather to database using the properly formatted data
+              const savedWeather = await saveWeatherToDatabase(weatherResponse.data, savedActivity.id);
+              weatherData.push(savedWeather);
+              
+              console.log(`✅ Weather saved for ${activity.name}: ${weatherResponse.data.weather?.main || 'Unknown'}`);
             } catch (weatherError) {
-              console.warn('Failed to fetch/save weather for activity:', activity.id, weatherError);
+              console.warn(`❌ Failed to fetch/save weather for activity ${activity.name}:`, weatherError);
+              // Continue with other activities - weather is optional
             }
+          } else {
+            console.log(`⏭️ Skipping weather for ${activity.name} (no GPS coordinates)`);
           }
         } catch (activityError) {
           console.error('Failed to save activity:', activity.id, activityError);
@@ -209,7 +208,7 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
         }
       }
 
-      setStatus(`Sync complete! Saved ${savedCount} activities to database.`);
+      setStatus(`Sync complete! Saved ${savedCount} activities and ${weatherData.length} weather records to database.`);
       setProgress(100);
 
       const syncResult = {
