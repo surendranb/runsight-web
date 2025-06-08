@@ -18,10 +18,18 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
   const [accessToken, setAccessToken] = useState<string>('');
   const [userId, setUserId] = useState<string>('');
   const [isFirstRun, setIsFirstRun] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     const handleCallback = async () => {
+      // Prevent duplicate processing
+      if (isProcessing) {
+        console.log('OAuth processing already in progress, skipping...');
+        return;
+      }
+
       try {
+        setIsProcessing(true);
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         const error = urlParams.get('error');
@@ -34,6 +42,19 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
 
         if (!code) {
           throw new Error('No authorization code received from Strava');
+        }
+
+        // Check if this code has already been processed
+        const processedCode = sessionStorage.getItem('processed_oauth_code');
+        if (processedCode === code) {
+          console.log('OAuth code already processed, redirecting to dashboard...');
+          // If we have user data, go to dashboard
+          const userData = sessionStorage.getItem('runsight_user');
+          if (userData) {
+            onLoginSuccess(JSON.parse(userData));
+          }
+          setIsProcessing(false);
+          return;
         }
 
         setStatus('Exchanging authorization code...');
@@ -70,6 +91,16 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
         }
         setProgress(100);
 
+        // Mark OAuth code as processed and store user data
+        sessionStorage.setItem('processed_oauth_code', code);
+        sessionStorage.setItem('runsight_user', JSON.stringify({
+          id: user.id,
+          strava_id: user.strava_id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          profile_medium: user.profile_medium
+        }));
+
         // Store access token and user ID for data sync
         setAccessToken(authResponse.access_token);
         setUserId(user.id);
@@ -80,6 +111,8 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         setError(errorMessage);
         setStatus(`Error: ${errorMessage}`);
+      } finally {
+        setIsProcessing(false);
       }
     };
 

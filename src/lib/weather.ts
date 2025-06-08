@@ -53,48 +53,45 @@ export const fetchWeatherData = async (lat: number, lon: number, date: string) =
 };
 
 export const saveWeatherToDatabase = async (weatherData: any, activityId: string) => {
+  // Validate and extract weather data with fallbacks
+  const safeWeatherData = {
+    activity_id: activityId,
+    temperature: weatherData.temp || null,
+    feels_like: weatherData.feels_like || null,
+    humidity: weatherData.humidity || null,
+    pressure: weatherData.pressure || null,
+    visibility: weatherData.visibility || null,
+    wind_speed: weatherData.wind_speed || null,
+    wind_deg: weatherData.wind_deg || null,
+    weather_main: weatherData.weather?.main || null,
+    weather_description: weatherData.weather?.description || null,
+    weather_icon: weatherData.weather?.icon || null,
+    clouds: weatherData.clouds || null,
+  };
+
+  console.log('Saving weather data:', safeWeatherData);
+
   // Skip database save if using temporary activity (RLS issue)
   if (activityId.startsWith('temp_')) {
     console.warn('Skipping weather save for temporary activity due to RLS policy');
     return {
       id: `temp_weather_${activityId}`,
-      activity_id: activityId,
-      temperature: weatherData.temp,
-      feels_like: weatherData.feels_like,
-      humidity: weatherData.humidity,
-      pressure: weatherData.pressure,
-      visibility: weatherData.visibility,
-      wind_speed: weatherData.wind_speed,
-      wind_deg: weatherData.wind_deg,
-      weather_main: weatherData.weather.main,
-      weather_description: weatherData.weather.description,
-      weather_icon: weatherData.weather.icon,
-      clouds: weatherData.clouds,
+      ...safeWeatherData
     };
   }
 
   const { data, error } = await supabase
     .from('weather')
-    .upsert({
-      activity_id: activityId,
-      temperature: weatherData.temp,
-      feels_like: weatherData.feels_like,
-      humidity: weatherData.humidity,
-      pressure: weatherData.pressure,
-      visibility: weatherData.visibility,
-      wind_speed: weatherData.wind_speed,
-      wind_deg: weatherData.wind_deg,
-      weather_main: weatherData.weather.main,
-      weather_description: weatherData.weather.description,
-      weather_icon: weatherData.weather.icon,
-      clouds: weatherData.clouds,
-    })
+    .upsert(safeWeatherData)
     .select()
     .single();
 
   if (error) {
     console.error('Weather save error:', error);
+    console.error('Failed weather data:', safeWeatherData);
     throw error;
   }
+  
+  console.log('Weather saved successfully:', data);
   return data;
 };
