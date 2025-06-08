@@ -1,8 +1,10 @@
-# Strava Running Analytics
+# RunSight Web 🏃‍♂️
 
 A beautiful, open-source running analytics app that connects with Strava and OpenWeatherMap to provide comprehensive insights about your runs.
 
-## Features
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/surendranb/runsight-web)
+
+## ✨ Features
 
 - 🏃‍♂️ **Strava Integration**: Secure OAuth authentication and automatic run data sync
 - 🌤️ **Weather Data**: Historical weather conditions for each run via OpenWeatherMap
@@ -10,6 +12,15 @@ A beautiful, open-source running analytics app that connects with Strava and Ope
 - 🔒 **Secure**: Only authenticated users can access their own data
 - 📱 **Responsive**: Optimized for desktop, tablet, and mobile devices
 - 🚀 **Easy Deployment**: One-click deployment to Netlify + Supabase
+
+## 🚀 Quick Deploy to Netlify
+
+1. Click the "Deploy to Netlify" button above
+2. Connect your GitHub account
+3. Set up your environment variables (see below)
+4. Deploy!
+
+## 🔧 Environment Variables Setup
 
 ## Quick Setup
 

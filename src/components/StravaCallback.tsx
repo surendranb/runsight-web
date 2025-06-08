@@ -42,16 +42,61 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
 
         // Save user to database
         const user = await saveUserToDatabase(authResponse);
-        console.log('User saved, redirecting to dashboard...');
+        console.log('User saved, fetching activities...');
         
-        setStatus('Complete! Redirecting...');
+        setStatus('Importing your running activities...');
+        setProgress(60);
+
+        // Fetch all running activities from Strava
+        let allActivities: any[] = [];
+        let page = 1;
+        const perPage = 50;
+        
+        while (true) {
+          const activities = await fetchStravaActivities(authResponse.access_token, page, perPage);
+          if (activities.length === 0) break;
+          
+          // Filter only running activities
+          const runningActivities = activities.filter(activity => activity.type === 'Run');
+          allActivities = [...allActivities, ...runningActivities];
+          
+          page++;
+          if (activities.length < perPage) break; // Last page
+        }
+
+        console.log(`Found ${allActivities.length} running activities`);
+        
+        setStatus(`Saving ${allActivities.length} running activities...`);
+        setProgress(80);
+
+        // Save activities to database
+        for (const activity of allActivities) {
+          try {
+            const savedActivity = await saveActivityToDatabase(activity, user.id);
+            
+            // Fetch weather data if we have coordinates
+            if (activity.start_latlng && activity.start_latlng.length === 2) {
+              try {
+                const [lat, lon] = activity.start_latlng;
+                const weatherData = await fetchWeatherData(lat, lon, activity.start_date);
+                await saveWeatherToDatabase(weatherData.data, savedActivity.id);
+              } catch (weatherError) {
+                console.warn('Failed to fetch weather for activity:', activity.id, weatherError);
+                // Continue without weather data
+              }
+            }
+          } catch (activityError) {
+            console.warn('Failed to save activity:', activity.id, activityError);
+            // Continue with other activities
+          }
+        }
+        
+        setStatus('Complete! Redirecting to your dashboard...');
         setProgress(100);
 
-        // For now, just redirect to dashboard without fetching activities
-        // We'll add activity fetching once basic auth is working
         setTimeout(() => {
           onLoginSuccess(user);
-        }, 1000);
+        }, 1500);
         
       } catch (error) {
         console.error('Callback error:', error);
