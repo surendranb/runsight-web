@@ -10,10 +10,20 @@ export const getStravaAuthUrl = () => {
   const responseType = 'code';
   const approvalPrompt = 'force';
   
-  return `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=${responseType}&redirect_uri=${STRAVA_REDIRECT_URI}&approval_prompt=${approvalPrompt}&scope=${scope}`;
+  const authUrl = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=${responseType}&redirect_uri=${encodeURIComponent(STRAVA_REDIRECT_URI)}&approval_prompt=${approvalPrompt}&scope=${scope}`;
+  
+  console.log('Auth URL:', authUrl);
+  console.log('Client ID:', STRAVA_CLIENT_ID);
+  console.log('Redirect URI:', STRAVA_REDIRECT_URI);
+  
+  return authUrl;
 };
 
 export const exchangeCodeForToken = async (code: string): Promise<StravaAuthResponse> => {
+  console.log('Exchanging code for token:', code);
+  console.log('Using client ID:', STRAVA_CLIENT_ID);
+  console.log('Using redirect URI:', STRAVA_REDIRECT_URI);
+  
   const response = await fetch('https://www.strava.com/oauth/token', {
     method: 'POST',
     headers: {
@@ -27,11 +37,14 @@ export const exchangeCodeForToken = async (code: string): Promise<StravaAuthResp
     }),
   });
 
+  const responseText = await response.text();
+  console.log('Token exchange response:', responseText);
+
   if (!response.ok) {
-    throw new Error('Failed to exchange code for token');
+    throw new Error(`Failed to exchange code for token: ${response.status} ${responseText}`);
   }
 
-  return response.json();
+  return JSON.parse(responseText);
 };
 
 export const refreshStravaToken = async (refreshToken: string): Promise<StravaAuthResponse> => {
@@ -56,6 +69,8 @@ export const refreshStravaToken = async (refreshToken: string): Promise<StravaAu
 };
 
 export const fetchStravaActivities = async (accessToken: string, page = 1, perPage = 50): Promise<any[]> => {
+  console.log('Fetching activities with token:', accessToken.substring(0, 10) + '...');
+  
   const response = await fetch(
     `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`,
     {
@@ -65,15 +80,20 @@ export const fetchStravaActivities = async (accessToken: string, page = 1, perPa
     }
   );
 
+  const responseText = await response.text();
+  console.log('Activities response:', response.status, responseText);
+
   if (!response.ok) {
-    throw new Error('Failed to fetch activities');
+    throw new Error(`Failed to fetch activities: ${response.status} ${responseText}`);
   }
 
-  return response.json();
+  return JSON.parse(responseText);
 };
 
 export const saveUserToDatabase = async (authResponse: StravaAuthResponse) => {
   const { athlete, access_token, refresh_token, expires_at } = authResponse;
+  
+  console.log('Saving user to database:', athlete);
   
   const { data, error } = await supabase
     .from('users')
@@ -91,7 +111,12 @@ export const saveUserToDatabase = async (authResponse: StravaAuthResponse) => {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Database error:', error);
+    throw error;
+  }
+  
+  console.log('User saved successfully:', data);
   return data;
 };
 

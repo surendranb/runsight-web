@@ -11,6 +11,7 @@ interface StravaCallbackProps {
 export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }) => {
   const [status, setStatus] = useState('Connecting to Strava...');
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -18,6 +19,8 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         const error = urlParams.get('error');
+
+        console.log('URL params:', { code: code?.substring(0, 10) + '...', error });
 
         if (error) {
           throw new Error(`Strava authorization error: ${error}`);
@@ -32,63 +35,58 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
 
         // Exchange code for token
         const authResponse = await exchangeCodeForToken(code);
+        console.log('Auth response received:', { athlete: authResponse.athlete?.firstname });
         
         setStatus('Saving user data...');
         setProgress(40);
 
         // Save user to database
         const user = await saveUserToDatabase(authResponse);
+        console.log('User saved, redirecting to dashboard...');
         
-        setStatus('Fetching your activities...');
-        setProgress(60);
-
-        // Fetch and save activities
-        const activities = await fetchStravaActivities(authResponse.access_token);
-        const runningActivities = activities.filter(activity => activity.type === 'Run');
-        
-        setStatus(`Processing ${runningActivities.length} running activities...`);
-        setProgress(80);
-
-        // Process activities and fetch weather data
-        for (let i = 0; i < runningActivities.length; i++) {
-          const activity = runningActivities[i];
-          
-          // Save activity to database
-          const savedActivity = await saveActivityToDatabase(activity, user.id);
-          
-          // Fetch weather data if location is available
-          if (activity.start_latlng && activity.start_latlng.length === 2) {
-            try {
-              const weatherData = await fetchWeatherData(
-                activity.start_latlng[0],
-                activity.start_latlng[1],
-                activity.start_date
-              );
-              await saveWeatherToDatabase(weatherData.data, savedActivity.id);
-            } catch (weatherError) {
-              console.warn(`Failed to fetch weather for activity ${activity.id}:`, weatherError);
-            }
-          }
-          
-          // Update progress
-          const activityProgress = (i + 1) / runningActivities.length * 20;
-          setProgress(80 + activityProgress);
-        }
-
         setStatus('Complete! Redirecting...');
         setProgress(100);
 
-        // Redirect to dashboard
-        onLoginSuccess(user);
+        // For now, just redirect to dashboard without fetching activities
+        // We'll add activity fetching once basic auth is working
+        setTimeout(() => {
+          onLoginSuccess(user);
+        }, 1000);
         
       } catch (error) {
         console.error('Callback error:', error);
-        setStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        setError(errorMessage);
+        setStatus(`Error: ${errorMessage}`);
       }
     };
 
     handleCallback();
   }, [onLoginSuccess]);
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 max-w-md w-full mx-4">
+          <div className="text-center">
+            <div className="bg-red-100 p-4 rounded-full w-16 h-16 mx-auto mb-6">
+              <Activity className="w-8 h-8 text-red-600" />
+            </div>
+            
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Authentication Failed</h2>
+            <p className="text-red-600 mb-6">{error}</p>
+            
+            <button
+              onClick={() => window.location.href = '/'}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50 flex items-center justify-center">
