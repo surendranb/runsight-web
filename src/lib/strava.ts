@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { StravaAuthResponse, Activity } from '../types';
+import { fetchWeatherData, saveWeatherToDatabase } from '../lib/weather';
 
 const STRAVA_CLIENT_ID = import.meta.env.VITE_STRAVA_CLIENT_ID;
 const STRAVA_CLIENT_SECRET = import.meta.env.VITE_STRAVA_CLIENT_SECRET;
@@ -272,5 +273,21 @@ export const saveActivityToDatabase = async (activity: any, userId: string) => {
     console.error('Activity save error:', error);
     throw error;
   }
+
+  // Fetch and save weather data
+  if (data && data.start_latlng && data.start_latlng.length === 2 && data.start_date_local) {
+    try {
+      console.log(`Fetching weather for activity ${data.id} at ${data.start_latlng} on ${data.start_date_local}`);
+      const weatherDataResult = await fetchWeatherData(data.start_latlng[0], data.start_latlng[1], data.start_date_local);
+      if (weatherDataResult && weatherDataResult.data) {
+        console.log(`Saving weather for activity ${data.id}`);
+        await saveWeatherToDatabase(weatherDataResult.data, data.id);
+      }
+    } catch (weatherError) {
+      console.error('Failed to fetch or save weather data:', weatherError);
+      // Do not re-throw, allow activity saving to succeed
+    }
+  }
+
   return data;
 };
