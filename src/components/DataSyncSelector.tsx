@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, Database, Activity, Zap } from 'lucide-react';
+import { saveActivityToDatabase } from '../lib/strava';
+import { saveWeatherToDatabase } from '../lib/weather';
 
 interface DataSyncSelectorProps {
   accessToken: string;
   userId: string;
   onSyncComplete: (data: any) => void;
   onSkip: () => void;
+  isFirstRun?: boolean;
 }
 
 interface SyncOption {
@@ -70,7 +73,8 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
   accessToken, 
   userId, 
   onSyncComplete, 
-  onSkip 
+  onSkip,
+  isFirstRun = true
 }) => {
   const [selectedOption, setSelectedOption] = useState<string>('month');
   const [isLoading, setIsLoading] = useState(false);
@@ -154,91 +158,58 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
       setStatus(`Processing ${runningActivities.length} running activities...`);
       setProgress(50);
 
-      // Process activities with weather data
+      // Process and save activities with weather data
       const processedActivities = [];
       const weatherData = [];
+      let savedCount = 0;
 
       for (let i = 0; i < runningActivities.length; i++) {
         const activity = runningActivities[i];
         
-        setStatus(`Processing activity ${i + 1}/${runningActivities.length}: ${activity.name}`);
+        setStatus(`Saving activity ${i + 1}/${runningActivities.length}: ${activity.name}`);
         setProgress(50 + ((i / runningActivities.length) * 40));
 
-        // Process activity data
-        const processedActivity = {
-          strava_id: activity.id,
-          user_id: userId,
-          name: activity.name,
-          distance: activity.distance,
-          moving_time: activity.moving_time,
-          elapsed_time: activity.elapsed_time,
-          total_elevation_gain: activity.total_elevation_gain,
-          type: activity.type,
-          start_date: activity.start_date,
-          start_date_local: activity.start_date_local,
-          timezone: activity.timezone,
-          utc_offset: activity.utc_offset,
-          start_latlng: activity.start_latlng,
-          end_latlng: activity.end_latlng,
-          location_city: activity.location_city,
-          location_state: activity.location_state,
-          location_country: activity.location_country,
-          achievement_count: activity.achievement_count,
-          kudos_count: activity.kudos_count,
-          comment_count: activity.comment_count,
-          athlete_count: activity.athlete_count,
-          photo_count: activity.photo_count,
-          average_speed: activity.average_speed,
-          max_speed: activity.max_speed,
-          average_heartrate: activity.average_heartrate,
-          max_heartrate: activity.max_heartrate,
-          suffer_score: activity.suffer_score,
-        };
+        try {
+          // Save activity to database
+          const savedActivity = await saveActivityToDatabase(activity, userId);
+          processedActivities.push(savedActivity);
+          savedCount++;
 
-        processedActivities.push(processedActivity);
+          // Fetch and save weather data if coordinates available
+          if (activity.start_latlng && activity.start_latlng.length === 2) {
+            try {
+              const [lat, lon] = activity.start_latlng;
+              const activityDate = new Date(activity.start_date);
+              const weatherTimestamp = Math.floor(activityDate.getTime() / 1000);
 
-        // Fetch weather data if coordinates available
-        if (activity.start_latlng && activity.start_latlng.length === 2) {
-          try {
-            const [lat, lon] = activity.start_latlng;
-            const activityDate = new Date(activity.start_date);
-            const weatherTimestamp = Math.floor(activityDate.getTime() / 1000);
+              const weatherResponse = await fetch(
+                `https://api.openweathermap.org/data/3.0/onecall/timemachine?lat=${lat}&lon=${lon}&dt=${weatherTimestamp}&appid=${import.meta.env.VITE_OPENWEATHER_API_KEY}&units=metric`
+              );
 
-            const weatherResponse = await fetch(
-              `https://api.openweathermap.org/data/3.0/onecall/timemachine?lat=${lat}&lon=${lon}&dt=${weatherTimestamp}&appid=${import.meta.env.VITE_OPENWEATHER_API_KEY}&units=metric`
-            );
+              if (weatherResponse.ok) {
+                const weatherApiData = await weatherResponse.json();
+                const weather = weatherApiData.data[0];
 
-            if (weatherResponse.ok) {
-              const weatherApiData = await weatherResponse.json();
-              const weather = weatherApiData.data[0];
-
-              weatherData.push({
-                activity_strava_id: activity.id,
-                temperature: weather.temp,
-                feels_like: weather.feels_like,
-                humidity: weather.humidity,
-                pressure: weather.pressure,
-                visibility: weather.visibility,
-                wind_speed: weather.wind_speed,
-                wind_deg: weather.wind_deg,
-                weather_main: weather.weather[0].main,
-                weather_description: weather.weather[0].description,
-                weather_icon: weather.weather[0].icon,
-                clouds: weather.clouds,
-              });
+                // Save weather to database
+                const savedWeather = await saveWeatherToDatabase(weather, savedActivity.id);
+                weatherData.push(savedWeather);
+              }
+            } catch (weatherError) {
+              console.warn('Failed to fetch/save weather for activity:', activity.id, weatherError);
             }
-          } catch (weatherError) {
-            console.warn('Failed to fetch weather for activity:', activity.id, weatherError);
           }
+        } catch (activityError) {
+          console.error('Failed to save activity:', activity.id, activityError);
+          // Continue with other activities
         }
 
         // Small delay to avoid rate limiting
-        if (i % 10 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+        if (i % 5 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
 
-      setStatus('Sync complete!');
+      setStatus(`Sync complete! Saved ${savedCount} activities to database.`);
       setProgress(100);
 
       const syncResult = {
@@ -250,6 +221,7 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
         summary: {
           totalActivities: allActivities.length,
           runningActivities: runningActivities.length,
+          savedActivities: savedCount,
           activitiesWithWeather: weatherData.length,
           activitiesWithCoordinates: runningActivities.filter(a => a.start_latlng).length,
           activitiesWithHeartRate: runningActivities.filter(a => a.average_heartrate).length,
@@ -260,11 +232,6 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
       };
 
       setSyncData(syncResult);
-      
-      // Store in localStorage for now (until RLS is fixed)
-      localStorage.setItem('runsight_activities', JSON.stringify(processedActivities));
-      localStorage.setItem('runsight_weather', JSON.stringify(weatherData));
-      localStorage.setItem('runsight_sync_summary', JSON.stringify(syncResult.summary));
 
       setTimeout(() => {
         onSyncComplete(syncResult);
@@ -320,9 +287,9 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Sync Complete!</h2>
             
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 text-left">
-              <h3 className="font-semibold text-green-800 mb-2">📊 Import Summary</h3>
+              <h3 className="font-semibold text-green-800 mb-2">📊 Database Import Summary</h3>
               <div className="space-y-1 text-sm text-green-700">
-                <div>✅ {syncData.summary.runningActivities} running activities</div>
+                <div>💾 {syncData.summary.savedActivities} activities saved to database</div>
                 <div>🌤️ {syncData.summary.activitiesWithWeather} with weather data</div>
                 <div>📍 {syncData.summary.activitiesWithCoordinates} with GPS coordinates</div>
                 <div>❤️ {syncData.summary.activitiesWithHeartRate} with heart rate data</div>
@@ -346,9 +313,14 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50 p-6">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">📊 Choose Your Data Sync Range</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            {isFirstRun ? '🎉 Welcome to RunSight!' : '🔄 Sync New Activities'}
+          </h1>
           <p className="text-gray-600 mb-6">
-            Select how much of your running history you'd like to import and analyze.
+            {isFirstRun 
+              ? 'Select how much of your running history you\'d like to import and analyze.'
+              : 'Choose how far back to check for new activities since your last sync.'
+            }
           </p>
         </div>
 
