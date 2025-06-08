@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Welcome } from './components/Welcome';
 import { Dashboard } from './components/Dashboard';
 import { StravaCallback } from './components/StravaCallback';
+import { EnvDebug } from './components/EnvDebug';
 import { useAuth } from './hooks/useAuth';
 
 function App() {
@@ -33,10 +34,20 @@ function App() {
   }
 
   if (user) {
-    return <Dashboard user={user} onLogout={logout} />;
+    return (
+      <>
+        <Dashboard user={user} onLogout={logout} />
+        <EnvDebug />
+      </>
+    );
   }
 
-  return <Welcome />;
+  return (
+    <>
+      <Welcome />
+      <EnvDebug />
+    </>
+  );
 }
 
 export default App;
