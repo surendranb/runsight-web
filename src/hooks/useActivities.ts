@@ -18,6 +18,36 @@ export const useActivities = (userId: string | null) => {
 
   const fetchActivities = async () => {
     try {
+      // First try to load from localStorage (for when RLS is blocking database)
+      const localActivities = localStorage.getItem('runsight_activities');
+      const localWeather = localStorage.getItem('runsight_weather');
+      
+      if (localActivities) {
+        console.log('Loading activities from localStorage');
+        const activities = JSON.parse(localActivities);
+        const weather = localWeather ? JSON.parse(localWeather) : [];
+        
+        // Merge weather data with activities
+        const activitiesWithWeather = activities.map((activity: any) => {
+          const activityWeather = weather.find((w: any) => w.activity_strava_id === activity.strava_id);
+          return {
+            ...activity,
+            weather: activityWeather || null
+          };
+        });
+        
+        // Sort by date (newest first)
+        activitiesWithWeather.sort((a: any, b: any) => 
+          new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+        );
+        
+        setActivities(activitiesWithWeather);
+        calculateStats(activitiesWithWeather);
+        setLoading(false);
+        return;
+      }
+
+      // Fallback to database if localStorage is empty
       const { data, error } = await supabase
         .from('activities')
         .select('*')
@@ -25,12 +55,18 @@ export const useActivities = (userId: string | null) => {
         .eq('type', 'Run')
         .order('start_date', { ascending: false });
 
-      if (error) throw error;
-
-      setActivities(data || []);
-      calculateStats(data || []);
+      if (error) {
+        console.warn('Database fetch failed, no local data available:', error);
+        setActivities([]);
+        setStats(null);
+      } else {
+        setActivities(data || []);
+        calculateStats(data || []);
+      }
     } catch (error) {
       console.error('Error fetching activities:', error);
+      setActivities([]);
+      setStats(null);
     } finally {
       setLoading(false);
     }

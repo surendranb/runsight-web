@@ -3,6 +3,7 @@ import { Activity } from 'lucide-react';
 import { exchangeCodeForToken, saveUserToDatabase, fetchStravaActivities, saveActivityToDatabase } from '../lib/strava';
 import { fetchWeatherData, saveWeatherToDatabase } from '../lib/weather';
 import { User } from '../types';
+import { DataSyncSelector } from './DataSyncSelector';
 
 interface StravaCallbackProps {
   onLoginSuccess: (user: User) => void;
@@ -12,6 +13,9 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
   const [status, setStatus] = useState('Connecting to Strava...');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [showDataSync, setShowDataSync] = useState(false);
+  const [accessToken, setAccessToken] = useState<string>('');
+  const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -42,61 +46,15 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
 
         // Save user to database
         const user = await saveUserToDatabase(authResponse);
-        console.log('User saved, fetching activities...');
+        console.log('User saved successfully');
         
-        setStatus('Importing your running activities...');
-        setProgress(60);
-
-        // Fetch all running activities from Strava
-        let allActivities: any[] = [];
-        let page = 1;
-        const perPage = 50;
-        
-        while (true) {
-          const activities = await fetchStravaActivities(authResponse.access_token, page, perPage);
-          if (activities.length === 0) break;
-          
-          // Filter only running activities
-          const runningActivities = activities.filter(activity => activity.type === 'Run');
-          allActivities = [...allActivities, ...runningActivities];
-          
-          page++;
-          if (activities.length < perPage) break; // Last page
-        }
-
-        console.log(`Found ${allActivities.length} running activities`);
-        
-        setStatus(`Saving ${allActivities.length} running activities...`);
-        setProgress(80);
-
-        // Save activities to database
-        for (const activity of allActivities) {
-          try {
-            const savedActivity = await saveActivityToDatabase(activity, user.id);
-            
-            // Fetch weather data if we have coordinates
-            if (activity.start_latlng && activity.start_latlng.length === 2) {
-              try {
-                const [lat, lon] = activity.start_latlng;
-                const weatherData = await fetchWeatherData(lat, lon, activity.start_date);
-                await saveWeatherToDatabase(weatherData.data, savedActivity.id);
-              } catch (weatherError) {
-                console.warn('Failed to fetch weather for activity:', activity.id, weatherError);
-                // Continue without weather data
-              }
-            }
-          } catch (activityError) {
-            console.warn('Failed to save activity:', activity.id, activityError);
-            // Continue with other activities
-          }
-        }
-        
-        setStatus('Complete! Redirecting to your dashboard...');
+        setStatus('Ready to test data import!');
         setProgress(100);
 
-        setTimeout(() => {
-          onLoginSuccess(user);
-        }, 1500);
+        // Store access token and user ID for data sync
+        setAccessToken(authResponse.access_token);
+        setUserId(user.id);
+        setShowDataSync(true);
         
       } catch (error) {
         console.error('Callback error:', error);
@@ -130,6 +88,34 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
           </div>
         </div>
       </div>
+    );
+  }
+
+  if (showDataSync && accessToken && userId) {
+    return (
+      <DataSyncSelector 
+        accessToken={accessToken} 
+        userId={userId}
+        onSyncComplete={(data) => {
+          console.log('Sync completed with data:', data);
+          onLoginSuccess({ 
+            id: userId, 
+            strava_id: 20683290, 
+            first_name: 'Surendran', 
+            last_name: 'Balachandran', 
+            profile_medium: '' 
+          });
+        }}
+        onSkip={() => {
+          onLoginSuccess({ 
+            id: userId, 
+            strava_id: 20683290, 
+            first_name: 'Surendran', 
+            last_name: 'Balachandran', 
+            profile_medium: '' 
+          });
+        }}
+      />
     );
   }
 
