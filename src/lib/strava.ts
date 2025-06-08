@@ -178,6 +178,36 @@ export const saveUserToDatabase = async (authResponse: StravaAuthResponse) => {
   return userData;
 };
 
+export const getExistingActivitiesDateRange = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('activities')
+      .select('start_date')
+      .eq('user_id', userId)
+      .eq('type', 'Run')
+      .order('start_date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching existing activities:', error);
+      return { earliest: null, latest: null, count: 0 };
+    }
+
+    if (!data || data.length === 0) {
+      return { earliest: null, latest: null, count: 0 };
+    }
+
+    const dates = data.map(a => new Date(a.start_date));
+    return {
+      earliest: new Date(Math.min(...dates.map(d => d.getTime()))),
+      latest: new Date(Math.max(...dates.map(d => d.getTime()))),
+      count: data.length
+    };
+  } catch (error) {
+    console.error('Error checking existing activities:', error);
+    return { earliest: null, latest: null, count: 0 };
+  }
+};
+
 export const saveActivityToDatabase = async (activity: any, userId: string) => {
   // Skip database save if using temporary user (RLS issue)
   if (userId.startsWith('temp_')) {
