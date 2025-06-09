@@ -46,13 +46,21 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
         // Check if this code has already been processed
         const processedCode = sessionStorage.getItem('processed_oauth_code');
         if (processedCode === code) {
-          console.log('OAuth code already processed, redirecting to dashboard...');
-          // If we have user data, go to dashboard
+          // If we have user data, trigger login success which should lead to a redirect.
           const userData = sessionStorage.getItem('runsight_user');
           if (userData) {
             onLoginSuccess(JSON.parse(userData));
+            // setIsProcessing(false) will be called in the finally block.
+            // It's important that onLoginSuccess is called to navigate away.
+            // If the component somehow still attempts to process, the top-level
+            // isProcessing check should prevent re-entry into the main logic.
+            return;
           }
-          setIsProcessing(false);
+          // If there's no user data, something is unexpected.
+          // Allow processing to continue (or error out) rather than getting stuck.
+          // However, the original code would have also returned here after setIsProcessing(false).
+          // For safety and to maintain similar behavior for this edge case:
+          setIsProcessing(false); // Or rely on the finally block, but being explicit here for this path.
           return;
         }
 
@@ -73,20 +81,26 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
         setStatus('Checking existing data...');
         setProgress(80);
 
-        // Check if user has existing activities (to determine first run vs. subsequent run)
-        const { data: existingActivities, error: activitiesError } = await supabase
-          .from('activities')
-          .select('id')
-          .eq('user_id', user.id)
-          .limit(1);
+        // Check if user has existing enriched runs (to determine first run vs. subsequent run)
+        const { count, error: countError } = await supabase
+          .from('enriched_runs')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
 
-        const hasExistingData = !activitiesError && existingActivities && existingActivities.length > 0;
-        setIsFirstRun(!hasExistingData);
-
-        if (hasExistingData) {
-          setStatus('Welcome back! Ready to sync new activities.');
+        if (countError) {
+          console.error("Error counting existing enriched_runs:", countError);
+          // Default to isFirstRun = true on error to allow user to proceed with sync options,
+          // as DataSyncSelector's duplicate check will prevent reprocessing existing runs.
+          setIsFirstRun(true);
+          setStatus('Error checking existing data. Proceeding as if first run.');
         } else {
-          setStatus('Welcome! Ready to import your running history.');
+          const newIsFirstRun = count === 0;
+          setIsFirstRun(newIsFirstRun);
+          if (!newIsFirstRun) {
+            setStatus('Welcome back! Ready to sync new activities.');
+          } else {
+            setStatus('Welcome! Ready to import your running history.');
+          }
         }
         setProgress(100);
 

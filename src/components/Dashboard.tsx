@@ -1,13 +1,28 @@
-import React from 'react';
-import { User, Activity } from 'lucide-react';
-import { supabase } from '../lib/supabase'; // Adjusted path
-// import { fetchWeatherData, saveWeatherToDatabase } from '../lib/weather'; // Removed as per request
-import { StatCard } from './StatCard';
-import { ActivityList } from './ActivityList';
-import { ActivityChart } from './ActivityChart';
-import { useActivities } from '../hooks/useActivities';
+import React, { useState, useEffect } from 'react';
+import { Activity } from 'lucide-react'; // Kept for header
+import { supabase } from '../lib/supabase';
 import { User as UserType } from '../types';
-import { MapPin, Clock, Zap, TrendingUp, Heart, Mountain } from 'lucide-react';
+
+// Define interfaces for the new tables (assuming these might be moved to types/index.ts later)
+interface EnrichedRun {
+  id: string;
+  user_id: string;
+  name: string;
+  start_date: string;
+  distance: number;
+  moving_time: number;
+  // Add other relevant fields as necessary
+}
+
+interface RunSplit {
+  id: string;
+  run_id: string;
+  user_id: string; // Assuming user_id is available for direct querying
+  split_number: number;
+  distance: number;
+  elapsed_time: number;
+  // Add other relevant fields as necessary
+}
 
 interface DashboardProps {
   user: UserType;
@@ -15,35 +30,55 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
-  const { activities, stats, loading } = useActivities(user.id);
+  const [enrichedRuns, setEnrichedRuns] = useState<EnrichedRun[]>([]);
+  const [runSplits, setRunSplits] = useState<RunSplit[]>([]);
+  const [loadingData, setLoadingData] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // const handleTestWeatherBackfill = async () => { ... removed ... };
+  useEffect(() => {
+    if (!user?.id) return;
 
-  const formatDistance = (distance: number) => {
-    return (distance / 1000).toFixed(0) + ' km';
-  };
+    const fetchData = async () => {
+      setLoadingData(true);
+      setError(null);
+      try {
+        // Fetch enriched_runs
+        const { data: runsData, error: runsError } = await supabase
+          .from('enriched_runs')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('start_date', { ascending: false });
 
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    return hours + 'h';
-  };
+        if (runsError) {
+          console.error("Error fetching enriched_runs:", runsError);
+          throw new Error(`Failed to fetch enriched runs: ${runsError.message}`);
+        }
+        setEnrichedRuns(runsData || []);
 
-  const formatPace = (pace: number) => {
-    const minutes = Math.floor(pace);
-    const seconds = Math.floor((pace - minutes) * 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}/km`;
-  };
+        // Fetch run_splits
+        const { data: splitsData, error: splitsError } = await supabase
+          .from('run_splits')
+          .select('*')
+          .eq('user_id', user.id) // Assumes user_id exists on run_splits
+          .order('run_id', { ascending: true })
+          .order('split_number', { ascending: true });
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your running data...</p>
-        </div>
-      </div>
-    );
-  }
+        if (splitsError) {
+          console.error("Error fetching run_splits:", splitsError);
+          throw new Error(`Failed to fetch run splits: ${splitsError.message}`);
+        }
+        setRunSplits(splitsData || []);
+
+      } catch (err: any) {
+        console.error("Error fetching data:", err);
+        setError(err.message || 'An unknown error occurred while fetching data.');
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    fetchData();
+  }, [user?.id]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -58,11 +93,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
-                <img
-                  src={user.profile_medium}
-                  alt="Profile"
-                  className="w-8 h-8 rounded-full"
-                />
+                {user.profile_medium && (
+                  <img
+                    src={user.profile_medium}
+                    alt="Profile"
+                    className="w-8 h-8 rounded-full"
+                  />
+                )}
                 <span className="text-sm font-medium text-gray-700">
                   {user.first_name} {user.last_name}
                 </span>
@@ -80,108 +117,86 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {stats ? (
+        {loadingData && (
+          <div className="text-center py-10">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading your new running data...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6" role="alert">
+            <strong className="font-bold">Error:</strong>
+            <span className="block sm:inline"> {error}</span>
+          </div>
+        )}
+
+        {!loadingData && !error && (
           <>
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
-              <StatCard
-                title="Total Runs"
-                value={stats.totalRuns.toString()}
-                icon={Activity}
-                color="bg-gradient-to-br from-blue-500 to-blue-600"
-              />
-              <StatCard
-                title="Total Distance"
-                value={formatDistance(stats.totalDistance)}
-                icon={MapPin}
-                color="bg-gradient-to-br from-green-500 to-green-600"
-              />
-              <StatCard
-                title="Total Time"
-                value={formatTime(stats.totalTime)}
-                icon={Clock}
-                color="bg-gradient-to-br from-orange-500 to-orange-600"
-              />
-              <StatCard
-                title="Average Pace"
-                value={formatPace(stats.averagePace)}
-                icon={Zap}
-                color="bg-gradient-to-br from-purple-500 to-purple-600"
-              />
-              <StatCard
-                title="Total Elevation"
-                value={Math.round(stats.totalElevation) + 'm'}
-                icon={Mountain}
-                color="bg-gradient-to-br from-indigo-500 to-indigo-600"
-              />
-              {stats.averageHeartRate > 0 && (
-                <StatCard
-                  title="Avg Heart Rate"
-                  value={Math.round(stats.averageHeartRate) + ' bpm'}
-                  icon={Heart}
-                  color="bg-gradient-to-br from-red-500 to-red-600"
-                />
+            <div className="mb-8 p-6 bg-white rounded-2xl shadow-sm border border-gray-100">
+              <h2 className="text-2xl font-semibold text-gray-800 mb-4">Enriched Runs</h2>
+              {enrichedRuns.length === 0 ? (
+                <p className="text-gray-600">No enriched runs found for this user.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distance (m)</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Moving Time (s)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {enrichedRuns.map(run => (
+                        <tr key={run.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{run.name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(run.start_date).toLocaleDateString()}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{run.distance}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{run.moving_time}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
 
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              <ActivityChart activities={activities} />
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Insights</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl">
-                    <div>
-                      <p className="font-medium text-blue-900">Longest Run</p>
-                      <p className="text-sm text-blue-700">{formatDistance(stats.bestDistance)}</p>
-                    </div>
-                    <TrendingUp className="w-8 h-8 text-blue-600" />
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl">
-                    <div>
-                      <p className="font-medium text-green-900">Best Pace</p>
-                      <p className="text-sm text-green-700">{formatPace(stats.bestPace)}</p>
-                    </div>
-                    <Zap className="w-8 h-8 text-green-600" />
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-orange-50 rounded-xl">
-                    <div>
-                      <p className="font-medium text-orange-900">Longest Time</p>
-                      <p className="text-sm text-orange-700">{formatTime(stats.bestTime)}</p>
-                    </div>
-                    <Clock className="w-8 h-8 text-orange-600" />
-                  </div>
+            <div className="p-6 bg-white rounded-2xl shadow-sm border border-gray-100">
+              <h2 className="text-2xl font-semibold text-gray-800 mb-4">Run Splits</h2>
+              {runSplits.length === 0 ? (
+                <p className="text-gray-600">No run splits found for this user.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Run ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Split #</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distance (m)</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time (s)</th>
+                        {/* Add more headers if needed, e.g., Avg Speed, Avg Heartrate */}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {runSplits.map(split => (
+                        <tr key={split.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{split.run_id.substring(0,8)}...</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{split.split_number}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{split.distance}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{split.elapsed_time}</td>
+                          {/* Add more cells if needed */}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
+              )}
             </div>
-
-            {/* Activity List */}
-            <ActivityList activities={activities} />
           </>
-        ) : (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
-            <Activity className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No running data found</h3>
-            <p className="text-gray-600 mb-6">
-              We couldn't find any running activities in your Strava account. 
-              Start running and sync your activities to see beautiful analytics here!
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-            >
-              Refresh Data
-            </button>
-          </div>
         )}
       </main>
-      {/* Test button removed */}
-      {/* <button
-        onClick={handleTestWeatherBackfill}
-        style={{ padding: '10px', margin: '20px', backgroundColor: 'lightblue' }}
-      >
-        Test Single Weather Backfill for 748a221e-472e-45b5-b828-da722c59e9a2
-      </button> */}
     </div>
   );
 };
