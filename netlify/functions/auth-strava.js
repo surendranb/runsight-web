@@ -81,31 +81,51 @@ exports.handler = async (event, context) => {
 
       const tokenData = await tokenResponse.json();
 
-      // For now, create a simple user object without database storage
-      // This allows the OAuth flow to complete while we set up the database properly
+      // Get the Strava athlete ID
+      const strava_athlete_id = tokenData.athlete.id;
+
+      // Call Supabase RPC to get or generate user UUID
+      const { data: userId, error: rpcError } = await supabase.rpc('generate_strava_user_uuid', { strava_id: strava_athlete_id });
+
+      if (rpcError) {
+        console.error('Supabase RPC error:', rpcError);
+        throw new Error(`Failed to get user UUID from Supabase: ${rpcError.message}`);
+      }
+
+      if (!userId) {
+        console.error('Supabase RPC error: userId is null or undefined');
+        throw new Error('Failed to get user UUID from Supabase: RPC returned no data.');
+      }
+
+      // Create user object with the UUID from Supabase
       const user = {
-        id: `strava_${tokenData.athlete.id}`,
-        strava_id: tokenData.athlete.id,
+        id: userId, // Use the UUID from the RPC call
+        strava_id: strava_athlete_id,
         name: `${tokenData.athlete.firstname} ${tokenData.athlete.lastname}`,
-        email: `strava_${tokenData.athlete.id}@runsight.app`,
+        // Using a placeholder email format, can be updated if real email is available/needed
+        email: `user_${userId}@runsight.app`,
         strava_access_token: tokenData.access_token,
         strava_refresh_token: tokenData.refresh_token,
         strava_expires_at: tokenData.expires_at,
         athlete_data: tokenData.athlete
       };
 
+      // Note: For now, we are not storing the full user object or tokens in Supabase from this function.
+      // This function's primary role is to authenticate with Strava and return user identifiers.
+      // Subsequent API calls from the client will handle data storage/synchronization.
+
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           success: true,
-          user: {
+          user: { // Return a slimmed-down user object, primarily ID and basic info
             id: user.id,
             strava_id: user.strava_id,
             name: user.name,
-            email: user.email
+            email: user.email // Consider if email is needed by client immediately post-auth
           },
-          sessionUrl: null // Session handled client-side for now
+          sessionUrl: null // Session management (e.g., JWT) would typically happen here or be initiated by client
         })
       };
     }
