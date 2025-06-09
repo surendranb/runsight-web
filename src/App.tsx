@@ -4,88 +4,125 @@ import { Welcome } from './components/Welcome';
 import { SimpleStravaCallback } from './components/SimpleStravaCallback';
 import { SimpleDashboard } from './components/SimpleDashboard';
 import { InsightsPage } from './components/InsightsPage';
-import { NavigationBar } from './components/NavigationBar'; // Import NavigationBar
+import { NavigationBar } from './components/NavigationBar';
 import { useSimpleAuth } from './hooks/useSimpleAuth';
 import { supabase } from './lib/supabase';
 import { EnrichedRun, RunSplit, User } from './types';
 
-// Ensure this View type is comprehensive for App's logic and NavigationBar's needs
+console.log('DEBUG: App.tsx module evaluating');
+
 type View = 'dashboard' | 'insights' | 'welcome' | 'callback' | 'loading' | 'goals' | 'settings';
 
 function App() {
+  console.log('DEBUG: App() function component executing');
+
   const { user, loading: authLoading, login, logout } = useSimpleAuth();
+  console.log('DEBUG: App() - useSimpleAuth() hook results:', { user, authLoading });
+
   const [currentView, setCurrentView] = useState<View>('loading');
+  console.log('DEBUG: App() - useState currentView initial:', currentView);
 
   const [runs, setRuns] = useState<EnrichedRun[]>([]);
   const [splits, setSplits] = useState<RunSplit[]>([]);
   const [dataLoading, setDataLoading] = useState<boolean>(false);
   const [dataError, setDataError] = useState<string | null>(null);
+  console.log('DEBUG: App() - useState for data initial:', { runsLength: runs.length, splitsLength: splits.length, dataLoading, dataError });
 
-  // useEffect for view based on auth state (remains largely the same)
   useEffect(() => {
+    console.log('DEBUG: App() - useEffect [authLoading, user] executing. Current values:', { authLoading, userId: user?.id, currentView });
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const isCallbackRoute = (window.location.pathname === '/callback' || code);
+    console.log('DEBUG: App() - useEffect [authLoading, user] - URL params:', { path: window.location.pathname, code, isCallbackRoute });
 
+    let newView: View = currentView;
     if (authLoading) {
-      setCurrentView('loading');
+      newView = 'loading';
     } else if (isCallbackRoute && !user) {
-      setCurrentView('callback');
+      newView = 'callback';
     } else if (user) {
-      setCurrentView('dashboard');
+      newView = 'dashboard';
     } else {
-      setCurrentView('welcome');
+      newView = 'welcome';
     }
-  }, [authLoading, user]);
+    console.log('DEBUG: App() - useEffect [authLoading, user] - determined newView:', newView, 'Previous currentView was:', currentView);
+    if (newView !== currentView) {
+        setCurrentView(newView);
+        console.log('DEBUG: App() - useEffect [authLoading, user] - called setCurrentView with:', newView);
+    }
+  }, [authLoading, user]); // Removed currentView from dependency array as it's set here
 
-  // useEffect for data fetching (remains the same)
   useEffect(() => {
+    console.log('DEBUG: App() - useEffect [user, user?.id, currentView] for data fetching executing. Current values:', { userId: user?.id, currentView });
     if (user && (currentView === 'dashboard' || currentView === 'insights')) {
       const fetchData = async () => {
+        console.log('DEBUG: App() - fetchData() called for user:', user.id, 'and view:', currentView);
         if (!user.id) {
+          console.error('DEBUG: App() - fetchData() - User ID is missing, cannot fetch data.');
           setDataError("User ID is missing, cannot fetch data.");
           setDataLoading(false);
           return;
         }
         setDataLoading(true);
         setDataError(null);
+        console.log('DEBUG: App() - fetchData() - Set dataLoading=true, dataError=null');
         try {
+          console.log('DEBUG: App() - fetchData() - Attempting to fetch runs for user_id:', user.id);
           const { data: runsData, error: runsError } = await supabase
             .from('runs')
             .select('*')
             .eq('user_id', user.id)
             .order('start_date', { ascending: false });
-          if (runsError) throw runsError;
-          setRuns(runsData || []);
 
+          if (runsError) {
+            console.error('DEBUG: App() - fetchData() - Error fetching runs:', runsError);
+            throw runsError;
+          }
+          setRuns(runsData || []);
+          console.log('DEBUG: App() - fetchData() - Fetched runs. Count:', runsData?.length || 0);
+
+          console.log('DEBUG: App() - fetchData() - Attempting to fetch run_splits for user_id:', user.id);
           const { data: splitsData, error: splitsError } = await supabase
             .from('run_splits')
             .select('*')
             .eq('user_id', user.id)
             .order('enriched_run_id', { ascending: true })
             .order('split_number', { ascending: true });
-          if (splitsError) throw splitsError;
+
+          if (splitsError) {
+            console.error('DEBUG: App() - fetchData() - Error fetching run_splits:', splitsError);
+            throw splitsError; // Or handle more gracefully if splits are optional
+          }
           setSplits(splitsData || []);
+          console.log('DEBUG: App() - fetchData() - Fetched run_splits. Count:', splitsData?.length || 0);
+
         } catch (err: any) {
-          console.error("Error fetching data in App.tsx:", err);
+          console.error('DEBUG: App() - fetchData() - Catch block error:', err);
           const message = err.message || 'Failed to load activity data.';
           setDataError(`Error: ${message}. Check if RLS policies on 'runs' and 'run_splits' tables are correct and if the user ID matches.`);
           setRuns([]);
           setSplits([]);
         } finally {
           setDataLoading(false);
+          console.log('DEBUG: App() - fetchData() - Finally block. Set dataLoading=false.');
         }
       };
       fetchData();
     } else if (!user && (currentView === 'dashboard' || currentView === 'insights')) {
+      console.log('DEBUG: App() - useEffect [user, user?.id, currentView] - No user, but view is dashboard/insights. Resetting.');
       setRuns([]);
       setSplits([]);
       setCurrentView('welcome');
+    } else {
+      console.log('DEBUG: App() - useEffect [user, user?.id, currentView] - Conditions for data fetch not met (user not present or view is not dashboard/insights).', { userExists: !!user, currentView });
     }
   }, [user, user?.id, currentView]);
 
-  // Loading view
+
+  console.log('DEBUG: App() - Before rendering. Current state:', { currentView, authLoading, userId: user?.id, dataLoading, dataError, runsCount: runs.length });
+
   if (currentView === 'loading' || authLoading) {
+    console.log('DEBUG: App() - Rendering Loading View');
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -94,44 +131,35 @@ function App() {
     );
   }
 
-  // Callback view for Strava authentication
   if (currentView === 'callback') {
+    console.log('DEBUG: App() - Rendering Strava Callback View');
     return <SimpleStravaCallback onSuccess={login} />;
   }
 
-  // Welcome view for logged-out users
   if (currentView === 'welcome' || !user) {
+    console.log('DEBUG: App() - Rendering Welcome View (user may be null here)');
     return <Welcome />;
   }
 
-  // --- User is authenticated beyond this point ---
-
-  // Function to handle logout, ensuring view is reset
   const handleLogout = () => {
-    logout(); // From useSimpleAuth
+    console.log('DEBUG: App() - handleLogout called');
+    logout();
     setRuns([]);
     setSplits([]);
     setCurrentView('welcome');
   };
 
-  // Render main application structure for logged-in users
+  console.log('DEBUG: App() - Rendering Authenticated Views Area. CurrentView:', currentView);
   return (
     <div className="min-h-screen bg-gray-100">
       <NavigationBar
         currentView={currentView}
-        onNavigate={(viewName) => setCurrentView(viewName as View)}
+        onNavigate={(viewName) => {
+          console.log('DEBUG: App() - NavigationBar onNavigate called with viewName:', viewName);
+          setCurrentView(viewName as View);
+        }}
       />
-      {/*
-        The NavigationBar now also includes the app title "RunSight".
-        The user info and logout button are not part of NavigationBar.tsx yet.
-        For now, let's keep the logout button accessible. We can integrate it better later.
-        A temporary logout button can be added here or we modify SimpleDashboard/InsightsPage
-        to no longer show their own headers if NavigationBar is present.
-        Let's assume for now the old headers in SimpleDashboard/InsightsPage will be removed in the next step.
-        We might need a user display and logout button in the NavigationBar itself or as a separate UserMenu component.
-        For this step, the primary goal is integrating the main navigation links.
-      */}
-      <div className="absolute top-4 right-4 z-50"> {/* Temporary placement for logout */}
+      <div className="absolute top-4 right-4 z-50">
         {user && (
             <button
                 onClick={handleLogout}
@@ -143,35 +171,47 @@ function App() {
       </div>
 
       {currentView === 'dashboard' && (
-        <SimpleDashboard
-          user={user}
-          onLogout={handleLogout} // Prop still needed if dashboard has its own logout
-          runs={runs}
-          splits={splits}
-          isLoading={dataLoading}
-          error={dataError}
-          // onNavigateToInsights prop will be removed in the next step
-          onNavigateToInsights={() => setCurrentView('insights')}
-        />
+        <>
+          {console.log('DEBUG: App() - Rendering SimpleDashboard. Props:', { userId: user?.id, runsCount: runs.length, splitsCount: splits.length, dataLoading, dataError })}
+          <SimpleDashboard
+            user={user}
+            onLogout={handleLogout}
+            runs={runs}
+            splits={splits}
+            isLoading={dataLoading}
+            error={dataError}
+            onNavigateToInsights={() => { // This prop is still here from previous version, will be removed in cleanup
+                console.log('DEBUG: App() - SimpleDashboard onNavigateToInsights (old prop) called');
+                setCurrentView('insights');
+            }}
+          />
+        </>
       )}
       {currentView === 'insights' && (
-        <InsightsPage
-          user={user}
-          runs={runs}
-          isLoading={dataLoading}
-          error={dataError}
-          // onNavigateToDashboard prop will be removed in the next step
-          onNavigateToDashboard={() => setCurrentView('dashboard')}
-        />
+        <>
+          {console.log('DEBUG: App() - Rendering InsightsPage. Props:', { userId: user?.id, runsCount: runs.length, dataLoading, dataError })}
+          <InsightsPage
+            user={user}
+            runs={runs}
+            isLoading={dataLoading}
+            error={dataError}
+            onNavigateToDashboard={() => { // This prop is still here, will be removed
+                console.log('DEBUG: App() - InsightsPage onNavigateToDashboard (old prop) called');
+                setCurrentView('dashboard');
+            }}
+          />
+        </>
       )}
-      {/* Placeholder for future views like 'goals' or 'settings' if they have full pages */}
       {(currentView === 'goals' || currentView === 'settings') && (
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="bg-white shadow rounded-lg p-12 text-center">
-                <h2 className="text-2xl font-semibold text-gray-700">Coming Soon!</h2>
-                <p className="text-gray-500 mt-2">The '{currentView}' section is under construction.</p>
-            </div>
-        </main>
+        <>
+          {console.log('DEBUG: App() - Rendering Placeholder View for:', currentView)}
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <div className="bg-white shadow rounded-lg p-12 text-center">
+                  <h2 className="text-2xl font-semibold text-gray-700">Coming Soon!</h2>
+                  <p className="text-gray-500 mt-2">The '{currentView}' section is under construction.</p>
+              </div>
+          </main>
+        </>
       )}
     </div>
   );
