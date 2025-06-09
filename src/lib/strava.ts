@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { StravaAuthResponse, Activity, StravaDetailedActivity } from '../types';
 // fetchWeatherData and saveWeatherToDatabase are no longer directly used here.
 // import { fetchWeatherData, saveWeatherToDatabase } from '../lib/weather';
-import { processAndSaveActivity } from './activityProcessor';
+// import { processAndSaveActivity } from './activityProcessor'; // No longer needed as saveActivityToDatabase is removed
 
 const STRAVA_CLIENT_ID = import.meta.env.VITE_STRAVA_CLIENT_ID;
 const STRAVA_CLIENT_SECRET = import.meta.env.VITE_STRAVA_CLIENT_SECRET;
@@ -71,26 +71,37 @@ export const refreshStravaToken = async (refreshToken: string): Promise<StravaAu
   return response.json();
 };
 
-export const fetchStravaActivities = async (accessToken: string, page = 1, perPage = 50): Promise<any[]> => {
-  console.log('Fetching activities with token:', accessToken.substring(0, 10) + '...');
+export const fetchStravaActivities = async (accessToken: string, page: number = 1, perPage: number = 30, after?: number): Promise<any[]> => {
+  let url = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`;
+  if (after) {
+    url += `&after=${after}`;
+  }
   
-  const response = await fetch(
-    `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
+  console.log(`Fetching Strava activities with token (first 10 chars): ${accessToken.substring(0, 10)}..., page: ${page}, perPage: ${perPage}${after ? ', after: ' + after : ''}`);
+  console.log(`Requesting URL: ${url}`);
 
-  const responseText = await response.text();
-  console.log('Activities response:', response.status, responseText);
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  const responseText = await response.text(); // Read text for better error logging if JSON parse fails
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch activities: ${response.status} ${responseText}`);
+    console.error(`Failed to fetch Strava activities: ${response.status} ${response.statusText}. Response: ${responseText.substring(0, 500)}`);
+    throw new Error(`Failed to fetch Strava activities: ${response.status} ${response.statusText}. Response: ${responseText.substring(0, 500)}`);
   }
 
-  return JSON.parse(responseText);
+  try {
+    const data = JSON.parse(responseText);
+    console.log(`Successfully fetched ${data.length} activities.`);
+    return data;
+  } catch (error) {
+    console.error('Failed to parse Strava activities response as JSON:', error);
+    console.error('Response text (first 500 chars):', responseText.substring(0,500));
+    throw new Error('Failed to parse Strava activities response as JSON.');
+  }
 };
 
 export const saveUserToDatabase = async (authResponse: StravaAuthResponse) => {
@@ -211,73 +222,7 @@ export const getExistingActivitiesDateRange = async (userId: string) => {
   }
 };
 
-/**
- * @deprecated This function is being refactored to use the new activity processing pipeline.
- * Its direct usage for saving to the old 'activities' table is being phased out.
- * The caller should ideally be updated to call processAndSaveActivity directly
- * and manage Strava access token retrieval.
- */
-export const saveActivityToDatabase = async (activity: any, userId: string, stravaAccessToken: string): Promise<any> => {
-  console.log(`[saveActivityToDatabase - DEPRECATEDISH] Received call for activity ${activity.id}, user ${userId}. Redirecting to processAndSaveActivity.`);
-
-  if (!stravaAccessToken) {
-    console.error(`[saveActivityToDatabase] CRITICAL: stravaAccessToken was not provided.`);
-    return { id: `temp_token_error_${activity.id}`, error: "Strava Access Token was not provided to saveActivityToDatabase." };
-  }
-
-  if (!activity || !activity.id) {
-    console.error('[saveActivityToDatabase] Invalid activity object received.');
-    return { error: "Invalid activity object." };
-  }
-
-  // The old logic for temp_user check and direct supabase.upsert to 'activities' table is now commented out.
-  // if (userId.startsWith('temp_')) {
-  //   console.warn('Skipping activity save for temporary user due to RLS policy');
-  //   // ... old return for temp user
-  // }
-  // const { data, error } = await supabase.from('activities').upsert({ ... }); // Old logic
-  // ... old weather fetching logic ...
-
-  try {
-    const result = await processAndSaveActivity(
-      activity.id, // Strava Activity ID (number)
-      userId,      // Internal User ID (UUID)
-      stravaAccessToken
-    );
-
-    if (result.error) {
-      console.error(`[saveActivityToDatabase] Error processing activity ${activity.id} via new pipeline:`, result.error);
-      // Adapt error structure if needed to be compatible with callers
-      return {
-        id: `temp_error_${activity.id}`, // Keep a similar structure for ID if possible
-        strava_id: activity.id,
-        error: result.error.message || result.error
-      };
-    }
-
-    console.log(`[saveActivityToDatabase] Activity ${activity.id} processed via new pipeline. Enriched Run ID: ${result.enrichedRunId}`);
-    // Return a compatible success response, perhaps the new enrichedRunId or a status
-    // The old function returned the saved activity object from the 'activities' table.
-    // The new function returns the enrichedRunId. We need to adapt.
-    return {
-      id: result.enrichedRunId, // This is the new UUID from enriched_runs
-      strava_id: activity.id,
-      name: activity.name, // Include some basic fields for compatibility if needed by UI
-      // distance: activity.distance, // etc.
-      processed_via_new_pipeline: true,
-      // Note: This response structure is different from the original one.
-      // Callers might need adjustment if they relied on the full old activity structure.
-    };
-
-  } catch (e: any) {
-    console.error(`[saveActivityToDatabase] Unexpected error when calling processAndSaveActivity for ${activity.id}:`, e);
-    return {
-      id: `temp_unexpected_error_${activity.id}`,
-      strava_id: activity.id,
-      error: e.message || String(e)
-    };
-  }
-};
+// Removed saveActivityToDatabase function as it's superseded by direct calls to processAndSaveActivity
 
 export const fetchDetailedStravaActivity = async (activityId: string, accessToken: string): Promise<StravaDetailedActivity> => {
   console.log(`Fetching detailed Strava activity ${activityId}...`);
