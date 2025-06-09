@@ -18,20 +18,20 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Server-side environment variables (secure)
-    const STRAVA_CLIENT_ID = process.env.STRAVA_CLIENT_ID;
-    const STRAVA_CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET;
-    const STRAVA_REDIRECT_URI = process.env.STRAVA_REDIRECT_URI;
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY; // Service key, not anon key!
+    // Use existing VITE_ environment variables (they're available server-side too)
+    const STRAVA_CLIENT_ID = process.env.VITE_STRAVA_CLIENT_ID;
+    const STRAVA_CLIENT_SECRET = process.env.VITE_STRAVA_CLIENT_SECRET;
+    const STRAVA_REDIRECT_URI = process.env.VITE_STRAVA_REDIRECT_URI || 'https://resonant-pony-ea7953.netlify.app/auth/callback';
+    const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+    const SUPABASE_SERVICE_KEY = process.env.VITE_SUPABASE_ANON_KEY; // Using anon key for now
 
     // Check for missing environment variables with detailed error
     const missingVars = [];
-    if (!STRAVA_CLIENT_ID) missingVars.push('STRAVA_CLIENT_ID');
-    if (!STRAVA_CLIENT_SECRET) missingVars.push('STRAVA_CLIENT_SECRET');
-    if (!STRAVA_REDIRECT_URI) missingVars.push('STRAVA_REDIRECT_URI');
-    if (!SUPABASE_URL) missingVars.push('SUPABASE_URL');
-    if (!SUPABASE_SERVICE_KEY) missingVars.push('SUPABASE_SERVICE_KEY');
+    if (!STRAVA_CLIENT_ID) missingVars.push('VITE_STRAVA_CLIENT_ID');
+    if (!STRAVA_CLIENT_SECRET) missingVars.push('VITE_STRAVA_CLIENT_SECRET');
+    if (!STRAVA_REDIRECT_URI) missingVars.push('VITE_STRAVA_REDIRECT_URI');
+    if (!SUPABASE_URL) missingVars.push('VITE_SUPABASE_URL');
+    if (!SUPABASE_SERVICE_KEY) missingVars.push('VITE_SUPABASE_ANON_KEY');
 
     if (missingVars.length > 0) {
       throw new Error(`Missing required environment variables: ${missingVars.join(', ')}. Please set these in Netlify dashboard and redeploy.`);
