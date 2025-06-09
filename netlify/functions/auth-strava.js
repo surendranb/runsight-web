@@ -23,7 +23,10 @@ exports.handler = async (event, context) => {
     const STRAVA_CLIENT_SECRET = process.env.VITE_STRAVA_CLIENT_SECRET;
     const STRAVA_REDIRECT_URI = process.env.VITE_STRAVA_REDIRECT_URI || 'https://resonant-pony-ea7953.netlify.app/auth/callback';
     const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-    const SUPABASE_SERVICE_KEY = process.env.VITE_SUPABASE_ANON_KEY; // Using anon key for now
+    // Ensure SUPABASE_SERVICE_KEY is configured (use VITE_ prefix for Netlify, or direct for local)
+    const SUPABASE_SERVICE_KEY = process.env.VITE_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
+
 
     // Check for missing environment variables with detailed error
     const missingVars = [];
@@ -31,13 +34,19 @@ exports.handler = async (event, context) => {
     if (!STRAVA_CLIENT_SECRET) missingVars.push('VITE_STRAVA_CLIENT_SECRET');
     if (!STRAVA_REDIRECT_URI) missingVars.push('VITE_STRAVA_REDIRECT_URI');
     if (!SUPABASE_URL) missingVars.push('VITE_SUPABASE_URL');
-    if (!SUPABASE_SERVICE_KEY) missingVars.push('VITE_SUPABASE_ANON_KEY');
+    if (!SUPABASE_ANON_KEY) missingVars.push('VITE_SUPABASE_ANON_KEY'); // Still check anon key for the public client
+    if (!SUPABASE_SERVICE_KEY) missingVars.push('SUPABASE_SERVICE_KEY');
+
 
     if (missingVars.length > 0) {
       throw new Error(`Missing required environment variables: ${missingVars.join(', ')}. Please set these in Netlify dashboard and redeploy.`);
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    // Public client for RPC call (if RPC permissions allow anon or user role)
+    // Note: The existing supabase client uses VITE_SUPABASE_ANON_KEY.
+    // For admin operations, a new client with SERVICE_KEY is needed.
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 
     if (event.httpMethod === 'GET') {
       // Step 1: Generate Strava authorization URL
@@ -84,48 +93,91 @@ exports.handler = async (event, context) => {
       // Get the Strava athlete ID
       const strava_athlete_id = tokenData.athlete.id;
 
-      // Call Supabase RPC to get or generate user UUID
-      const { data: userId, error: rpcError } = await supabase.rpc('generate_strava_user_uuid', { strava_id: strava_athlete_id });
+      // Call Supabase RPC to get or generate user UUID (using the public client)
+      const { data: generatedUuid, error: rpcError } = await supabase.rpc('generate_strava_user_uuid', { strava_id: strava_athlete_id });
 
       if (rpcError) {
-        console.error('Supabase RPC error:', rpcError);
-        throw new Error(`Failed to get user UUID from Supabase: ${rpcError.message}`);
+        console.error('Supabase RPC error (generate_strava_user_uuid):', rpcError);
+        throw new Error(`Failed to get user UUID from Supabase RPC: ${rpcError.message}`);
       }
 
-      if (!userId) {
-        console.error('Supabase RPC error: userId is null or undefined');
-        throw new Error('Failed to get user UUID from Supabase: RPC returned no data.');
+      if (!generatedUuid) {
+        console.error('Supabase RPC error: generatedUuid is null or undefined');
+        throw new Error('Failed to get user UUID from Supabase RPC: No data returned.');
       }
 
-      // Create user object with the UUID from Supabase
-      const user = {
-        id: userId, // Use the UUID from the RPC call
-        strava_id: strava_athlete_id,
-        name: `${tokenData.athlete.firstname} ${tokenData.athlete.lastname}`,
-        // Using a placeholder email format, can be updated if real email is available/needed
-        email: `user_${userId}@runsight.app`,
+      // Initialize Supabase Admin client for auth operations
+      const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+      const userMetadata = {
         strava_access_token: tokenData.access_token,
         strava_refresh_token: tokenData.refresh_token,
         strava_expires_at: tokenData.expires_at,
-        athlete_data: tokenData.athlete
+        strava_id: strava_athlete_id, // Store Strava ID in metadata
+        name: `${tokenData.athlete.firstname} ${tokenData.athlete.lastname}`
       };
 
-      // Note: For now, we are not storing the full user object or tokens in Supabase from this function.
-      // This function's primary role is to authenticate with Strava and return user identifiers.
-      // Subsequent API calls from the client will handle data storage/synchronization.
+      let authUser;
+      let { data: existingAuthUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(generatedUuid);
+
+      if (getUserError) {
+        // Check if error is because user was not found
+        // Supabase might return an error with a specific status or message for "user not found"
+        // For instance, error.message might contain "User not found" or error.status might be 404.
+        // This condition might need adjustment based on actual Supabase error responses.
+        if (getUserError.message && getUserError.message.toLowerCase().includes('user not found')) { // More robust check
+          const userEmailForAuth = `user_${generatedUuid}@runsight.app`; // Ensure this email is unique
+          const { data: newAuthUserData, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
+            id: generatedUuid,
+            email: userEmailForAuth,
+            email_confirm: true, // Auto-confirm email as this is a server-side creation
+            user_metadata: userMetadata
+          });
+
+          if (createUserError) {
+            console.error('Supabase createUser error:', createUserError);
+            throw new Error(`Failed to create Supabase auth user: ${createUserError.message}`);
+          }
+          authUser = newAuthUserData.user; // Supabase client v2 returns { data: { user: { ... } } }
+        } else {
+          // Another error occurred trying to get the user
+          console.error('Supabase getUserById error:', getUserError);
+          throw new Error(`Failed to get Supabase auth user: ${getUserError.message}`);
+        }
+      } else {
+        // User was found, update their metadata
+        authUser = existingAuthUser.user; // Supabase client v2 returns { data: { user: { ... } } }
+        const { data: updatedAuthUserData, error: updateUserError } = await supabaseAdmin.auth.admin.updateUserById(
+          generatedUuid,
+          { user_metadata: userMetadata }
+        );
+
+        if (updateUserError) {
+          console.error('Supabase updateUserById error:', updateUserError);
+          throw new Error(`Failed to update Supabase auth user: ${updateUserError.message}`);
+        }
+        // The updateUserById data structure is { data: { user: { ... } } } in v2
+        authUser = updatedAuthUserData.user;
+      }
+
+      if (!authUser) {
+        // This should ideally not happen if the logic above is correct
+        console.error('Auth user record is unexpectedly null after create/update.');
+        throw new Error('Failed to obtain a valid auth user record.');
+      }
 
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           success: true,
-          user: { // Return a slimmed-down user object, primarily ID and basic info
-            id: user.id,
-            strava_id: user.strava_id,
-            name: user.name,
-            email: user.email // Consider if email is needed by client immediately post-auth
+          user: {
+            id: generatedUuid,
+            strava_id: strava_athlete_id, // Keep strava_id directly accessible
+            name: authUser.user_metadata.name || `${tokenData.athlete.firstname} ${tokenData.athlete.lastname}`,
+            email: authUser.email
           },
-          sessionUrl: null // Session management (e.g., JWT) would typically happen here or be initiated by client
+          sessionUrl: null
         })
       };
     }
