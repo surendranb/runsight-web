@@ -217,18 +217,12 @@ export const getExistingActivitiesDateRange = async (userId: string) => {
  * The caller should ideally be updated to call processAndSaveActivity directly
  * and manage Strava access token retrieval.
  */
-export const saveActivityToDatabase = async (activity: any, userId: string /*, stravaAccessToken: string - This would need to be added */): Promise<any> => {
+export const saveActivityToDatabase = async (activity: any, userId: string, stravaAccessToken: string): Promise<any> => {
   console.log(`[saveActivityToDatabase - DEPRECATEDISH] Received call for activity ${activity.id}, user ${userId}. Redirecting to processAndSaveActivity.`);
 
-  // IMPORTANT: stravaAccessToken is needed by processAndSaveActivity.
-  // This function's signature or its caller needs to be updated to provide it.
-  // For now, using a placeholder. This will fail if not replaced.
-  const stravaAccessToken = 'PLACEHOLDER_ACCESS_TOKEN_NEEDS_TO_BE_PROVIDED';
-
-  if (stravaAccessToken === 'PLACEHOLDER_ACCESS_TOKEN_NEEDS_TO_BE_PROVIDED') {
-    console.error(`[saveActivityToDatabase] CRITICAL: stravaAccessToken is a placeholder. The actual token must be provided to call processAndSaveActivity.`);
-    // Return a structure similar to what the old function might have, or handle error
-    return { id: `temp_placeholder_error_${activity.id}`, error: "Missing Strava Access Token for new processing pipeline." };
+  if (!stravaAccessToken) {
+    console.error(`[saveActivityToDatabase] CRITICAL: stravaAccessToken was not provided.`);
+    return { id: `temp_token_error_${activity.id}`, error: "Strava Access Token was not provided to saveActivityToDatabase." };
   }
 
   if (!activity || !activity.id) {
