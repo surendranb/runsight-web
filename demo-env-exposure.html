@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Environment Variable Exposure Demo</title>
+</head>
+<body>
+    <h1>🔍 How Frontend Environment Variables Get Exposed</h1>
+    
+    <h2>Step 1: Set Test Environment Variables</h2>
+    <p>In your .env file or Netlify settings:</p>
+    <pre>
+VITE_PUBLIC_API_KEY=secret-api-key-12345
+VITE_DATABASE_URL=https://my-secret-database.com
+    </pre>
+    
+    <h2>Step 2: Use Them in Code</h2>
+    <pre>
+// In your React/Vite app:
+const apiKey = import.meta.env.VITE_PUBLIC_API_KEY
+const dbUrl = import.meta.env.VITE_DATABASE_URL
+
+console.log('API Key:', apiKey)
+console.log('DB URL:', dbUrl)
+    </pre>
+    
+    <h2>Step 3: Build and Check Output</h2>
+    <p>After <code>npm run build</code>, your environment variables become:</p>
+    <pre>
+// In the built JavaScript file:
+const apiKey = "secret-api-key-12345"  // ← EXPOSED!
+const dbUrl = "https://my-secret-database.com"  // ← EXPOSED!
+    </pre>
+    
+    <h2>Step 4: How Attackers Extract Them</h2>
+    <ol>
+        <li><strong>Method 1 - View Source:</strong>
+            <ul>
+                <li>Right-click → View Page Source</li>
+                <li>Find the JavaScript file links</li>
+                <li>Open those files and search for your secrets</li>
+            </ul>
+        </li>
+        
+        <li><strong>Method 2 - Developer Tools:</strong>
+            <ul>
+                <li>F12 → Sources tab</li>
+                <li>Browse the JavaScript files</li>
+                <li>Search for "supabase", "api", etc.</li>
+            </ul>
+        </li>
+        
+        <li><strong>Method 3 - Network Tab:</strong>
+            <ul>
+                <li>F12 → Network tab</li>
+                <li>Reload page</li>
+                <li>Click on JavaScript files</li>
+                <li>See the actual content with your secrets</li>
+            </ul>
+        </li>
+        
+        <li><strong>Method 4 - Automated:</strong>
+            <pre>
+# Download and search all JS files:
+curl -s https://your-app.netlify.app | grep -o 'src="[^"]*\.js"' | \
+  xargs -I {} curl -s "https://your-app.netlify.app{}" | \
+  grep -o 'supabase[^"]*'
+            </pre>
+        </li>
+    </ol>
+    
+    <h2>🎯 The Reality Check</h2>
+    <div style="background: #fff3cd; padding: 20px; border-left: 4px solid #ffc107;">
+        <h3>Why This Happens:</h3>
+        <ul>
+            <li><strong>Frontend apps run in the browser</strong> - everything is public</li>
+            <li><strong>Environment variables get compiled in</strong> - they become hardcoded strings</li>
+            <li><strong>No way to hide them</strong> - if your app needs them, the browser needs them</li>
+            <li><strong>This is by design</strong> - frontend env vars are meant to be public</li>
+        </ul>
+    </div>
+    
+    <h2>🛡️ The Solution</h2>
+    <div style="background: #d1ecf1; padding: 20px; border-left: 4px solid #bee5eb;">
+        <h3>Accept Reality and Design for It:</h3>
+        <ul>
+            <li><strong>Supabase anon keys are MEANT to be public</strong></li>
+            <li><strong>Use Row Level Security (RLS)</strong> to protect data</li>
+            <li><strong>Never put actual secrets in frontend env vars</strong></li>
+            <li><strong>Design your security assuming keys are public</strong></li>
+        </ul>
+    </div>
+    
+    <h2>🧪 Test Your Own App</h2>
+    <p>Try this on your deployed Netlify app:</p>
+    <ol>
+        <li>Open your app in browser</li>
+        <li>Press F12 → Network tab</li>
+        <li>Reload the page</li>
+        <li>Click on any .js file</li>
+        <li>Search for "supabase" or your project name</li>
+        <li>You'll find your actual credentials!</li>
+    </ol>
+    
+    <script>
+        // This demonstrates the exposure:
+        console.log('🔍 Environment variables in this page:');
+        console.log('Any VITE_ variables would be visible here in the browser console');
+        console.log('And in the source code of this page');
+        console.log('And in the Network tab when this file loads');
+        
+        // If this were a real Vite app with env vars:
+        // console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);  // ← EXPOSED!
+        // console.log('API Key:', import.meta.env.VITE_API_KEY);            // ← EXPOSED!
+    </script>
+</body>
+</html>
