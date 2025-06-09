@@ -109,87 +109,71 @@ export const saveUserToDatabase = async (authResponse: StravaAuthResponse) => {
   
   console.log('Saving user to database:', athlete);
   
-  // First, try to find existing user
-  const { data: existingUser } = await supabase
-    .from('users')
-    .select('*')
-    .eq('strava_id', athlete.id)
-    .single();
-
-  let userData;
-  if (existingUser) {
-    // Update existing user
-    const { data, error } = await supabase
-      .from('users')
-      .update({
-        email: `${athlete.id}@strava.local`,
-        first_name: athlete.firstname,
-        last_name: athlete.lastname,
-        profile_medium: athlete.profile_medium,
-        access_token,
-        refresh_token,
-        expires_at,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('strava_id', athlete.id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Database update error:', error);
-      throw error;
+  try {
+    // Generate a deterministic UUID for this Strava user
+    const { data: uuidData, error: uuidError } = await supabase
+      .rpc('generate_strava_user_uuid', { strava_id: athlete.id });
+    
+    if (uuidError) {
+      console.error('Error generating user UUID:', uuidError);
+      throw uuidError;
     }
-    userData = data;
-  } else {
-    // Try to create new user
-    const { data, error } = await supabase
-      .from('users')
-      .insert({
-        strava_id: athlete.id,
-        email: `${athlete.id}@strava.local`,
-        first_name: athlete.firstname,
-        last_name: athlete.lastname,
-        profile_medium: athlete.profile_medium,
-        access_token,
-        refresh_token,
-        expires_at,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Database insert error:', error);
-      
-      // If RLS is blocking, create a temporary user object for localStorage
-      if (error.code === '42501') {
-        console.warn('RLS policy blocking insert, using temporary user session');
-        userData = {
-          id: `temp_${athlete.id}`,
-          strava_id: athlete.id,
-          email: `${athlete.id}@strava.local`,
-          first_name: athlete.firstname,
-          last_name: athlete.lastname,
-          profile_medium: athlete.profile_medium,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        
-        // Store tokens separately for API calls
-        localStorage.setItem('strava_tokens', JSON.stringify({
-          access_token,
-          refresh_token,
-          expires_at,
-        }));
-      } else {
-        throw error;
-      }
-    } else {
-      userData = data;
-    }
+    
+    const userId = uuidData;
+    console.log('Generated user UUID:', userId);
+    
+    const userData = {
+      id: userId,
+      strava_id: athlete.id,
+      email: `${athlete.id}@strava.local`,
+      first_name: athlete.firstname,
+      last_name: athlete.lastname,
+      profile_medium: athlete.profile_medium,
+      access_token,
+      refresh_token,
+      expires_at,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    // Store tokens separately for API calls
+    localStorage.setItem('strava_tokens', JSON.stringify({
+      access_token,
+      refresh_token,
+      expires_at,
+    }));
+    
+    console.log('User data prepared successfully:', userData);
+    return userData;
+    
+  } catch (error) {
+    console.error('Error in saveUserToDatabase:', error);
+    
+    // Fallback: create a temporary user object for localStorage
+    console.warn('Using temporary user session due to error');
+    const userData = {
+      id: `temp_${athlete.id}`,
+      strava_id: athlete.id,
+      email: `${athlete.id}@strava.local`,
+      first_name: athlete.firstname,
+      last_name: athlete.lastname,
+      profile_medium: athlete.profile_medium,
+      access_token,
+      refresh_token,
+      expires_at,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    // Store tokens separately for API calls
+    localStorage.setItem('strava_tokens', JSON.stringify({
+      access_token,
+      refresh_token,
+      expires_at,
+    }));
+    
+    return userData;
   }
-  
-  console.log('User saved successfully:', userData);
-  return userData;
 };
 
 export const getExistingActivitiesDateRange = async (userId: string) => {
