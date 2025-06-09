@@ -27,6 +27,7 @@ exports.handler = async (event, context) => {
     const SUPABASE_SERVICE_KEY = process.env.VITE_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_KEY;
     const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 
+    console.log('[auth-strava] SUPABASE_URL configured:', !!SUPABASE_URL, '; SUPABASE_ANON_KEY configured:', !!SUPABASE_ANON_KEY, '; SUPABASE_SERVICE_KEY configured:', !!SUPABASE_SERVICE_KEY);
 
     // Check for missing environment variables with detailed error
     const missingVars = [];
@@ -65,6 +66,7 @@ exports.handler = async (event, context) => {
     }
 
     if (event.httpMethod === 'POST') {
+      console.log('[auth-strava] POST request received.');
       // Step 2: Handle OAuth callback and exchange code for tokens
       const { code } = JSON.parse(event.body);
 
@@ -89,20 +91,23 @@ exports.handler = async (event, context) => {
       }
 
       const tokenData = await tokenResponse.json();
+      console.log('[auth-strava] Strava token exchange successful. Athlete ID:', tokenData.athlete.id);
 
       // Get the Strava athlete ID
       const strava_athlete_id = tokenData.athlete.id;
 
       // Call Supabase RPC to get or generate user UUID (using the public client)
       const { data: generatedUuid, error: rpcError } = await supabase.rpc('generate_strava_user_uuid', { strava_id: strava_athlete_id });
+      console.log('[auth-strava] generate_strava_user_uuid RPC result. UUID:', generatedUuid, 'Error:', JSON.stringify(rpcError, null, 2));
+
 
       if (rpcError) {
-        console.error('Supabase RPC error (generate_strava_user_uuid):', rpcError);
+        console.error('Supabase RPC error (generate_strava_user_uuid):', rpcError); // Keep specific error for this
         throw new Error(`Failed to get user UUID from Supabase RPC: ${rpcError.message}`);
       }
 
       if (!generatedUuid) {
-        console.error('Supabase RPC error: generatedUuid is null or undefined');
+        console.error('Supabase RPC error: generatedUuid is null or undefined'); // Keep specific error for this
         throw new Error('Failed to get user UUID from Supabase RPC: No data returned.');
       }
 
@@ -118,54 +123,61 @@ exports.handler = async (event, context) => {
       };
 
       let authUser;
+      console.log('[auth-strava] Attempting to get user by UUID:', generatedUuid);
       let { data: existingAuthUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(generatedUuid);
 
       if (getUserError) {
-        // Check if error is because user was not found
-        // Supabase might return an error with a specific status or message for "user not found"
-        // For instance, error.message might contain "User not found" or error.status might be 404.
-        // This condition might need adjustment based on actual Supabase error responses.
-        if (getUserError.message && getUserError.message.toLowerCase().includes('user not found')) { // More robust check
-          const userEmailForAuth = `user_${generatedUuid}@runsight.app`; // Ensure this email is unique
+        console.log('[auth-strava] getUserById error:', JSON.stringify(getUserError, null, 2));
+        console.log('[auth-strava] User not found with getUserById (or other error). Attempting to determine if "not found"...');
+        const isNotFoundError = getUserError.message && getUserError.message.toLowerCase().includes('user not found');
+        console.log('[auth-strava] Condition for creation (is "user not found" error):', isNotFoundError);
+
+        if (isNotFoundError) {
+          const userEmailForAuth = `user_${generatedUuid}@runsight.app`;
+          console.log('[auth-strava] Attempting to create user with UUID:', generatedUuid, 'Email:', userEmailForAuth, 'Metadata:', JSON.stringify(userMetadata, null, 2));
           const { data: newAuthUserData, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
             id: generatedUuid,
             email: userEmailForAuth,
-            email_confirm: true, // Auto-confirm email as this is a server-side creation
+            email_confirm: true,
             user_metadata: userMetadata
           });
 
           if (createUserError) {
-            console.error('Supabase createUser error:', createUserError);
+            console.log('[auth-strava] createUser error:', JSON.stringify(createUserError, null, 2));
+            console.error('Supabase createUser error:', createUserError); // Keep specific error
             throw new Error(`Failed to create Supabase auth user: ${createUserError.message}`);
           }
-          authUser = newAuthUserData.user; // Supabase client v2 returns { data: { user: { ... } } }
+          console.log('[auth-strava] createUser success. New authUser data:', JSON.stringify(newAuthUserData, null, 2));
+          authUser = newAuthUserData.user;
         } else {
           // Another error occurred trying to get the user
-          console.error('Supabase getUserById error:', getUserError);
+          console.error('Supabase getUserById error:', getUserError); // Keep specific error
           throw new Error(`Failed to get Supabase auth user: ${getUserError.message}`);
         }
       } else {
-        // User was found, update their metadata
-        authUser = existingAuthUser.user; // Supabase client v2 returns { data: { user: { ... } } }
+        console.log('[auth-strava] getUserById success. Existing user data:', JSON.stringify(existingAuthUser, null, 2));
+        authUser = existingAuthUser.user;
+        console.log('[auth-strava] User found. Attempting to update metadata for UUID:', generatedUuid, 'Metadata:', JSON.stringify(userMetadata, null, 2));
         const { data: updatedAuthUserData, error: updateUserError } = await supabaseAdmin.auth.admin.updateUserById(
           generatedUuid,
           { user_metadata: userMetadata }
         );
 
         if (updateUserError) {
-          console.error('Supabase updateUserById error:', updateUserError);
+          console.log('[auth-strava] updateUserById error:', JSON.stringify(updateUserError, null, 2));
+          console.error('Supabase updateUserById error:', updateUserError); // Keep specific error
           throw new Error(`Failed to update Supabase auth user: ${updateUserError.message}`);
         }
-        // The updateUserById data structure is { data: { user: { ... } } } in v2
+        console.log('[auth-strava] updateUserById success. Updated authUser data:', JSON.stringify(updatedAuthUserData, null, 2));
         authUser = updatedAuthUserData.user;
       }
 
       if (!authUser) {
-        // This should ideally not happen if the logic above is correct
-        console.error('Auth user record is unexpectedly null after create/update.');
+        console.error('Auth user record is unexpectedly null after create/update.'); // Keep specific error
         throw new Error('Failed to obtain a valid auth user record.');
       }
 
+      console.log('[auth-strava] Preparing final response. AuthUser for response:', JSON.stringify(authUser, null, 2));
       return {
         statusCode: 200,
         headers,
@@ -173,7 +185,7 @@ exports.handler = async (event, context) => {
           success: true,
           user: {
             id: generatedUuid,
-            strava_id: strava_athlete_id, // Keep strava_id directly accessible
+            strava_id: strava_athlete_id,
             name: authUser.user_metadata.name || `${tokenData.athlete.firstname} ${tokenData.athlete.lastname}`,
             email: authUser.email
           },
@@ -189,7 +201,7 @@ exports.handler = async (event, context) => {
     };
 
   } catch (error) {
-    console.error('Auth error:', error);
+    console.error('[auth-strava] Critical error in handler:', error, 'Stack:', error.stack);
     return {
       statusCode: 500,
       headers,
