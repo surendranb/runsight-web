@@ -25,8 +25,16 @@ exports.handler = async (event, context) => {
     const SUPABASE_URL = process.env.SUPABASE_URL;
     const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY; // Service key, not anon key!
 
-    if (!STRAVA_CLIENT_ID || !STRAVA_CLIENT_SECRET || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-      throw new Error('Missing required environment variables');
+    // Check for missing environment variables with detailed error
+    const missingVars = [];
+    if (!STRAVA_CLIENT_ID) missingVars.push('STRAVA_CLIENT_ID');
+    if (!STRAVA_CLIENT_SECRET) missingVars.push('STRAVA_CLIENT_SECRET');
+    if (!STRAVA_REDIRECT_URI) missingVars.push('STRAVA_REDIRECT_URI');
+    if (!SUPABASE_URL) missingVars.push('SUPABASE_URL');
+    if (!SUPABASE_SERVICE_KEY) missingVars.push('SUPABASE_SERVICE_KEY');
+
+    if (missingVars.length > 0) {
+      throw new Error(`Missing required environment variables: ${missingVars.join(', ')}. Please set these in Netlify dashboard and redeploy.`);
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
