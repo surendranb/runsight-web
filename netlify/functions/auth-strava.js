@@ -81,31 +81,18 @@ exports.handler = async (event, context) => {
 
       const tokenData = await tokenResponse.json();
 
-      // Create or update user in Supabase (server-side)
-      const { data: user, error: userError } = await supabase.auth.admin.createUser({
+      // For now, create a simple user object without database storage
+      // This allows the OAuth flow to complete while we set up the database properly
+      const user = {
+        id: `strava_${tokenData.athlete.id}`,
+        strava_id: tokenData.athlete.id,
+        name: `${tokenData.athlete.firstname} ${tokenData.athlete.lastname}`,
         email: `strava_${tokenData.athlete.id}@runsight.app`,
-        user_metadata: {
-          strava_id: tokenData.athlete.id,
-          strava_access_token: tokenData.access_token,
-          strava_refresh_token: tokenData.refresh_token,
-          strava_expires_at: tokenData.expires_at,
-          athlete_data: tokenData.athlete
-        }
-      });
-
-      if (userError && !userError.message.includes('already registered')) {
-        throw new Error(`Failed to create user: ${userError.message}`);
-      }
-
-      // Generate session token for frontend
-      const { data: session, error: sessionError } = await supabase.auth.admin.generateLink({
-        type: 'magiclink',
-        email: `strava_${tokenData.athlete.id}@runsight.app`
-      });
-
-      if (sessionError) {
-        throw new Error(`Failed to generate session: ${sessionError.message}`);
-      }
+        strava_access_token: tokenData.access_token,
+        strava_refresh_token: tokenData.refresh_token,
+        strava_expires_at: tokenData.expires_at,
+        athlete_data: tokenData.athlete
+      };
 
       return {
         statusCode: 200,
@@ -113,11 +100,12 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({
           success: true,
           user: {
-            id: user?.user?.id || session.user.id,
-            strava_id: tokenData.athlete.id,
-            name: tokenData.athlete.firstname + ' ' + tokenData.athlete.lastname
+            id: user.id,
+            strava_id: user.strava_id,
+            name: user.name,
+            email: user.email
           },
-          session_url: session.properties.action_link
+          sessionUrl: null // Session handled client-side for now
         })
       };
     }
