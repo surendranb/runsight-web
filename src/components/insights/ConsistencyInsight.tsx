@@ -56,6 +56,7 @@ export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) 
   return (
     <div className="bg-white shadow rounded-lg p-6">
       <h3 className="text-xl font-semibold text-gray-800 mb-4">Consistency & Progress Over Time</h3>
+      <p className="text-sm text-gray-600 mb-6">Track your running frequency and volume trends on a weekly and monthly basis to see your progress.</p>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

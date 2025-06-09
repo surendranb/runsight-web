@@ -44,6 +44,7 @@ export const TimeOfDayInsight: React.FC<TimeOfDayInsightProps> = ({ runs }) => {
   return (
     <div className="bg-white shadow rounded-lg p-6">
       <h3 className="text-xl font-semibold text-gray-800 mb-4">Performance by Time of Day</h3>
+      <p className="text-sm text-gray-600 mb-6">Discover if you tend to run faster or with a different heart rate based on the time of day you start your runs.</p>
 
       <div className="overflow-x-auto">
          <table className="min-w-full text-sm">

@@ -45,6 +45,7 @@ export const WindPerformanceInsight: React.FC<WindPerformanceInsightProps> = ({ 
   return (
     <div className="bg-white shadow rounded-lg p-6">
       <h3 className="text-xl font-semibold text-gray-800 mb-4">Impact of Wind on Performance</h3>
+      <p className="text-sm text-gray-600 mb-6">Analyze how various wind conditions typically influence your average running pace and heart rate.</p>
 
       <div className="overflow-x-auto">
          <table className="min-w-full text-sm">
