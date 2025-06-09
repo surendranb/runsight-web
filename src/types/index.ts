@@ -1,17 +1,53 @@
+// src/types/index.ts
 export interface User {
-  id: string;
-  strava_id: number;
+  id: string; // This is the Supabase auth user ID
+  strava_id?: number; // Strava athlete ID
   email: string;
-  first_name: string;
-  last_name: string;
-  profile_medium: string;
-  access_token: string;
-  refresh_token: string;
-  expires_at: number;
-  created_at: string;
-  updated_at: string;
+  first_name?: string;
+  last_name?: string;
+  profile_medium?: string;
+  access_token?: string;
+  refresh_token?: string;
+  expires_at?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
+export interface EnrichedRun {
+  id: string; // UUID from your database table
+  user_id: string; // UUID, matches User.id (Supabase auth user id)
+  strava_id: number; // Strava activity ID
+  name: string;
+  distance: number; // meters
+  moving_time: number; // seconds
+  elapsed_time: number; // seconds
+  start_date: string; // ISO 8601 UTC date string (e.g., "2025-06-01T13:44:48+00:00")
+  start_date_local: string; // ISO 8601 local date string (e.g., "2025-06-01T19:14:48+00:00")
+  start_latlng?: string | null; // Format: "(longitude,latitude)" e.g., "(80.207051,12.975955)"
+  end_latlng?: string | null; // Format: "(longitude,latitude)"
+  average_speed: number; // m/s
+  max_speed?: number | null; // m/s
+  average_heartrate?: number | null; // bpm
+  max_heartrate?: number | null; // bpm
+  total_elevation_gain?: number | null; // meters
+  weather_data?: Record<string, any> | null; // JSON blob from your 'runs' table
+  strava_data?: Record<string, any> | null;  // JSON blob from your 'runs' table
+  created_at?: string;
+  updated_at?: string;
+  workout_type?: string | null; // from strava_data.workout_type
+}
+
+export interface RunSplit {
+  id: string;
+  enriched_run_id: string;
+  user_id: string;
+  split_number: number;
+  distance: number;
+  elapsed_time: number;
+  // Add other relevant fields from your 'run_splits' table
+}
+
+// Keep existing types
 export interface Activity {
   id: string;
   strava_id: number;
@@ -191,10 +227,4 @@ export interface StravaDetailedActivity {
     average_heartrate?: number | null;
     max_heartrate?: number | null;
   }> | null;
-  // Add any other fields that might be useful from the detailed activity object.
-  // For example:
-  // gear: any | null; // Detailed gear information
-  // photos: any | null; // Information about photos
-  // segment_efforts: any[] | null; // Detailed segment efforts
-  // best_efforts: any[] | null; // Best efforts for various distances
 }
