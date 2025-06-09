@@ -78,7 +78,7 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
   onSkip,
   isFirstRun = true
 }) => {
-  const [selectedOption, setSelectedOption] = useState<string>('month');
+  const [selectedOption, setSelectedOption] = useState<string>('week');
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('');
@@ -431,23 +431,12 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
         </div>
 
         {/* Show existing data summary for returning users */}
-        {!isFirstRun && existingData && existingData.count > 0 && (
+        {!isFirstRun && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <h3 className="font-semibold text-blue-800 mb-2">📊 Your Current Data</h3>
             <div className="space-y-1 text-sm text-blue-700">
-              {/* <div>🏃‍♂️ {existingData.count} activities in database</div> */}
-              {/* <div>📅 From {existingData.earliest?.toLocaleDateString()} to {existingData.latest?.toLocaleDateString()}</div> */}
               <div>Review sync options below.</div>
             </div>
-            
-            {/* Historic sync options toggle - COMMENTED OUT */}
-            {/* <button
-              onClick={() => setShowHistoricOptions(!showHistoricOptions)}
-              className="mt-3 flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium text-sm"
-            >
-              <History className="w-4 h-4" />
-              {showHistoricOptions ? 'Hide' : 'Show'} Historic Sync Options
-            </button> */}
           </div>
         )}
 
