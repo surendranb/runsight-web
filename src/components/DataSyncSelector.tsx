@@ -216,14 +216,18 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
           const result = await processAndSaveActivity(Number(activity.id), userId, accessToken);
           
           if (result.enrichedRunId) {
-            // Store basic info for summary, or more if needed later
             processedActivities.push({
               id: result.enrichedRunId,
               name: activity.name,
-              strava_id: activity.id
+              strava_id: activity.id,
+              wasSkipped: result.wasSkipped // Capture this for summary
             });
-            savedCount++;
-            console.log(`✅ Successfully processed and saved: ${activity.name} (Enriched ID: ${result.enrichedRunId})`);
+            if (!result.wasSkipped) { // Only count if it's a truly new save
+                savedCount++;
+                console.log(`✅ Successfully processed and NEWLY SAVED: ${activity.name} (Enriched ID: ${result.enrichedRunId})`);
+            } else {
+                console.log(`⏭️ Activity already processed (SKIPPED): ${activity.name} (Enriched ID: ${result.enrichedRunId})`);
+            }
           } else {
             console.error(`[DataSyncSelector] Failed to process activity ${activity.id} (${activity.name}):`, result.error);
             // Optionally, add to a list of failed activities to show to the user

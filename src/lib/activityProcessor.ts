@@ -9,11 +9,17 @@ import { fetchWeatherData, EnrichedWeatherInfo } from './weather';
 // type EnrichedRunInsert = Partial<YourEnrichedRunTableType>;
 // type RunSplitInsert = Partial<YourRunSplitTableType>;
 
+export interface ProcessActivityResult {
+  enrichedRunId: string | null;
+  wasSkipped?: boolean;
+  error?: any;
+}
+
 export const processAndSaveActivity = async (
   stravaActivityId: number,
   userId: string, // This should be the UUID from your auth.users table
   stravaAccessToken: string
-): Promise<{ enrichedRunId: string | null; error?: any }> => {
+): Promise<ProcessActivityResult> => {
   console.log(`[ActivityProcessor] Starting processing for Strava Activity ID: ${stravaActivityId}, User ID: ${userId}`);
 
   try {
@@ -47,7 +53,7 @@ export const processAndSaveActivity = async (
 
     if (existingRun) {
       console.log(`[ActivityProcessor] Activity ${detailedActivity.id} (Enriched ID: ${existingRun.id}) already processed. Skipping.`);
-      return { enrichedRunId: existingRun.id };
+      return { enrichedRunId: existingRun.id, wasSkipped: true }; // Add wasSkipped
     }
     console.log(`[ActivityProcessor] No existing enriched run found for Strava ID: ${detailedActivity.id}. Proceeding with enrichment.`);
 
@@ -160,6 +166,7 @@ export const processAndSaveActivity = async (
     // Add processed_at timestamp
     enrichedRunData.processed_at = new Date().toISOString();
 
+    console.log(`[ActivityProcessor] Attempting to insert enriched run for Strava ID ${detailedActivity.id}. Data:`, JSON.stringify(enrichedRunData, null, 2));
     const { data: savedRun, error: runSaveError } = await supabase
       .from('enriched_runs')
       .insert(enrichedRunData)
@@ -167,8 +174,7 @@ export const processAndSaveActivity = async (
       .single();
 
     if (runSaveError || !savedRun) {
-      console.error(`[ActivityProcessor] Error saving enriched run for Strava ID ${detailedActivity.id}:`, runSaveError);
-      console.error(`[ActivityProcessor] Data attempted:`, JSON.stringify(enrichedRunData).substring(0, 1000) + "..."); // Log part of the data
+      console.error(`[ActivityProcessor] FAILED to save enriched run for Strava ID ${detailedActivity.id}. Error:`, runSaveError, "Data attempted:", JSON.stringify(enrichedRunData, null, 2));
       throw new Error(`Error saving enriched run: ${runSaveError?.message || 'No saved run data returned'}`);
     }
     const newEnrichedRunId = savedRun.id;
@@ -224,12 +230,12 @@ export const processAndSaveActivity = async (
         };
       });
 
-      console.log(`[ActivityProcessor] Inserting ${runSplitsData.length} splits into 'run_splits' for Enriched ID: ${newEnrichedRunId}`);
+      console.log(`[ActivityProcessor] Attempting to insert ${runSplitsData.length} splits for Enriched ID ${newEnrichedRunId}. Data:`, JSON.stringify(runSplitsData, null, 2));
       const { error: splitsSaveError } = await supabase.from('run_splits').insert(runSplitsData);
 
       if (splitsSaveError) {
         // Log error but don't necessarily make it fatal for the whole process
-        console.error(`[ActivityProcessor] Error saving run splits for Enriched ID ${newEnrichedRunId}:`, splitsSaveError);
+        console.error(`[ActivityProcessor] FAILED to save splits for Enriched ID ${newEnrichedRunId}. Error:`, splitsSaveError, "Data attempted:", JSON.stringify(runSplitsData, null, 2));
         // Optionally, you might want to mark the enriched_run record as 'partially_processed' or similar
       } else {
         console.log(`[ActivityProcessor] Successfully saved ${runSplitsData.length} splits for Enriched ID: ${newEnrichedRunId}`);
@@ -239,7 +245,7 @@ export const processAndSaveActivity = async (
     }
 
     console.log(`[ActivityProcessor] Successfully processed and saved activity ${stravaActivityId}. Enriched Run ID: ${newEnrichedRunId}`);
-    return { enrichedRunId: newEnrichedRunId };
+    return { enrichedRunId: newEnrichedRunId, wasSkipped: false }; // For new saves
 
   } catch (error: any) {
     console.error(`[ActivityProcessor] Critical error processing activity ${stravaActivityId} for user ${userId}:`, error);
