@@ -9,8 +9,8 @@ import SecureDashboard from './components/SecureDashboard';
 const SecureApp: React.FC = () => {
   const { user, isLoading, error, initiateStravaAuth, clearError } = useSecureAuth();
 
-  // Handle OAuth callback
-  if (window.location.pathname === '/auth/callback') {
+  // Handle OAuth callback (support both /callback and /auth/callback)
+  if (window.location.pathname === '/auth/callback' || window.location.pathname === '/callback') {
     return <SecureStravaCallback />;
   }
 
