@@ -63,7 +63,7 @@ const SecureStravaCallback: React.FC = () => {
         });
 
         // Step 2: Sync data (server-side)
-        const syncResult = await apiClient.syncUserData(authenticatedUser.id, 7);
+        const syncResult = await apiClient.syncUserData(authenticatedUser.id, 14);
 
         setState({
           step: 'syncing',
