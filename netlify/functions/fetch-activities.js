@@ -25,13 +25,16 @@ exports.handler = async (event, context) => {
 
   try {
     const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-    const SUPABASE_SERVICE_KEY = process.env.VITE_SUPABASE_ANON_KEY;
+    // Correctly define and use the actual service key
+    const ACTUAL_SERVICE_KEY = process.env.VITE_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    console.log('[fetch-activities] Attempting to use SUPABASE_SERVICE_KEY. Is present:', !!ACTUAL_SERVICE_KEY);
 
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-      throw new Error('Missing Supabase configuration');
+
+    if (!SUPABASE_URL || !ACTUAL_SERVICE_KEY) {
+      throw new Error('Missing Supabase configuration (URL or Service Key)');
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const supabase = createClient(SUPABASE_URL, ACTUAL_SERVICE_KEY);
 
     // Get user ID from request
     const { userId, days = 7 } = JSON.parse(event.body);
