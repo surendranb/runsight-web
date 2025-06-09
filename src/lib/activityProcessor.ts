@@ -79,7 +79,7 @@ export const processAndSaveActivity = async (
       photo_count: detailedActivity.photo_count,
       map_summary_polyline: detailedActivity.map?.summary_polyline,
       map_polyline: detailedActivity.map?.polyline, // Detailed polyline
-      visibility: detailedActivity.visibility, // e.g., 'everyone', 'followers_only'
+      // visibility: detailedActivity.visibility, // REMOVED as per request
       average_speed: detailedActivity.average_speed,
       max_speed: detailedActivity.max_speed,
       has_heartrate: detailedActivity.has_heartrate,
@@ -93,12 +93,8 @@ export const processAndSaveActivity = async (
       laps: detailedActivity.laps || null,
       splits_metric: detailedActivity.splits_metric || null,
       splits_standard: detailedActivity.splits_standard || null,
-      // Assuming your DB schema has this field:
-      strava_data_fetched_at: new Date().toISOString(),
-      // Fields to be populated by other services:
-      // location_city, location_state, location_country, location_geocoding_provider, location_fetched_at
-      // weather_timestamp, temperature, feels_like, humidity, pressure, visibility_meters, wind_speed, wind_deg,
-      // weather_main, weather_description, weather_icon, clouds_percent, sunrise_time, sunset_time, weather_fetched_at
+      // strava_data_fetched_at: new Date().toISOString(), // REMOVED as per request
+      // Fields to be populated by other services (location_city, etc. are kept if populated below)
     };
 
     if (detailedActivity.start_latlng && detailedActivity.start_latlng.length === 2) {
@@ -119,8 +115,8 @@ export const processAndSaveActivity = async (
         enrichedRunData.location_city = locationInfo.city;
         enrichedRunData.location_state = locationInfo.state;
         enrichedRunData.location_country = locationInfo.country;
-        enrichedRunData.location_geocoding_provider = 'openweathermap'; // Or your provider
-        enrichedRunData.location_fetched_at = new Date().toISOString();
+        // enrichedRunData.location_geocoding_provider = 'openweathermap'; // REMOVED as per request
+        // enrichedRunData.location_fetched_at = new Date().toISOString(); // REMOVED as per request
         console.log(`[ActivityProcessor] Successfully fetched location: ${locationInfo.city}, ${locationInfo.country}`);
       } else {
         console.warn(`[ActivityProcessor] Could not fetch location data for activity ${detailedActivity.id}.`);
@@ -137,23 +133,13 @@ export const processAndSaveActivity = async (
         detailedActivity.start_latlng[1], // lon
         detailedActivity.start_date_local // date string
       );
+      // REMOVE weather block as per instruction - discrete weather fields are not in schema
       if (weatherInfo) {
-        enrichedRunData.weather_timestamp = new Date(weatherInfo.weather_timestamp * 1000).toISOString();
-        enrichedRunData.temperature = weatherInfo.temperature;
-        enrichedRunData.feels_like = weatherInfo.feels_like;
-        enrichedRunData.humidity = weatherInfo.humidity;
-        enrichedRunData.pressure = weatherInfo.pressure;
-        enrichedRunData.visibility_meters = weatherInfo.visibility_meters;
-        enrichedRunData.wind_speed = weatherInfo.wind_speed;
-        enrichedRunData.wind_deg = weatherInfo.wind_deg;
-        enrichedRunData.weather_main = weatherInfo.weather_main;
-        enrichedRunData.weather_description = weatherInfo.weather_description;
-        enrichedRunData.weather_icon = weatherInfo.weather_icon;
-        enrichedRunData.clouds_percent = weatherInfo.clouds_percent;
-        enrichedRunData.sunrise_time = new Date(weatherInfo.sunrise_time * 1000).toISOString();
-        enrichedRunData.sunset_time = new Date(weatherInfo.sunset_time * 1000).toISOString();
-        enrichedRunData.weather_fetched_at = new Date().toISOString(); // Assuming you add this field
-        console.log(`[ActivityProcessor] Successfully fetched weather: ${weatherInfo.weather_main}`);
+        // enrichedRunData.weather_timestamp = new Date(weatherInfo.weather_timestamp * 1000).toISOString();
+        // enrichedRunData.temperature = weatherInfo.temperature;
+        // ... (all other weather fields removed)
+        // enrichedRunData.weather_fetched_at = new Date().toISOString();
+        console.log(`[ActivityProcessor] Fetched weather: ${weatherInfo.weather_main}, but not adding discrete fields to enrichedRunData.`);
       } else {
         console.warn(`[ActivityProcessor] Could not fetch weather data for activity ${detailedActivity.id}.`);
       }
