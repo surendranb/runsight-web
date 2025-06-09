@@ -43,6 +43,7 @@ export const WorkoutTypePerformanceInsight: React.FC<WorkoutTypePerformanceInsig
   return (
     <div className="bg-white shadow rounded-lg p-6">
       <h3 className="text-xl font-semibold text-gray-800 mb-4">Performance by Workout Type</h3>
+      <p className="text-sm text-gray-600 mb-6">Compare your average performance metrics across different types of workouts as categorized in Strava (e.g., General Run, Long Run, Race, Workout).</p>
 
       <div className="overflow-x-auto">
          <table className="min-w-full text-sm">

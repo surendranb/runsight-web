@@ -65,6 +65,7 @@ export const PerformanceWeatherInsight: React.FC<PerformanceWeatherInsightProps>
   return (
     <div className="bg-white shadow rounded-lg p-6">
       <h3 className="text-xl font-semibold text-gray-800 mb-4">Performance vs. Weather Conditions</h3>
+      <p className="text-sm text-gray-600 mb-6">See how different temperature and humidity ranges typically affect your average pace and heart rate.</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
          <DataTable title="Pace vs Temperature" data={tempPerformance} type="Pace" />

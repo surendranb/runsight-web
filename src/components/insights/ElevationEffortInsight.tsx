@@ -50,6 +50,7 @@ export const ElevationEffortInsight: React.FC<ElevationEffortInsightProps> = ({ 
   return (
     <div className="bg-white shadow rounded-lg p-6">
       <h3 className="text-xl font-semibold text-gray-800 mb-4">Elevation Gain vs. Effort</h3>
+      <p className="text-sm text-gray-600 mb-6">Understand how different levels of hillyness (elevation gain per kilometer) impact your running effort and pace.</p>
 
       <div className="overflow-x-auto">
          <table className="min-w-full text-sm">
