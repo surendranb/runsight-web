@@ -16,7 +16,7 @@ interface EnrichedRun {
 
 interface RunSplit {
   id: string;
-  run_id: string;
+  enriched_run_id: string; // Corrected from run_id
   user_id: string; // Assuming user_id is available for direct querying
   split_number: number;
   distance: number;
@@ -60,7 +60,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           .from('run_splits')
           .select('*')
           .eq('user_id', user.id) // Assumes user_id exists on run_splits
-          .order('run_id', { ascending: true })
+          .order('enriched_run_id', { ascending: true }) // Corrected from run_id
           .order('split_number', { ascending: true });
 
         if (splitsError) {
@@ -182,7 +182,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {runSplits.map(split => (
                         <tr key={split.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{split.run_id.substring(0,8)}...</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">
+                            {/* Ensure enriched_run_id is not null or undefined before calling substring */}
+                            {split.enriched_run_id ? split.enriched_run_id.substring(0,8) + '...' : 'N/A'}
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{split.split_number}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{split.distance}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{split.elapsed_time}</td>

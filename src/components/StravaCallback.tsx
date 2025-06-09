@@ -162,24 +162,30 @@ export const StravaCallback: React.FC<StravaCallbackProps> = ({ onLoginSuccess }
         accessToken={accessToken} 
         userId={userId}
         isFirstRun={isFirstRun}
-        onSyncComplete={(data) => {
-          console.log('Sync completed with data:', data);
-          onLoginSuccess({ 
-            id: userId, 
-            strava_id: 20683290, 
-            first_name: 'Surendran', 
-            last_name: 'Balachandran', 
-            profile_medium: '' 
-          });
+        onSyncComplete={(syncResultData) => {
+          console.log('Sync completed with data:', syncResultData);
+          const storedUser = sessionStorage.getItem('runsight_user');
+          if (storedUser) {
+            window.history.replaceState({}, '', '/'); // Clean URL
+            onLoginSuccess(JSON.parse(storedUser));
+          } else {
+            console.error("User data not found in session storage for onLoginSuccess after sync.");
+            window.history.replaceState({}, '', '/'); // Clean URL
+            // Fallback to minimal user object if absolutely necessary, though App.tsx's useAuth should ideally handle user fetching
+            onLoginSuccess({ id: userId, strava_id: 0, first_name: 'User', last_name: '', profile_medium: '' });
+          }
         }}
         onSkip={() => {
-          onLoginSuccess({ 
-            id: userId, 
-            strava_id: 20683290, 
-            first_name: 'Surendran', 
-            last_name: 'Balachandran', 
-            profile_medium: '' 
-          });
+          console.log('User skipped sync.');
+          const storedUser = sessionStorage.getItem('runsight_user');
+          if (storedUser) {
+            window.history.replaceState({}, '', '/'); // Clean URL
+            onLoginSuccess(JSON.parse(storedUser));
+          } else {
+            console.error("User data not found in session storage for onLoginSuccess after skip.");
+            window.history.replaceState({}, '', '/'); // Clean URL
+            onLoginSuccess({ id: userId, strava_id: 0, first_name: 'User', last_name: '', profile_medium: '' });
+          }
         }}
       />
     );
