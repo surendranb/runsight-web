@@ -1,4 +1,4 @@
-# RunSight Web 🏃‍♂️
+# RunSight Web 🏃‍♂️ 
 
 A beautiful, open-source running analytics app that connects with Strava and OpenWeatherMap to provide comprehensive insights about your runs.
 
