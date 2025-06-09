@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Database, Activity, Zap, History, RefreshCw } from 'lucide-react';
-// import { saveActivityToDatabase, getExistingActivitiesDateRange } from '../lib/strava';
-import { getExistingActivitiesDateRange } from '../lib/strava'; // Assuming this is still needed
+import { Calendar, Clock, Database, Activity, Zap, History } from 'lucide-react'; // RefreshCw removed as historic options will be commented out
+import { processAndSaveActivity } from '../lib/activityProcessor';
+// import { getExistingActivitiesDateRange } from '../lib/strava'; // To be commented out
 
 interface DataSyncSelectorProps {
   accessToken: string;
@@ -82,69 +82,46 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('');
   const [syncData, setSyncData] = useState<any>(null);
-  const [existingData, setExistingData] = useState<{earliest: Date | null, latest: Date | null, count: number} | null>(null);
-  const [showHistoricOptions, setShowHistoricOptions] = useState(false);
+  // const [existingData, setExistingData] = useState<{earliest: Date | null, latest: Date | null, count: number} | null>(null); // Commented out
+  // const [showHistoricOptions, setShowHistoricOptions] = useState(false); // Commented out
   const [hasNavigated, setHasNavigated] = useState(false);
 
-  // Load existing data on component mount
-  useEffect(() => {
-    const loadExistingData = async () => {
-      if (!isFirstRun) {
-        const data = await getExistingActivitiesDateRange(userId);
-        setExistingData(data);
-      }
-    };
-    loadExistingData();
-  }, [userId, isFirstRun]);
+  // Load existing data on component mount - COMMENTED OUT FOR SIMPLIFICATION
+  // useEffect(() => {
+  //   const loadExistingData = async () => {
+  //     if (!isFirstRun) {
+  //       // const data = await getExistingActivitiesDateRange(userId); // Functionality to be simplified
+  //       // setExistingData(data);
+  //     }
+  //   };
+  //   loadExistingData();
+  // }, [userId, isFirstRun]);
 
-  // Generate historic sync options based on existing data
-  const getHistoricSyncOptions = (): SyncOption[] => {
-    if (!existingData || !existingData.earliest) return [];
-
-    const historicOptions: SyncOption[] = [];
-    const earliestYear = existingData.earliest.getFullYear();
-    const currentYear = new Date().getFullYear();
-
-    // Add option to sync before earliest existing data
-    if (earliestYear > 2009) { // Strava started in 2009
-      historicOptions.push({
-        id: 'before-existing',
-        label: `Before ${earliestYear}`,
-        description: `Sync activities before your earliest data (${existingData.earliest.toLocaleDateString()})`,
-        icon: <History className="w-5 h-5" />,
-        days: -2, // Special flag for "before existing"
-        estimatedActivities: '10-100+ runs',
-        estimatedTime: '5-20 minutes'
-      });
-    }
-
-    // Add year-by-year options for gaps
-    for (let year = earliestYear - 1; year >= Math.max(2009, currentYear - 10); year--) {
-      historicOptions.push({
-        id: `year-${year}`,
-        label: `Year ${year}`,
-        description: `Sync all activities from ${year}`,
-        icon: <Calendar className="w-5 h-5" />,
-        days: -3, // Special flag for specific year
-        estimatedActivities: '20-100 runs',
-        estimatedTime: '3-10 minutes',
-        customYear: year
-      });
-    }
-
-    return historicOptions;
-  };
+  // Generate historic sync options based on existing data - COMMENTED OUT FOR SIMPLIFICATION
+  // const getHistoricSyncOptions = (): SyncOption[] => {
+  //   // if (!existingData || !existingData.earliest) return [];
+  //   // const historicOptions: SyncOption[] = [];
+  //   // const earliestYear = existingData.earliest.getFullYear();
+  //   // const currentYear = new Date().getFullYear();
+  //   // ... (rest of the logic)
+  //   return []; // Return empty array as it's not used now
+  // };
 
   const startSync = async () => {
     let option = syncOptions.find(opt => opt.id === selectedOption);
     
-    // Check if it's a historic option
-    if (!option && showHistoricOptions) {
-      const historicOptions = getHistoricSyncOptions();
-      option = historicOptions.find(opt => opt.id === selectedOption);
-    }
+    // Check if it's a historic option - COMMENTED OUT FOR SIMPLIFICATION
+    // if (!option && showHistoricOptions) {
+    //   const historicOptions = getHistoricSyncOptions();
+    //   option = historicOptions.find(opt => opt.id === selectedOption);
+    // }
     
-    if (!option) return;
+    if (!option) {
+      // If historic options are disabled, and no regular option found, it's an issue.
+      // Default to a safe option or throw error. For now, just return.
+      console.error("Selected sync option not found or historic options disabled.");
+      return;
+    }
 
     setIsLoading(true);
     setProgress(0);
@@ -156,31 +133,20 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
 
       // Calculate date range based on option type
       let startDate: Date;
-      let endDate = new Date();
+      let endDate = new Date(); // Used if option.days !== -1
 
-      if (option.days === -1) {
-        // All time - start from a very early date
-        startDate = new Date('2000-01-01');
-      } else if (option.days === -2) {
-        // Before existing data
-        if (existingData?.earliest) {
-          endDate = new Date(existingData.earliest);
-          startDate = new Date('2009-01-01'); // Strava started in 2009
-        } else {
-          throw new Error('No existing data found for historic sync');
-        }
-      } else if (option.days === -3 && option.customYear) {
-        // Specific year
-        startDate = new Date(option.customYear, 0, 1);
-        endDate = new Date(option.customYear, 11, 31);
-      } else {
-        // Regular relative date range
+      if (option.days === -1) { // All time
+        startDate = new Date('2000-01-01'); // Strava's earliest possible data
+      } else { // Regular relative date range (historic options are disabled for now)
         startDate = new Date();
         startDate.setDate(startDate.getDate() - option.days);
       }
 
       const startTimestamp = Math.floor(startDate.getTime() / 1000);
-      const endTimestamp = Math.floor(endDate.getTime() / 1000);
+      // For "All time" or specific day ranges, endTimestamp isn't strictly needed by Strava API if `after` is used.
+      // However, if you want to cap "All time" to 'today' for the loop logic:
+      const endTimestamp = Math.floor(new Date().getTime() / 1000);
+
 
       setStatus('Fetching activities from Strava...');
       setProgress(25);
@@ -193,9 +159,12 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
       while (true) {
         let url = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`;
         
-        // Add date filters if not all time
-        if (option.days !== -1) {
-          url += `&after=${startTimestamp}&before=${endTimestamp}`;
+        // Add date filters. `after` is primary. `before` can cap it.
+        // For "All Time", we don't strictly need `before`, but it can be used to limit to "today".
+        // For specific ranges (e.g. "Last 7 days"), `before` ensures we don't get activities newer than "now" if the job runs for a while.
+        url += `&after=${startTimestamp}`;
+        if (option.days !== -1) { // If not "All time", set an end cap.
+          url += `&before=${endTimestamp}`;
         }
 
         const response = await fetch(url, {
@@ -236,25 +205,34 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
       let savedCount = 0;
 
       for (let i = 0; i < runningActivities.length; i++) {
-        const activity = runningActivities[i];
+        const activity = runningActivities[i]; // This is a StravaSummaryActivity
         
-        setStatus(`Saving activity ${i + 1}/${runningActivities.length}: ${activity.name}`);
-        setProgress(50 + ((i / runningActivities.length) * 45));
+        setStatus(`Processing activity ${i + 1}/${runningActivities.length}: ${activity.name}`);
+        setProgress(50 + Math.round(((i + 1) / runningActivities.length) * 45));
 
         try {
-          // Save activity to database
-          // TODO: Implement new sync logic here using fetchStravaActivities and processAndSaveActivity
-          // const savedActivity = await saveActivityToDatabase(activity, userId, accessToken); // Pass accessToken
-          // processedActivities.push(savedActivity);
-          // savedCount++;
+          console.log(`[DataSyncSelector] Processing activity: ${activity.name} (Strava ID: ${activity.id})`);
+          // Ensure activity.id is a number if processAndSaveActivity expects number
+          const result = await processAndSaveActivity(Number(activity.id), userId, accessToken);
           
-          console.log(`✅ Activity processing for: ${activity.name} - (New logic to be implemented)`);
+          if (result.enrichedRunId) {
+            // Store basic info for summary, or more if needed later
+            processedActivities.push({
+              id: result.enrichedRunId,
+              name: activity.name,
+              strava_id: activity.id
+            });
+            savedCount++;
+            console.log(`✅ Successfully processed and saved: ${activity.name} (Enriched ID: ${result.enrichedRunId})`);
+          } else {
+            console.error(`[DataSyncSelector] Failed to process activity ${activity.id} (${activity.name}):`, result.error);
+            // Optionally, add to a list of failed activities to show to the user
+          }
         } catch (activityError) {
-          console.error('Failed to process activity (new logic):', activity.id, activityError);
-          // Continue with other activities
+          console.error(`[DataSyncSelector] Critical error during processing of activity ${activity.id} (${activity.name}):`, activityError);
         }
 
-        // Small delay to avoid rate limiting
+        // Small delay to avoid potential rate limiting on services called by processAndSaveActivity
         if (i % 5 === 0) {
           await new Promise(resolve => setTimeout(resolve, 200));
         }
@@ -394,18 +372,19 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <h3 className="font-semibold text-blue-800 mb-2">📊 Your Current Data</h3>
             <div className="space-y-1 text-sm text-blue-700">
-              <div>🏃‍♂️ {existingData.count} activities in database</div>
-              <div>📅 From {existingData.earliest?.toLocaleDateString()} to {existingData.latest?.toLocaleDateString()}</div>
+              {/* <div>🏃‍♂️ {existingData.count} activities in database</div> */}
+              {/* <div>📅 From {existingData.earliest?.toLocaleDateString()} to {existingData.latest?.toLocaleDateString()}</div> */}
+              <div>Review sync options below.</div>
             </div>
             
-            {/* Historic sync options toggle */}
-            <button
+            {/* Historic sync options toggle - COMMENTED OUT */}
+            {/* <button
               onClick={() => setShowHistoricOptions(!showHistoricOptions)}
               className="mt-3 flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium text-sm"
             >
               <History className="w-4 h-4" />
               {showHistoricOptions ? 'Hide' : 'Show'} Historic Sync Options
-            </button>
+            </button> */}
           </div>
         )}
 
@@ -454,50 +433,10 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
             </div>
           ))}
           
-          {/* Historic sync options */}
-          {showHistoricOptions && getHistoricSyncOptions().map((option) => (
-            <div
-              key={option.id}
-              onClick={() => setSelectedOption(option.id)}
-              className={`
-                p-6 rounded-xl border-2 cursor-pointer transition-all duration-200
-                ${selectedOption === option.id 
-                  ? 'border-orange-500 bg-orange-50 shadow-lg' 
-                  : 'border-orange-200 bg-orange-25 hover:border-orange-300 hover:shadow-md'
-                }
-              `}
-            >
-              <div className="flex items-start gap-4">
-                <div className={`
-                  p-3 rounded-lg
-                  ${selectedOption === option.id ? 'bg-orange-100 text-orange-600' : 'bg-orange-50 text-orange-500'}
-                `}>
-                  {option.icon}
-                </div>
-                
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">{option.label}</h3>
-                    <span className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full font-medium">HISTORIC</span>
-                    {selectedOption === option.id && (
-                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                    )}
-                  </div>
-                  
-                  <p className="text-gray-600 mb-3">{option.description}</p>
-                  
-                  <div className="flex gap-6 text-sm text-gray-500">
-                    <div>
-                      <span className="font-medium">Est. Activities:</span> {option.estimatedActivities}
-                    </div>
-                    <div>
-                      <span className="font-medium">Est. Time:</span> {option.estimatedTime}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+          {/* Historic sync options - COMMENTED OUT */}
+          {/* {showHistoricOptions && getHistoricSyncOptions().map((option) => (
+            // ... historic option rendering ...
+          ))} */}
         </div>
 
         <div className="flex gap-4 justify-center">
@@ -512,10 +451,7 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2"
           >
             <Database className="w-5 h-5" />
-            Start Sync ({
-              syncOptions.find(opt => opt.id === selectedOption)?.label || 
-              getHistoricSyncOptions().find(opt => opt.id === selectedOption)?.label
-            })
+            Start Sync ({syncOptions.find(opt => opt.id === selectedOption)?.label})
           </button>
         </div>
       </div>
