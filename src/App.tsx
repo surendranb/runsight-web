@@ -1,20 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Welcome } from './components/Welcome';
-import { Dashboard } from './components/Dashboard';
-import { StravaCallback } from './components/StravaCallback';
-import { EnvDebug } from './components/EnvDebug';
-import { useAuth } from './hooks/useAuth';
+import { SimpleStravaCallback } from './components/SimpleStravaCallback';
+import { SimpleDashboard } from './components/SimpleDashboard';
+import { useSimpleAuth } from './hooks/useSimpleAuth';
 
 function App() {
-  const { user, loading, login, logout } = useAuth();
-  // Removed useState for isCallback
+  const { user, loading, login, logout } = useSimpleAuth();
 
-  // Determine if we should show the StravaCallback component dynamically
+  // Check if this is a callback from Strava
   const urlParams = new URLSearchParams(window.location.search);
   const code = urlParams.get('code');
-  // Only consider it a callback if the path/code indicates AND we don't yet have a user.
-  // Once the user is set by the login process, we are no longer in a "callback processing" state.
-  const showCallbackComponent = (window.location.pathname === '/callback' || code) && !user;
+  const isCallback = (window.location.pathname === '/callback' || code) && !user;
 
   if (loading) {
     return (
@@ -27,31 +23,15 @@ function App() {
     );
   }
 
-  // Order of checks:
-  // 1. If loading, show loader.
-  // 2. If it's a callback situation (URL indicates callback AND no user yet), show StravaCallback.
-  // 3. If user exists (and not a callback situation anymore), show Dashboard.
-  // 4. Otherwise, show Welcome.
-
-  if (showCallbackComponent) {
-    return <StravaCallback onLoginSuccess={login} />;
+  if (isCallback) {
+    return <SimpleStravaCallback onSuccess={login} />;
   }
 
   if (user) {
-    return (
-      <>
-        <Dashboard user={user} onLogout={logout} />
-        <EnvDebug />
-      </>
-    );
+    return <SimpleDashboard user={user} onLogout={logout} />;
   }
 
-  return (
-    <>
-      <Welcome />
-      <EnvDebug />
-    </>
-  );
+  return <Welcome />;
 }
 
 export default App;
