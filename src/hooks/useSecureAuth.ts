@@ -1,7 +1,7 @@
 // Secure Authentication Hook - No credentials in frontend
 // Uses session-based authentication with Netlify Functions
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiClient, type User } from '../lib/secure-api-client';
 
 interface AuthState {
@@ -70,7 +70,7 @@ export const useSecureAuth = () => {
     }
   };
 
-  const handleStravaCallback = async (code: string) => {
+  const handleStravaCallback = useCallback(async (code: string) => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
       
@@ -97,7 +97,7 @@ export const useSecureAuth = () => {
       }));
       throw error;
     }
-  };
+  }, []);
 
   const logout = () => {
     localStorage.removeItem('runsight_user');
