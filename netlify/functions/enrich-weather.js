@@ -22,7 +22,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY;
+    const OPENWEATHER_API_KEY = process.env.VITE_OPENWEATHER_API_KEY;
 
     if (!OPENWEATHER_API_KEY) {
       throw new Error('OpenWeatherMap API key not configured');
