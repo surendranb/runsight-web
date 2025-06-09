@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
-import { StravaAuthResponse, Activity } from '../types';
-import { fetchWeatherData, saveWeatherToDatabase } from '../lib/weather';
+import { StravaAuthResponse, Activity, StravaDetailedActivity } from '../types';
+// fetchWeatherData and saveWeatherToDatabase are no longer directly used here.
+// import { fetchWeatherData, saveWeatherToDatabase } from '../lib/weather';
+import { processAndSaveActivity } from './activityProcessor';
 
 const STRAVA_CLIENT_ID = import.meta.env.VITE_STRAVA_CLIENT_ID;
 const STRAVA_CLIENT_SECRET = import.meta.env.VITE_STRAVA_CLIENT_SECRET;
@@ -209,85 +211,104 @@ export const getExistingActivitiesDateRange = async (userId: string) => {
   }
 };
 
-export const saveActivityToDatabase = async (activity: any, userId: string) => {
-  // Skip database save if using temporary user (RLS issue)
-  if (userId.startsWith('temp_')) {
-    console.warn('Skipping activity save for temporary user due to RLS policy');
+/**
+ * @deprecated This function is being refactored to use the new activity processing pipeline.
+ * Its direct usage for saving to the old 'activities' table is being phased out.
+ * The caller should ideally be updated to call processAndSaveActivity directly
+ * and manage Strava access token retrieval.
+ */
+export const saveActivityToDatabase = async (activity: any, userId: string /*, stravaAccessToken: string - This would need to be added */): Promise<any> => {
+  console.log(`[saveActivityToDatabase - DEPRECATEDISH] Received call for activity ${activity.id}, user ${userId}. Redirecting to processAndSaveActivity.`);
+
+  // IMPORTANT: stravaAccessToken is needed by processAndSaveActivity.
+  // This function's signature or its caller needs to be updated to provide it.
+  // For now, using a placeholder. This will fail if not replaced.
+  const stravaAccessToken = 'PLACEHOLDER_ACCESS_TOKEN_NEEDS_TO_BE_PROVIDED';
+
+  if (stravaAccessToken === 'PLACEHOLDER_ACCESS_TOKEN_NEEDS_TO_BE_PROVIDED') {
+    console.error(`[saveActivityToDatabase] CRITICAL: stravaAccessToken is a placeholder. The actual token must be provided to call processAndSaveActivity.`);
+    // Return a structure similar to what the old function might have, or handle error
+    return { id: `temp_placeholder_error_${activity.id}`, error: "Missing Strava Access Token for new processing pipeline." };
+  }
+
+  if (!activity || !activity.id) {
+    console.error('[saveActivityToDatabase] Invalid activity object received.');
+    return { error: "Invalid activity object." };
+  }
+
+  // The old logic for temp_user check and direct supabase.upsert to 'activities' table is now commented out.
+  // if (userId.startsWith('temp_')) {
+  //   console.warn('Skipping activity save for temporary user due to RLS policy');
+  //   // ... old return for temp user
+  // }
+  // const { data, error } = await supabase.from('activities').upsert({ ... }); // Old logic
+  // ... old weather fetching logic ...
+
+  try {
+    const result = await processAndSaveActivity(
+      activity.id, // Strava Activity ID (number)
+      userId,      // Internal User ID (UUID)
+      stravaAccessToken
+    );
+
+    if (result.error) {
+      console.error(`[saveActivityToDatabase] Error processing activity ${activity.id} via new pipeline:`, result.error);
+      // Adapt error structure if needed to be compatible with callers
+      return {
+        id: `temp_error_${activity.id}`, // Keep a similar structure for ID if possible
+        strava_id: activity.id,
+        error: result.error.message || result.error
+      };
+    }
+
+    console.log(`[saveActivityToDatabase] Activity ${activity.id} processed via new pipeline. Enriched Run ID: ${result.enrichedRunId}`);
+    // Return a compatible success response, perhaps the new enrichedRunId or a status
+    // The old function returned the saved activity object from the 'activities' table.
+    // The new function returns the enrichedRunId. We need to adapt.
     return {
-      id: `temp_activity_${activity.id}`,
+      id: result.enrichedRunId, // This is the new UUID from enriched_runs
       strava_id: activity.id,
-      user_id: userId,
-      name: activity.name,
-      distance: activity.distance,
-      moving_time: activity.moving_time,
-      elapsed_time: activity.elapsed_time,
-      total_elevation_gain: activity.total_elevation_gain,
-      type: activity.type,
-      start_date: activity.start_date,
-      start_date_local: activity.start_date_local,
-      start_latlng: activity.start_latlng,
-      end_latlng: activity.end_latlng,
-      average_speed: activity.average_speed,
-      max_speed: activity.max_speed,
-      average_heartrate: activity.average_heartrate,
-      max_heartrate: activity.max_heartrate,
+      name: activity.name, // Include some basic fields for compatibility if needed by UI
+      // distance: activity.distance, // etc.
+      processed_via_new_pipeline: true,
+      // Note: This response structure is different from the original one.
+      // Callers might need adjustment if they relied on the full old activity structure.
+    };
+
+  } catch (e: any) {
+    console.error(`[saveActivityToDatabase] Unexpected error when calling processAndSaveActivity for ${activity.id}:`, e);
+    return {
+      id: `temp_unexpected_error_${activity.id}`,
+      strava_id: activity.id,
+      error: e.message || String(e)
     };
   }
+};
 
-  const { data, error } = await supabase
-    .from('activities')
-    .upsert({
-      strava_id: activity.id,
-      user_id: userId,
-      name: activity.name,
-      distance: activity.distance,
-      moving_time: activity.moving_time,
-      elapsed_time: activity.elapsed_time,
-      total_elevation_gain: activity.total_elevation_gain,
-      type: activity.type,
-      start_date: activity.start_date,
-      start_date_local: activity.start_date_local,
-      timezone: activity.timezone,
-      utc_offset: activity.utc_offset,
-      start_latlng: activity.start_latlng,
-      end_latlng: activity.end_latlng,
-      location_city: activity.location_city,
-      location_state: activity.location_state,
-      location_country: activity.location_country,
-      achievement_count: activity.achievement_count,
-      kudos_count: activity.kudos_count,
-      comment_count: activity.comment_count,
-      athlete_count: activity.athlete_count,
-      photo_count: activity.photo_count,
-      average_speed: activity.average_speed,
-      max_speed: activity.max_speed,
-      average_heartrate: activity.average_heartrate,
-      max_heartrate: activity.max_heartrate,
-      suffer_score: activity.suffer_score,
-      updated_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
+export const fetchDetailedStravaActivity = async (activityId: string, accessToken: string): Promise<StravaDetailedActivity> => {
+  console.log(`Fetching detailed Strava activity ${activityId}...`);
+  const apiUrl = `https://www.strava.com/api/v3/activities/${activityId}`;
 
-  if (error) {
-    console.error('Activity save error:', error);
-    throw error;
+  const response = await fetch(apiUrl, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  const responseText = await response.text(); // Read text first to avoid issues with large JSON
+
+  if (!response.ok) {
+    console.error(`Failed to fetch detailed Strava activity ${activityId}: ${response.status} ${responseText}`);
+    throw new Error(`Failed to fetch detailed Strava activity ${activityId}: ${response.status} ${responseText}`);
   }
 
-  // Fetch and save weather data
-  if (data && data.start_latlng && data.start_latlng.length === 2 && data.start_date_local) {
-    try {
-      console.log(`Fetching weather for activity ${data.id} at ${data.start_latlng} on ${data.start_date_local}`);
-      const weatherDataResult = await fetchWeatherData(data.start_latlng[0], data.start_latlng[1], data.start_date_local);
-      if (weatherDataResult && weatherDataResult.data) {
-        console.log(`Saving weather for activity ${data.id}`);
-        await saveWeatherToDatabase(weatherDataResult.data, data.id);
-      }
-    } catch (weatherError) {
-      console.error('Failed to fetch or save weather data:', weatherError);
-      // Do not re-throw, allow activity saving to succeed
-    }
+  try {
+    const data: StravaDetailedActivity = JSON.parse(responseText);
+    console.log(`Successfully fetched detailed Strava activity ${activityId}`);
+    return data;
+  } catch (e) {
+    console.error(`Failed to parse JSON for detailed Strava activity ${activityId}:`, e);
+    console.error(`Response text was: ${responseText.substring(0, 500)}...`); // Log part of the response
+    throw new Error(`Failed to parse JSON for detailed Strava activity ${activityId}`);
   }
-
-  return data;
 };

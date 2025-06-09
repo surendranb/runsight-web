@@ -103,3 +103,98 @@ export interface ActivityStats {
   bestTime: number;
   bestPace: number;
 }
+
+export interface StravaDetailedActivity {
+  id: number; // Strava ID
+  name: string;
+  distance: number;
+  moving_time: number;
+  elapsed_time: number;
+  total_elevation_gain: number;
+  type: string;
+  start_date: string; // ISO 8601 datetime
+  start_date_local: string; // ISO 8601 datetime
+  timezone: string;
+  utc_offset: number;
+  start_latlng: [number, number] | null;
+  end_latlng: [number, number] | null;
+  location_city: string | null;
+  location_state: string | null;
+  location_country: string | null;
+  achievement_count: number;
+  kudos_count: number;
+  comment_count: number;
+  athlete_count: number;
+  photo_count: number;
+  map: {
+    id: string;
+    summary_polyline: string | null;
+    polyline: string | null; // Detailed polyline, often very large
+  } | null;
+  trainer: boolean;
+  commute: boolean;
+  manual: boolean;
+  private: boolean;
+  visibility: string; // "followers_only", "everyone", "only_me"
+  average_speed: number;
+  max_speed: number;
+  has_heartrate: boolean;
+  average_heartrate: number | null;
+  max_heartrate: number | null;
+  suffer_score: number | null;
+  device_name: string | null;
+  gear_id: string | null; // ID of the gear used
+  external_id: string | null;
+  upload_id: number | null; // Legacy upload ID
+  upload_id_str?: string; // Sometimes Strava returns upload_id as a string
+  splits_metric: Array<{
+    distance: number; // meters
+    elapsed_time: number; // seconds
+    elevation_difference: number | null; // meters
+    moving_time: number; // seconds
+    split: number; // 1-based index
+    average_speed?: number; // m/s
+    average_heartrate?: number | null; // bpm
+    pace_seconds?: number; // seconds per km
+  }> | null;
+  splits_standard: Array<{
+    distance: number; // meters (convert to miles if needed, Strava provides it in meters)
+    elapsed_time: number; // seconds
+    elevation_difference: number | null; // meters
+    moving_time: number; // seconds
+    split: number; // 1-based index
+    average_speed?: number; // m/s
+    average_heartrate?: number | null; // bpm
+    pace_seconds?: number; // seconds per mile
+  }> | null;
+  laps: Array<{
+    id: number;
+    resource_state: number;
+    name: string;
+    activity: { id: number; resource_state: number; };
+    athlete: { id: number; resource_state: number; };
+    elapsed_time: number;
+    moving_time: number;
+    start_date: string;
+    start_date_local: string;
+    distance: number;
+    start_index: number;
+    end_index: number;
+    total_elevation_gain: number;
+    average_speed: number;
+    max_speed: number;
+    average_cadence?: number; // If available
+    device_watts?: boolean; // If power meter used for laps
+    average_watts?: number; // Average power for the lap
+    lap_index: number;
+    split: number; // Usually same as lap_index for simple cases
+    average_heartrate?: number | null;
+    max_heartrate?: number | null;
+  }> | null;
+  // Add any other fields that might be useful from the detailed activity object.
+  // For example:
+  // gear: any | null; // Detailed gear information
+  // photos: any | null; // Information about photos
+  // segment_efforts: any[] | null; // Detailed segment efforts
+  // best_efforts: any[] | null; // Best efforts for various distances
+}
