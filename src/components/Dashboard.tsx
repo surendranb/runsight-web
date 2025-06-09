@@ -1,5 +1,7 @@
 import React from 'react';
 import { User, Activity } from 'lucide-react';
+import { supabase } from '../lib/supabase'; // Adjusted path
+import { fetchWeatherData, saveWeatherToDatabase } from '../lib/weather'; // Adjusted path
 import { StatCard } from './StatCard';
 import { ActivityList } from './ActivityList';
 import { ActivityChart } from './ActivityChart';
@@ -14,6 +16,68 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const { activities, stats, loading } = useActivities(user.id);
+
+  const handleTestWeatherBackfill = async () => {
+    const testActivityId = '748a221e-472e-45b5-b828-da722c59e9a2';
+    console.log(`[WeatherTest] Starting single activity weather test for ID: ${testActivityId}`);
+
+    try {
+      // 1. Fetch activity details
+      const { data: activity, error: activityError } = await supabase
+        .from('activities')
+        .select('start_latlng, start_date_local')
+        .eq('id', testActivityId)
+        .single();
+
+      if (activityError) {
+        console.error(`[WeatherTest] Error fetching activity ${testActivityId}:`, activityError);
+        alert(`Error fetching activity: ${activityError.message}`);
+        return;
+      }
+
+      if (!activity) {
+        console.error(`[WeatherTest] Activity ${testActivityId} not found.`);
+        alert('Activity not found.');
+        return;
+      }
+
+      console.log(`[WeatherTest] Found activity:`, activity);
+
+      // 2. Check for necessary data
+      if (!activity.start_latlng || activity.start_latlng.length !== 2 || !activity.start_date_local) {
+        console.error(`[WeatherTest] Activity ${testActivityId} is missing start_latlng or start_date_local.`);
+        alert('Activity data is incomplete (missing lat/lng or local start date).');
+        return;
+      }
+
+      // 3. Fetch weather data
+      console.log(`[WeatherTest] Fetching weather data for lat: ${activity.start_latlng[0]}, lon: ${activity.start_latlng[1]}, date: ${activity.start_date_local}`);
+      const weatherDataResult = await fetchWeatherData(
+        activity.start_latlng[0],
+        activity.start_latlng[1],
+        activity.start_date_local
+      );
+      console.log('[WeatherTest] OWM API Response:', weatherDataResult);
+
+
+      if (!weatherDataResult || !weatherDataResult.data) {
+        console.error(`[WeatherTest] No weather data returned from fetchWeatherData for activity ${testActivityId}.`);
+        alert('Failed to fetch weather data (no data returned). Check console.');
+        return;
+      }
+
+      console.log(`[WeatherTest] Successfully fetched weather data for ${testActivityId}:`, weatherDataResult.data);
+
+      // 4. Save weather data
+      await saveWeatherToDatabase(weatherDataResult.data, testActivityId);
+      console.log(`[WeatherTest] Successfully saved weather data for activity ${testActivityId}.`);
+      alert('Weather data fetched and saved successfully! Check console and database.');
+
+    } catch (error) {
+      console.error(`[WeatherTest] An error occurred during the test weather backfill for ${testActivityId}:`, error);
+      alert(`An error occurred: ${error instanceof Error ? error.message : String(error)}. Check console.`);
+    }
+  };
 
   const formatDistance = (distance: number) => {
     return (distance / 1000).toFixed(0) + ' km';
@@ -171,6 +235,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           </div>
         )}
       </main>
+      <button
+        onClick={handleTestWeatherBackfill}
+        style={{ padding: '10px', margin: '20px', backgroundColor: 'lightblue' }}
+      >
+        Test Single Weather Backfill for 748a221e-472e-45b5-b828-da722c59e9a2
+      </button>
     </div>
   );
 };
