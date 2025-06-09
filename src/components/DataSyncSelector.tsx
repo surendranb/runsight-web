@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Database, Activity, Zap, History } from 'lucide-react'; // RefreshCw removed as historic options will be commented out
 import { processAndSaveActivity } from '../lib/activityProcessor';
+import { supabase } from '../lib/supabase'; // Adjust path as needed
 // import { getExistingActivitiesDateRange } from '../lib/strava'; // To be commented out
 
 interface DataSyncSelectorProps {
@@ -106,6 +107,64 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
   //   // ... (rest of the logic)
   //   return []; // Return empty array as it's not used now
   // };
+
+  const testMinimalInsert = async () => {
+    // Use a known, valid user_id from your auth.users table.
+    // For testing, you might need to hardcode one that you know exists,
+    // or dynamically get the current logged-in user's ID if available here.
+    // Assuming `userId` prop is available and is the correct auth.users UUID.
+    if (!userId) {
+      alert('User ID is not available for the test insert.');
+      console.error('[MinimalTest] User ID not available.');
+      return;
+    }
+
+    const testData = {
+      user_id: userId, // Use the actual logged-in user's ID
+      strava_id: Math.floor(Math.random() * 1000000000) + 100000000, // Random Strava ID for testing
+      name: 'Minimal Test Run - ' + new Date().toISOString(),
+      distance: 1000.0, // real
+      moving_time: 300,  // integer
+      elapsed_time: 310, // integer
+      type: 'Run',       // text, matches CHECK constraint
+      start_date: new Date().toISOString(), // timestamp with time zone
+      start_date_local: new Date().toISOString(), // timestamp with time zone
+      // Omitting all other nullable fields to keep it minimal
+      // Ensure all NOT NULL fields (without defaults) are included if any exist beyond this list
+    };
+
+    console.log('[MinimalTest] Attempting insert with data:', JSON.stringify(testData, null, 2));
+    alert('[MinimalTest] Check console: Attempting insert...');
+
+    try {
+      const { data, error, status, statusText } = await supabase
+        .from('enriched_runs')
+        .insert(testData)
+        .select(); // .select() is important to get detailed error or the inserted data back
+
+      if (error) {
+        console.error('[MinimalTest] Supabase insert error object:', JSON.stringify(error, null, 2));
+        console.error(`[MinimalTest] Supabase insert error: Code: ${error.code}, Message: ${error.message}, Details: ${error.details}, Hint: ${error.hint}`);
+        alert(`Minimal test insert FAILED. Code: ${error.code}. Message: ${error.message}. Check console for full error.`);
+      } else {
+        console.log('[MinimalTest] Supabase insert success. Status:', status, statusText);
+        console.log('[MinimalTest] Supabase insert success. Returned data:', JSON.stringify(data, null, 2));
+        alert('Minimal test insert SUCCEEDED. Check database and console.');
+      }
+    } catch (e: any) {
+      // This outer catch is for errors not originating from Supabase client's structured error object
+      console.error('[MinimalTest] Outer catch - An unexpected error occurred:', JSON.stringify(e, null, 2));
+      let errorMessage = 'Unknown error';
+      if (e instanceof Error) {
+          errorMessage = e.message;
+      } else if (typeof e === 'string') {
+          errorMessage = e;
+      } else if (e && typeof e.message === 'string') {
+          errorMessage = e.message;
+      }
+      alert(`Minimal test insert FAILED (outer catch). Error: ${errorMessage}. Check console.`);
+    }
+  };
 
   const startSync = async () => {
     let option = syncOptions.find(opt => opt.id === selectedOption);
@@ -456,6 +515,24 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
           >
             <Database className="w-5 h-5" />
             Start Sync ({syncOptions.find(opt => opt.id === selectedOption)?.label})
+          </button>
+        </div>
+
+        {/* Debug Tools Section */}
+        <div style={{ marginTop: '20px', padding: '10px', border: '1px solid red', textAlign: 'center' }}>
+          <h4 style={{ color: 'red', fontWeight: 'bold', marginBottom: '10px' }}>Debug Tools</h4>
+          <button
+            onClick={testMinimalInsert}
+            style={{
+              backgroundColor: 'orange',
+              color: 'white',
+              padding: '10px 15px',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer'
+            }}
+          >
+            Test Minimal Insert into enriched_runs
           </button>
         </div>
       </div>
