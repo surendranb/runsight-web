@@ -1,7 +1,7 @@
 // Secure Strava Callback Component - No credentials exposed
 // Handles OAuth callback through Netlify Functions
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSecureAuth } from '../hooks/useSecureAuth';
 import { apiClient } from '../lib/secure-api-client';
 
@@ -19,14 +19,23 @@ const SecureStravaCallback: React.FC = () => {
     message: 'Authenticating with Strava...',
     progress: 10
   });
+  const hasProcessed = useRef(false);
 
   useEffect(() => {
+    // Prevent multiple executions
+    if (hasProcessed.current) return;
+    hasProcessed.current = true;
+    
     const processCallback = async () => {
       try {
+        console.log('🔄 Starting callback processing...');
+        
         // Get authorization code from URL
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         const error = urlParams.get('error');
+        
+        console.log('📋 URL params:', { code: code?.substring(0, 10) + '...', error });
 
         if (error) {
           throw new Error(`Strava authorization failed: ${error}`);
@@ -43,7 +52,9 @@ const SecureStravaCallback: React.FC = () => {
           progress: 20
         });
 
+        console.log('🔐 Calling handleStravaCallback...');
         const authenticatedUser = await handleStravaCallback(code);
+        console.log('✅ Authentication successful:', authenticatedUser);
 
         setState({
           step: 'syncing',
@@ -86,7 +97,7 @@ const SecureStravaCallback: React.FC = () => {
     };
 
     processCallback();
-  }, [handleStravaCallback]);
+  }, []); // Run only once on mount
 
   const getStepIcon = () => {
     switch (state.step) {
