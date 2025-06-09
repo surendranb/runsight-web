@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Database, Activity, Zap, History, RefreshCw } from 'lucide-react';
-import { saveActivityToDatabase, getExistingActivitiesDateRange } from '../lib/strava';
+// import { saveActivityToDatabase, getExistingActivitiesDateRange } from '../lib/strava';
+import { getExistingActivitiesDateRange } from '../lib/strava'; // Assuming this is still needed
 
 interface DataSyncSelectorProps {
   accessToken: string;
@@ -242,13 +243,14 @@ export const DataSyncSelector: React.FC<DataSyncSelectorProps> = ({
 
         try {
           // Save activity to database
-          const savedActivity = await saveActivityToDatabase(activity, userId);
-          processedActivities.push(savedActivity);
-          savedCount++;
+          // TODO: Implement new sync logic here using fetchStravaActivities and processAndSaveActivity
+          // const savedActivity = await saveActivityToDatabase(activity, userId, accessToken); // Pass accessToken
+          // processedActivities.push(savedActivity);
+          // savedCount++;
           
-          console.log(`✅ Activity saved: ${activity.name}`);
+          console.log(`✅ Activity processing for: ${activity.name} - (New logic to be implemented)`);
         } catch (activityError) {
-          console.error('Failed to save activity:', activity.id, activityError);
+          console.error('Failed to process activity (new logic):', activity.id, activityError);
           // Continue with other activities
         }
 
