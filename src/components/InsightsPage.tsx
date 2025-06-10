@@ -43,7 +43,7 @@ export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoadin
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="bg-white shadow rounded-lg p-6 mb-6">
         <h2 className="text-2xl font-semibold text-gray-800 mb-1">Insights Hub</h2>
-        <p className="text-gray-600">Welcome, {user.first_name || user.email.split('@')[0]}! Analyzing {runs.length} runs.</p>
+        <p className="text-gray-600">Welcome, {user.name}! Analyzing {runs.length} runs.</p>
       </div>
 
       {runs.length === 0 && !isLoading && (
