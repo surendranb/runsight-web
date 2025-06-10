@@ -147,3 +147,4 @@ exports.handler = async (event, context) => {
     };
   }
 };
+// Re-committing to ensure visibility of batch insert fix.
