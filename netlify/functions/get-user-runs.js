@@ -1,5 +1,5 @@
-// Netlify Function: Get user's runs from database (server-side)
-// This keeps database access on the server
+// netlify/functions/get-user-runs.js
+// Netlify Function: Get user's runs, stats, and splits from database (server-side)
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -32,28 +32,43 @@ exports.handler = async (event, context) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
-    // Get user ID from query parameters
     const userId = event.queryStringParameters?.userId;
 
     if (!userId) {
       throw new Error('User ID is required');
     }
 
-    // Fetch user's runs from database (server-side with service key)
-    const { data: runs, error: fetchError } = await supabase
+    // Fetch user's runs
+    console.log(`Fetching runs for user ${userId}...`);
+    const { data: runs, error: fetchRunsError } = await supabase
       .from('runs')
       .select('*')
       .eq('user_id', userId)
       .order('start_date', { ascending: false });
 
-    if (fetchError) {
-      throw new Error(`Failed to fetch runs: ${fetchError.message}`);
+    if (fetchRunsError) {
+      console.error(`Error fetching runs for user ${userId}:`, fetchRunsError);
+      throw new Error(`Failed to fetch runs: ${fetchRunsError.message}`);
     }
-
     console.log(`✅ Fetched ${runs.length} runs for user ${userId}`);
 
-    // Calculate statistics
+    // Fetch user's run_splits
+    console.log(`Fetching run_splits for user ${userId}...`);
+    const { data: splits, error: fetchSplitsError } = await supabase
+      .from('run_splits')
+      .select('*')
+      .eq('user_id', userId)
+      // Ordering splits might be useful, e.g., by run ID then split number
+      .order('enriched_run_id', { ascending: true })
+      .order('split_number', { ascending: true });
+
+    if (fetchSplitsError) {
+      console.error(`Error fetching run_splits for user ${userId}:`, fetchSplitsError);
+      throw new Error(`Failed to fetch run splits: ${fetchSplitsError.message}`);
+    }
+    console.log(`✅ Fetched ${splits.length} run_splits for user ${userId}`);
+
+    // Calculate statistics (remains the same)
     const stats = {
       total_runs: runs.length,
       total_distance: runs.reduce((sum, run) => sum + (run.distance || 0), 0),
@@ -64,13 +79,16 @@ exports.handler = async (event, context) => {
 
     if (runs.length > 0) {
       stats.average_distance = stats.total_distance / runs.length;
-      const totalPace = runs.reduce((sum, run) => {
-        if (run.distance && run.moving_time) {
-          return sum + (run.moving_time / (run.distance / 1000));
-        }
-        return sum;
+      const validPaceRuns = runs.filter(r => r.distance && r.moving_time && r.distance > 0);
+      const totalPaceSeconds = validPaceRuns.reduce((sum, run) => {
+        // pace in seconds per kilometer
+        return sum + (run.moving_time / (run.distance / 1000));
       }, 0);
-      stats.average_pace = totalPace / runs.length;
+
+      // Average pace in seconds per kilometer
+      stats.average_pace = validPaceRuns.length > 0
+                         ? totalPaceSeconds / validPaceRuns.length
+                         : 0;
     }
 
     return {
@@ -80,17 +98,18 @@ exports.handler = async (event, context) => {
         success: true,
         runs: runs,
         stats: stats,
-        count: runs.length
+        splits: splits, // Added splits to the response
+        count: runs.length // This typically refers to runs count
       })
     };
 
   } catch (error) {
-    console.error('Get user runs error:', error);
+    console.error('Get user runs/splits error:', error);
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        error: 'Failed to fetch user runs',
+        error: 'Failed to fetch user runs and splits',
         message: error.message 
       })
     };

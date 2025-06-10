@@ -45,9 +45,14 @@ export interface RunSplit {
   enriched_run_id: string;
   user_id: string;
   split_number: number;
-  distance: number;
-  elapsed_time: number;
-  // Add other relevant fields from your 'run_splits' table
+  distance: number; // meters
+  elapsed_time: number; // seconds
+  moving_time?: number; // Optional: if available
+  average_speed?: number; // Optional: m/s
+  average_heartrate?: number | null; // Optional: bpm
+  total_elevation_gain?: number | null; // Optional: meters for the split
+  // Add other fields as per your 'run_splits' table schema if they exist
+  // and are returned by the Netlify function.
 }
 
 // Add RunStats if it's to be passed around, though SimpleDashboard calculates its own
