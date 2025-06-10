@@ -14,7 +14,7 @@ import {
 } from 'recharts';
 import { EnrichedRun } from '../../types';
 import { groupRunsByWeek, groupRunsByMonth, TimeGroupData } from '../../lib/insights/consistencyUtils';
-import { convertSecondsToHoursMinutes } from '@/utils/utils';
+ import { convertSecondsToHoursMinutes } from '../../lib/insightsUtils';
 
 interface ConsistencyInsightProps {
   runs: EnrichedRun[];

@@ -22,3 +22,12 @@ export const getHourFromDateString = (dateString?: string): number | null => {
   if (isNaN(date.getTime())) return null;
   return date.getHours();
 };
+
+export const convertSecondsToHoursMinutes = (totalSeconds: number): { hours: number; minutes: number } => {
+  if (totalSeconds < 0) {
+    return { hours: 0, minutes: 0 };
+  }
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  return { hours, minutes };
+};
