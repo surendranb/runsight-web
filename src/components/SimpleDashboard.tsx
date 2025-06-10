@@ -1,5 +1,5 @@
 // src/components/SimpleDashboard.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { Activity, MapPin, Clock, Zap, Heart } from 'lucide-react'; // LogOut removed as logout is global
 import { User, EnrichedRun, RunSplit } from '../types';
 
@@ -22,6 +22,22 @@ export const SimpleDashboard: React.FC<SimpleDashboardProps> = ({
   error
   // onNavigateToInsights is removed
 }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const totalPages = Math.ceil(runs.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedRuns = runs.slice(startIndex, endIndex);
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
   const formatDistance = (meters: number) => (meters / 1000).toFixed(2) + ' km';
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -169,7 +185,7 @@ export const SimpleDashboard: React.FC<SimpleDashboardProps> = ({
               <h2 className="text-lg font-semibold text-gray-800">Recent Runs</h2>
             </div>
             <div className="divide-y divide-gray-200">
-              {runs.map((run) => {
+              {paginatedRuns.map((run) => {
                 const weather = getWeatherInfo(run);
                 return (
                   <div key={run.id} className="p-6 hover:bg-gray-50 transition-colors">
@@ -213,6 +229,27 @@ export const SimpleDashboard: React.FC<SimpleDashboardProps> = ({
               })}
             </div>
           </div>
+          {runs.length > 0 && (
+            <div className="mt-8 flex justify-between items-center p-4 bg-white shadow rounded-lg">
+              <button
+                onClick={handlePreviousPage}
+                disabled={currentPage === 1}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-gray-700">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages || totalPages === 0}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </>
       )}
       </main>
