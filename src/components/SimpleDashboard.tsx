@@ -53,7 +53,24 @@ export const SimpleDashboard: React.FC<SimpleDashboardProps> = ({
     const secondsVal = Math.floor(paceSeconds % 60);
     return `${minutes}:${secondsVal.toString().padStart(2, '0')}/km`;
   };
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const formatDate = (dateString: string) => {
+    // Extract YYYY-MM-DD from the ISO string (e.g., "2025-06-10T23:58:00Z" -> "2025-06-10")
+    // This assumes dateString is a valid ISO string or at least starts with YYYY-MM-DD.
+    const datePart = dateString.substring(0, 10);
+
+    // Create a Date object by appending T00:00:00Z to the date part.
+    // This forces the Date object to be interpreted as midnight UTC on that specific date.
+    const utcDate = new Date(datePart + 'T00:00:00Z');
+
+    // Format this date using toLocaleDateString, specifying UTC as the timezone.
+    // This ensures the output date is based on the UTC interpretation, not the browser's local timezone.
+    return utcDate.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC' // Key change: format the date as it is in UTC.
+    });
+  };
 
   const getWeatherInfo = (run: EnrichedRun) => {
     if (!run.weather_data || typeof run.weather_data !== 'object') return null;
