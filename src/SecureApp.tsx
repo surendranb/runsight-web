@@ -5,9 +5,10 @@ import SecureStravaCallback from './components/SecureStravaCallback';
 import { NavigationBar } from './components/NavigationBar';
 import { SimpleDashboard } from './components/SimpleDashboard';
 import { InsightsPage } from './components/InsightsPage';
-import { User, EnrichedRun, RunSplit } from './types'; // Use our main types
-import { supabase } from './lib/supabase'; // For direct data fetching
-import { apiClient } from './lib/secure-api-client'; // For sync functionality
+import { User, EnrichedRun, RunSplit, RunStats } from './types'; // Use our main types
+// Remove direct supabase client import if no longer used here
+// import { supabase } from './lib/supabase';
+import { apiClient } from './lib/secure-api-client'; // For ALL data operations
 
 // View type consistent with NavigationBar and App.tsx's previous definition
 type View = 'dashboard' | 'insights' | 'welcome' | 'callback' | 'loading' | 'goals' | 'settings';
@@ -30,6 +31,7 @@ const SecureApp: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('loading');
   const [runs, setRuns] = useState<EnrichedRun[]>([]);
   const [splits, setSplits] = useState<RunSplit[]>([]);
+  const [stats, setStats] = useState<RunStats | null>(null); // Optional: to store stats
   const [dataLoading, setDataLoading] = useState<boolean>(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -54,80 +56,64 @@ const SecureApp: React.FC = () => {
     }
   }, [authLoading, user]);
 
-  // Effect to fetch data when user is available and view requires it
+  // MODIFIED: Effect to fetch data using apiClient
+  const fetchData = useCallback(async () => {
+    if (!user || !user.id) {
+      setDataError("User ID is missing, cannot fetch data.");
+      setRuns([]);
+      setSplits([]);
+      setStats(null);
+      setDataLoading(false);
+      return;
+    }
+
+    setDataLoading(true);
+    setDataError(null);
+    try {
+      console.log(`SecureApp: Calling apiClient.getUserRuns for user ${user.id}`);
+      const { runs: fetchedRuns, stats: fetchedStats, splits: fetchedSplits } = await apiClient.getUserRuns(user.id);
+
+      // The Run type from apiClient should be compatible with EnrichedRun
+      setRuns(fetchedRuns as EnrichedRun[]);
+      setSplits(fetchedSplits as RunSplit[]);
+      setStats(fetchedStats); // Store stats
+
+      console.log(`SecureApp: Data fetched. Runs: ${fetchedRuns.length}, Splits: ${fetchedSplits.length}, Stats:`, fetchedStats);
+
+    } catch (err: any) {
+      console.error("SecureApp: Error fetching data via apiClient:", err);
+      setDataError(err.message || 'Failed to load activity data via apiClient.');
+      setRuns([]);
+      setSplits([]);
+      setStats(null);
+    } finally {
+      setDataLoading(false);
+    }
+  }, [user]); // useCallback depends on user
+
   useEffect(() => {
     if (user && user.id && (currentView === 'dashboard' || currentView === 'insights')) {
-      const fetchData = async () => {
-        setDataLoading(true);
-        setDataError(null);
-        try {
-          // Fetch enriched_runs (detailed runs for insights)
-          const { data: runsData, error: runsError } = await supabase
-            .from('runs') // Using 'runs' table as identified for EnrichedRun data
-            .select('*')
-            .eq('user_id', user.id)
-            .order('start_date', { ascending: false });
-          if (runsError) throw runsError;
-          setRuns(runsData || []);
-
-          // Fetch run_splits
-          const { data: splitsData, error: splitsError } = await supabase
-            .from('run_splits')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('enriched_run_id', { ascending: true })
-            .order('split_number', { ascending: true });
-          if (splitsError) throw splitsError;
-          setSplits(splitsData || []);
-
-        } catch (err: any) {
-          console.error("SecureApp: Error fetching data:", err);
-          setDataError(err.message || 'Failed to load activity data.');
-          setRuns([]);
-          setSplits([]);
-        } finally {
-          setDataLoading(false);
-        }
-      };
       fetchData();
     }
-  }, [user, user?.id, currentView]);
+  }, [user, user?.id, currentView, fetchData]);
 
 
   const handleLogout = () => {
-    secureLogout(); // This comes from useSecureAuth
-    setCurrentView('welcome'); // Reset view
-    setRuns([]); // Clear data
+    secureLogout();
+    setCurrentView('welcome');
+    setRuns([]);
     setSplits([]);
+    setStats(null);
   };
 
   const handleSyncData = async () => {
       if (!user || !user.id) return;
       setIsSyncing(true);
-      setDataError(null); // Clear previous errors
+      setDataError(null);
       try {
-          const result = await apiClient.syncUserData(user.id, 30); // Sync last 30 days
+          const result = await apiClient.syncUserData(user.id, 30);
           alert(`Sync complete! Added ${result.savedCount} new runs, skipped ${result.skippedCount}. Data will refresh.`);
-          // Re-fetch data by triggering the data fetching useEffect
-          // A simple way is to temporarily change currentView and change it back, or add a manual refetch trigger
-          // For now, let's rely on the existing useEffect by just setting dataLoading to true
-          // which will show loading indicator, and then data will be re-fetched if view changes or user changes.
-          // Forcing a re-fetch of data:
-          if (user && user.id && (currentView === 'dashboard' || currentView === 'insights')) {
-            setDataLoading(true); // Show loading
-             // Fetch enriched_runs (detailed runs for insights)
-            const { data: runsData, error: runsError } = await supabase
-              .from('runs') .select('*').eq('user_id', user.id).order('start_date', { ascending: false });
-            if (runsError) throw runsError;
-            setRuns(runsData || []);
-             // Fetch run_splits
-            const { data: splitsData, error: splitsError } = await supabase
-              .from('run_splits').select('*').eq('user_id', user.id).order('enriched_run_id', { ascending: true }).order('split_number', { ascending: true });
-            if (splitsError) throw splitsError;
-            setSplits(splitsData || []);
-            setDataLoading(false);
-          }
-
+          await fetchData(); // Re-fetch all data after sync
       } catch (error: any) {
           console.error('Sync failed:', error);
           setDataError(error.message || 'Sync failed');
@@ -191,16 +177,17 @@ const SecureApp: React.FC = () => {
             user={user}
             onLogout={handleLogout} // Kept if SimpleDashboard has specific logout needs, else remove
             runs={runs}
-            splits={splits}
-            isLoading={dataLoading} // Use dataLoading for content area
+            splits={splits} // Pass splits to SimpleDashboard
+            isLoading={dataLoading}
             error={dataError}
+            // stats={stats} // Optionally pass stats if SimpleDashboard is adapted
           />
         )}
         {currentView === 'insights' && (
           <InsightsPage
             user={user}
-            runs={runs}
-            isLoading={dataLoading} // Use dataLoading for content area
+            runs={runs} // InsightsPage uses runs to calculate its own internal stats
+            isLoading={dataLoading}
             error={dataError}
           />
         )}
@@ -219,7 +206,7 @@ const SecureApp: React.FC = () => {
   // Fallback / default (should ideally not be reached if logic above is correct)
   return (
     <div style={{ padding: '20px', textAlign: 'center' }}>
-      <p>Something went wrong. Current view: {currentView}</p>
+      <p>Something went wrong. Current view: {currentView}. User authenticated: {!!user}</p>
     </div>
   );
 };

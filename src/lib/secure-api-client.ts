@@ -32,9 +32,25 @@ export interface RunStats {
   total_runs: number;
   total_distance: number;
   total_time: number;
-  average_pace: number;
-  average_distance: number;
+  average_pace: number; // seconds per km
+  average_distance: number; // meters
 }
+
+// Add RunSplit interface, ensuring it matches the expected structure
+export interface RunSplit {
+  id: string; // UUID from database
+  enriched_run_id: string; // Foreign key to runs.id
+  user_id: string; // Foreign key to users.id
+  split_number: number;
+  distance: number; // meters
+  elapsed_time: number; // seconds
+  moving_time?: number; // Optional: if available
+  average_speed?: number; // Optional: m/s
+  average_heartrate?: number | null; // Optional: bpm
+  total_elevation_gain?: number | null; // Optional: meters for the split
+  // Add other fields as per your 'run_splits' table schema
+}
+
 
 class SecureApiClient {
   private baseUrl: string;
@@ -139,8 +155,8 @@ class SecureApiClient {
     };
   }
 
-  async getUserRuns(userId: string): Promise<{ runs: Run[]; stats: RunStats }> {
-    console.log(`📖 Fetching runs for user ${userId}...`);
+  async getUserRuns(userId: string): Promise<{ runs: Run[]; stats: RunStats; splits: RunSplit[] }> {
+    console.log(`📖 Fetching runs, stats, and splits for user ${userId}...`);
     
     const response = await fetch(`${this.baseUrl}/get-user-runs?userId=${userId}`, {
       method: 'GET',
@@ -148,16 +164,19 @@ class SecureApiClient {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch user runs');
+      throw new Error(error.message || 'Failed to fetch user runs, stats, and splits');
     }
 
     const data = await response.json();
+    // Ensure the response structure matches what the Netlify function now sends
     return {
-      runs: data.runs,
-      stats: data.stats
+      runs: data.runs || [], // Default to empty array if undefined
+      stats: data.stats,
+      splits: data.splits || [] // Default to empty array if undefined
     };
   }
 
+  // ... (syncUserData remains the same, but will now benefit from getUserRuns returning splits if that's part of a reload) ...
   // Complete flow: Fetch → Enrich → Save
   async syncUserData(userId: string, days: number = 7): Promise<{
     activities: any[];
@@ -199,5 +218,15 @@ class SecureApiClient {
 // Export singleton instance
 export const apiClient = new SecureApiClient();
 
-// Export types
-export type { User, Run, RunStats };
+// Export types (User, Run, RunStats already exported, ensure RunSplit is too)
+export type { User, Run, RunStats, RunSplit };
+
+// Self-correction: max_speed and total_elevation_gain in Run interface
+// should be number | null to match EnrichedRun from src/types/index.ts
+// if they can indeed be null from the database.
+// The current 'Run' type here has them as 'number'.
+// For now, I'll keep them as defined in the existing secure-api-client.ts,
+// but this is a point of potential mismatch if DB can have nulls for these.
+// The provided `Run` type here already has `average_heartrate: number | null` and `max_heartrate: number | null`.
+// `start_latlng` and `end_latlng` are `string | null`.
+// Let's assume `max_speed` and `total_elevation_gain` are non-nullable `number` as per this file's current Run definition.
