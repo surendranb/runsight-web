@@ -24,8 +24,12 @@ export interface Run {
   average_heartrate: number | null;
   max_heartrate: number | null;
   total_elevation_gain: number;
-  weather_data: any;
-  strava_data: any;
+  weather_data: any; // Contains weather details
+  strava_data: any;  // Contains full Strava activity, including splits_metric, laps etc.
+  // Potentially also direct columns like splits_metric, splits_standard, laps if defined on the 'runs' table
+  splits_metric?: any; // Example if it's a direct column
+  splits_standard?: any; // Example if it's a direct column
+  laps?: any; // Example if it's a direct column
 }
 
 export interface RunStats {
@@ -36,19 +40,19 @@ export interface RunStats {
   average_distance: number; // meters
 }
 
-// Add RunSplit interface, ensuring it matches the expected structure
+// RunSplit interface can remain for potential client-side parsing,
+// but it's not directly part of getUserRuns response structure anymore.
 export interface RunSplit {
-  id: string; // UUID from database
-  enriched_run_id: string; // Foreign key to runs.id
-  user_id: string; // Foreign key to users.id
+  id: string;
+  enriched_run_id: string;
+  user_id: string;
   split_number: number;
-  distance: number; // meters
-  elapsed_time: number; // seconds
-  moving_time?: number; // Optional: if available
-  average_speed?: number; // Optional: m/s
-  average_heartrate?: number | null; // Optional: bpm
-  total_elevation_gain?: number | null; // Optional: meters for the split
-  // Add other fields as per your 'run_splits' table schema
+  distance: number;
+  elapsed_time: number;
+  moving_time?: number;
+  average_speed?: number;
+  average_heartrate?: number | null;
+  total_elevation_gain?: number | null;
 }
 
 
@@ -155,8 +159,9 @@ class SecureApiClient {
     };
   }
 
-  async getUserRuns(userId: string): Promise<{ runs: Run[]; stats: RunStats; splits: RunSplit[] }> {
-    console.log(`📖 Fetching runs, stats, and splits for user ${userId}...`);
+  // MODIFIED: getUserRuns - removed splits from direct return type
+  async getUserRuns(userId: string): Promise<{ runs: Run[]; stats: RunStats; count?: number }> { // count is also in response
+    console.log(`📖 Fetching runs and stats for user ${userId}...`); // Updated log
     
     const response = await fetch(`${this.baseUrl}/get-user-runs?userId=${userId}`, {
       method: 'GET',
@@ -164,20 +169,20 @@ class SecureApiClient {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch user runs, stats, and splits');
+      throw new Error(error.message || 'Failed to fetch user runs and stats'); // Updated error
     }
 
     const data = await response.json();
-    // Ensure the response structure matches what the Netlify function now sends
+    // The Netlify function now returns: { success, runs, stats, count }
     return {
-      runs: data.runs || [], // Default to empty array if undefined
+      runs: data.runs || [],
       stats: data.stats,
-      splits: data.splits || [] // Default to empty array if undefined
+      count: data.count // Keep count as it's provided by the function
+      // 'splits' field is no longer expected here
     };
   }
 
-  // ... (syncUserData remains the same, but will now benefit from getUserRuns returning splits if that's part of a reload) ...
-  // Complete flow: Fetch → Enrich → Save
+  // ... (syncUserData remains the same) ...
   async syncUserData(userId: string, days: number = 7): Promise<{
     activities: any[];
     savedCount: number;

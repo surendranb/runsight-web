@@ -1,5 +1,5 @@
 // netlify/functions/get-user-runs.js
-// Netlify Function: Get user's runs, stats, and splits from database (server-side)
+// Netlify Function: Get user's runs and stats from database (server-side)
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -41,8 +41,9 @@ exports.handler = async (event, context) => {
     // Fetch user's runs
     console.log(`Fetching runs for user ${userId}...`);
     const { data: runs, error: fetchRunsError } = await supabase
-      .from('runs')
-      .select('*')
+      .from('runs') // This table is 'enriched_runs' in the migration file, but used as 'runs' elsewhere.
+                    // Assuming 'runs' is the correct name as used by save-runs.js and previously by this function.
+      .select('*') // This will include splits_metric, splits_standard, laps, strava_data JSONB columns
       .eq('user_id', userId)
       .order('start_date', { ascending: false });
 
@@ -52,21 +53,7 @@ exports.handler = async (event, context) => {
     }
     console.log(`✅ Fetched ${runs.length} runs for user ${userId}`);
 
-    // Fetch user's run_splits
-    console.log(`Fetching run_splits for user ${userId}...`);
-    const { data: splits, error: fetchSplitsError } = await supabase
-      .from('run_splits')
-      .select('*')
-      .eq('user_id', userId)
-      // Ordering splits might be useful, e.g., by run ID then split number
-      .order('enriched_run_id', { ascending: true })
-      .order('split_number', { ascending: true });
-
-    if (fetchSplitsError) {
-      console.error(`Error fetching run_splits for user ${userId}:`, fetchSplitsError);
-      throw new Error(`Failed to fetch run splits: ${fetchSplitsError.message}`);
-    }
-    console.log(`✅ Fetched ${splits.length} run_splits for user ${userId}`);
+    // REMOVED: Fetch user's run_splits logic
 
     // Calculate statistics (remains the same)
     const stats = {
@@ -96,20 +83,20 @@ exports.handler = async (event, context) => {
       headers,
       body: JSON.stringify({
         success: true,
-        runs: runs,
+        runs: runs, // Contains all columns from the 'runs' table
         stats: stats,
-        splits: splits, // Added splits to the response
-        count: runs.length // This typically refers to runs count
+        // REMOVED: 'splits' array from the top-level response
+        count: runs.length
       })
     };
 
   } catch (error) {
-    console.error('Get user runs/splits error:', error);
+    console.error('Get user runs error:', error); // Updated error message
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        error: 'Failed to fetch user runs and splits',
+        error: 'Failed to fetch user runs', // Updated error message
         message: error.message 
       })
     };

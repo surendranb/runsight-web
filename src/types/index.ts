@@ -33,11 +33,19 @@ export interface EnrichedRun { // This should be compatible with 'Run' from secu
   average_heartrate?: number | null;
   max_heartrate?: number | null;
   total_elevation_gain?: number | null;
-  weather_data?: any;
-  strava_data?: any;
+
+  weather_data?: any; // JSON blob from 'runs' table
+  strava_data?: any;  // Full Strava activity object, contains its own splits/laps
+
+  // Explicit columns for split data if they exist on the 'runs' table schema
+  // as per the migration file (enriched_runs table definition)
+  splits_metric?: any;    // JSONB column for metric splits
+  splits_standard?: any;  // JSONB column for standard (mile) splits
+  laps?: any;             // JSONB column for lap data
+
   created_at?: string;
   updated_at?: string;
-  workout_type?: string | null; // from strava_data.workout_type
+  workout_type?: string | null; // from strava_data.workout_type or a direct column
 }
 
 export interface RunSplit {
