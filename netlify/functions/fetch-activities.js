@@ -1,5 +1,5 @@
+// netlify/functions/fetch-activities.js
 // Netlify Function: Fetch Strava activities (server-side)
-// This keeps Strava API calls and tokens on the server
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -7,7 +7,7 @@ exports.handler = async (event, context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS', // Ensure POST is allowed
     'Content-Type': 'application/json',
   };
 
@@ -19,118 +19,148 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ error: 'Method not allowed' })
+      body: JSON.stringify({ error: 'Method not allowed, please use POST.' })
     };
   }
 
   try {
     const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-    // Correctly define and use the actual service key
-    const ACTUAL_SERVICE_KEY = process.env.VITE_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_KEY;
-    console.log('[fetch-activities] Attempting to use SUPABASE_SERVICE_KEY. Is present:', !!ACTUAL_SERVICE_KEY);
-
+    const ACTUAL_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY; // Use SUPABASE_SERVICE_KEY directly
 
     if (!SUPABASE_URL || !ACTUAL_SERVICE_KEY) {
-      throw new Error('Missing Supabase configuration (URL or Service Key)');
+      console.error('[fetch-activities] Missing Supabase configuration (URL or Service Key)');
+      throw new Error('Missing Supabase configuration');
     }
 
     const supabase = createClient(SUPABASE_URL, ACTUAL_SERVICE_KEY);
 
-    // Get user ID from request
-    const { userId, days = 7 } = JSON.parse(event.body);
+    // MODIFIED: Destructure userId and params from request body
+    const body = JSON.parse(event.body);
+    const userId = body.userId;
+    const params = body.params || {}; // Default to empty object if params not sent
+
+    // Log received parameters for debugging
+    console.log('[fetch-activities] Received request for userId:', userId, 'with params:', params);
+
 
     if (!userId) {
       throw new Error('User ID is required');
     }
 
-    // Get user's Strava tokens from Supabase (server-side)
-    const { data: user, error: userError } = await supabase.auth.admin.getUserById(userId);
+    // Get user's Strava tokens from Supabase
+    const { data: userAuthData, error: userError } = await supabase.auth.admin.getUserById(userId);
 
-    if (userError || !user) {
-      throw new Error('User not found');
+    if (userError || !userAuthData || !userAuthData.user) {
+      console.error('[fetch-activities] User not found or error fetching user:', userError);
+      throw new Error(`User not found or error fetching user: ${userError?.message || 'Unknown error'}`);
     }
 
-    const stravaAccessToken = user.user.user_metadata?.strava_access_token;
-    const stravaRefreshToken = user.user.user_metadata?.strava_refresh_token;
-    const stravaExpiresAt = user.user.user_metadata?.strava_expires_at;
+    const user = userAuthData.user; // Actual user object
 
-    if (!stravaAccessToken) {
-      throw new Error('Strava access token not found');
+    let accessToken = user.user_metadata?.strava_access_token;
+    const refreshToken = user.user_metadata?.strava_refresh_token;
+    const expiresAt = user.user_metadata?.strava_expires_at;
+
+    if (!accessToken) {
+      throw new Error('Strava access token not found for user.');
     }
 
     // Check if token needs refresh
-    let accessToken = stravaAccessToken;
-    if (stravaExpiresAt && Date.now() / 1000 > stravaExpiresAt) {
-      // Refresh token (server-side)
+    if (expiresAt && Date.now() / 1000 > expiresAt) {
+      console.log('[fetch-activities] Strava token expired, attempting refresh for user:', userId);
       const refreshResponse = await fetch('https://www.strava.com/oauth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           client_id: process.env.STRAVA_CLIENT_ID,
           client_secret: process.env.STRAVA_CLIENT_SECRET,
-          refresh_token: stravaRefreshToken,
+          refresh_token: refreshToken,
           grant_type: 'refresh_token'
         })
       });
 
       if (!refreshResponse.ok) {
-        throw new Error('Failed to refresh Strava token');
+        const errorBody = await refreshResponse.text();
+        console.error('[fetch-activities] Failed to refresh Strava token. Status:', refreshResponse.status, 'Body:', errorBody);
+        throw new Error(`Failed to refresh Strava token. Status: ${refreshResponse.status}`);
       }
 
       const refreshData = await refreshResponse.json();
       accessToken = refreshData.access_token;
 
       // Update user metadata with new tokens
-      await supabase.auth.admin.updateUserById(userId, {
+      const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
         user_metadata: {
-          ...user.user.user_metadata,
+          ...user.user_metadata,
           strava_access_token: refreshData.access_token,
-          strava_refresh_token: refreshData.refresh_token,
+          strava_refresh_token: refreshData.refresh_token || refreshToken, // Strava might not always return a new refresh_token
           strava_expires_at: refreshData.expires_at
         }
       });
+      if (updateError) {
+          console.error('[fetch-activities] Failed to update user with new Strava tokens:', updateError);
+          // Non-fatal, proceed with new token for this session
+      }
+      console.log('[fetch-activities] Strava token refreshed successfully for user:', userId);
     }
 
-    // Calculate date range
-    const after = Math.floor((Date.now() - (days * 24 * 60 * 60 * 1000)) / 1000);
+    // Construct Strava API URL based on params
+    let stravaApiUrl = 'https://www.strava.com/api/v3/athlete/activities';
+    const queryParams = new URLSearchParams();
 
-    // Fetch activities from Strava (server-side)
-    const activitiesResponse = await fetch(
-      `https://www.strava.com/api/v3/athlete/activities?after=${after}&per_page=50`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      }
-    );
+    // Default per_page, can be overridden by params
+    const perPage = params.per_page || 50;
+    queryParams.append('per_page', perPage.toString());
+
+    if (params.days) {
+      const afterTimestamp = Math.floor((Date.now() - (params.days * 24 * 60 * 60 * 1000)) / 1000);
+      queryParams.append('after', afterTimestamp.toString());
+      console.log(`[fetch-activities] Fetching for last ${params.days} days (after: ${afterTimestamp})`);
+    } else if (params.page) {
+      queryParams.append('page', params.page.toString());
+      console.log(`[fetch-activities] Fetching page ${params.page}`);
+    } else {
+      // Default behavior if no specific params: fetch first page of recent activities
+      queryParams.append('page', '1');
+      console.log('[fetch-activities] No specific period/page, fetching page 1 by default.');
+    }
+
+    stravaApiUrl += `?${queryParams.toString()}`;
+    console.log('[fetch-activities] Calling Strava API URL:', stravaApiUrl);
+
+    const activitiesResponse = await fetch(stravaApiUrl, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
 
     if (!activitiesResponse.ok) {
-      throw new Error('Failed to fetch activities from Strava');
+      const errorBody = await activitiesResponse.text();
+      console.error('[fetch-activities] Failed to fetch activities from Strava. Status:', activitiesResponse.status, 'Body:', errorBody);
+      throw new Error(`Failed to fetch activities from Strava. Status: ${activitiesResponse.status}`);
     }
 
-    const activities = await activitiesResponse.json();
+    const fetchedActivities = await activitiesResponse.json();
 
-    // Filter for running activities
-    const runs = activities.filter(activity => 
+    // Filter for actual running activities and ensure they have latlng
+    const filteredRuns = fetchedActivities.filter(activity =>
       activity.type === 'Run' && 
       activity.start_latlng && 
       activity.start_latlng.length === 2
     );
 
-    console.log(`✅ Fetched ${runs.length} runs for user ${userId}`);
+    console.log(`[fetch-activities] ✅ Fetched ${filteredRuns.length} runs (after filtering) for user ${userId}. Original count from Strava: ${fetchedActivities.length}.`);
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         success: true,
-        runs: runs,
-        count: runs.length
+        activities: filteredRuns, // MODIFIED: key from 'runs' to 'activities'
+        count: filteredRuns.length
       })
     };
 
   } catch (error) {
-    console.error('Fetch activities error:', error);
+    console.error('[fetch-activities] Error:', error);
     return {
       statusCode: 500,
       headers,

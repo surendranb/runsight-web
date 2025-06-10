@@ -55,6 +55,23 @@ export interface RunSplit {
   total_elevation_gain?: number | null;
 }
 
+// Type for pagination parameters for chunked sync
+export interface StravaPaginationParams {
+    page?: number;
+    // Could also include 'before' (timestamp) if Strava API is called with date cursors
+    // For now, page-based is simpler to start with.
+    per_page?: number; // To control chunk size, defaults to Strava's default if not set
+}
+
+// Expected response from the chunk processing Netlify function
+export interface ProcessChunkResponse {
+    processedActivityCount: number; // Number of activities received from Strava in this chunk
+    savedCount: number;
+    skippedCount: number;
+    nextPageParams: StravaPaginationParams | null; // Params for the next chunk, or null if done
+    isComplete: boolean; // True if this was the last chunk or no more activities
+}
+
 
 class SecureApiClient {
   private baseUrl: string;
@@ -101,14 +118,16 @@ class SecureApiClient {
     };
   }
 
-  // Data fetching and processing
-  async fetchUserActivities(userId: string, days: number = 7): Promise<any[]> {
-    console.log(`📥 Fetching activities for user ${userId}...`);
+  // fetchUserActivities is called by syncUserData and will be called by processStravaActivityChunk
+  // It needs to correctly pass pagination to the 'fetch-activities' Netlify function
+  async fetchUserActivities(userId: string, params: { days?: number; page?: number; per_page?: number }): Promise<any[]> {
+    console.log(`📥 Fetching activities for user ${userId} with params:`, params);
     
     const response = await fetch(`${this.baseUrl}/fetch-activities`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, days }),
+      // Body now sends a structured object for params
+      body: JSON.stringify({ userId, params }),
     });
 
     if (!response.ok) {
@@ -117,7 +136,7 @@ class SecureApiClient {
     }
 
     const data = await response.json();
-    return data.runs;
+    return data.activities || []; // activities, not runs, as per previous use in syncUserData
   }
 
   async enrichWithWeather(activities: any[]): Promise<any[]> {
@@ -182,56 +201,48 @@ class SecureApiClient {
     };
   }
 
-  // ... (syncUserData remains the same) ...
-  async syncUserData(userId: string, days: number = 7): Promise<{
+  // Existing syncUserData for fixed day periods
+  async syncUserData(userId: string, days: number): Promise<{
     activities: any[];
     savedCount: number;
     skippedCount: number;
   }> {
-    console.log('🔄 Starting complete data sync...');
-    
+    console.log(`🔄 Starting data sync for last ${days} days...`);
     try {
-      // Step 1: Fetch activities from Strava
-      const activities = await this.fetchUserActivities(userId, days);
-      console.log(`✅ Fetched ${activities.length} activities`);
-
+      // Pass days in the params object to fetchUserActivities
+      const activities = await this.fetchUserActivities(userId, { days });
+      console.log(`✅ Fetched ${activities.length} activities for last ${days} days`);
       if (activities.length === 0) {
         return { activities: [], savedCount: 0, skippedCount: 0 };
       }
-
-      // Step 2: Enrich with weather data
       const enrichedActivities = await this.enrichWithWeather(activities);
       console.log(`✅ Enriched activities with weather data`);
 
-      // Step 3: Save to database
       const { savedCount, skippedCount } = await this.saveRuns(userId, enrichedActivities);
       console.log(`✅ Saved ${savedCount} runs, skipped ${skippedCount}`);
-
-      return {
-        activities: enrichedActivities,
-        savedCount,
-        skippedCount
-      };
-
+      return { activities: enrichedActivities, savedCount, skippedCount };
     } catch (error) {
-      console.error('❌ Data sync failed:', error);
+      console.error(`❌ Data sync for ${days} days failed:`, error);
       throw error;
     }
   }
+
+  // NEW method for processing a single chunk of "All Time" sync
+  async processStravaActivityChunk(userId: string, paginationParams: StravaPaginationParams): Promise<ProcessChunkResponse> {
+    console.log(`🔄 Processing Strava activity chunk for user ${userId}, params:`, paginationParams);
+    const response = await fetch(`${this.baseUrl}/process-strava-chunk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, paginationParams }),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to process activity chunk and parse error response' }));
+        throw new Error(errorData.message || 'Failed to process activity chunk');
+    }
+    return response.json();
+  }
 }
 
-// Export singleton instance
 export const apiClient = new SecureApiClient();
-
-// Export types (User, Run, RunStats already exported, ensure RunSplit is too)
-export type { User, Run, RunStats, RunSplit };
-
-// Self-correction: max_speed and total_elevation_gain in Run interface
-// should be number | null to match EnrichedRun from src/types/index.ts
-// if they can indeed be null from the database.
-// The current 'Run' type here has them as 'number'.
-// For now, I'll keep them as defined in the existing secure-api-client.ts,
-// but this is a point of potential mismatch if DB can have nulls for these.
-// The provided `Run` type here already has `average_heartrate: number | null` and `max_heartrate: number | null`.
-// `start_latlng` and `end_latlng` are `string | null`.
-// Let's assume `max_speed` and `total_elevation_gain` are non-nullable `number` as per this file's current Run definition.
+export type { User, Run, RunStats, RunSplit, StravaPaginationParams, ProcessChunkResponse };

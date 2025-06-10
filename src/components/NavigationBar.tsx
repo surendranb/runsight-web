@@ -1,15 +1,17 @@
 // src/components/NavigationBar.tsx
-import React from 'react';
+import React, { useState } from 'react'; // Added useState
 
 type View = 'dashboard' | 'insights' | 'goals' | 'settings' | string;
+
+export type SyncPeriod = 7 | 30 | 90 | 180 | 'all'; // Exporting for SecureApp.tsx
 
 interface NavigationBarProps {
   currentView: View;
   onNavigate: (view: View) => void;
-  userName?: string; // Optional: for displaying user name
-  onLogout?: () => void; // Optional: for logout button
-  onSyncData?: () => void; // Optional: for sync button
-  isSyncing?: boolean; // Optional: for sync button state
+  userName?: string;
+  onLogout?: () => void;
+  onSyncData?: (period: SyncPeriod) => void; // Modified to pass SyncPeriod
+  isSyncing?: boolean;
 }
 
 // ... (NavItem component remains the same)
@@ -42,13 +44,22 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
     onSyncData,
     isSyncing
 }) => {
+  const [selectedSyncPeriod, setSelectedSyncPeriod] = useState<SyncPeriod>(30); // Default to 30 days
+
+  const handleSyncClick = () => {
+    if (onSyncData) {
+      onSyncData(selectedSyncPeriod);
+    }
+  };
+
   return (
     <nav className="bg-white shadow-md border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
+          {/* Left side: App Name & Main Navigation */}
           <div className="flex items-center">
             <span className="text-xl font-bold text-blue-600 mr-6">RunSight</span>
-            <div className="flex items-baseline space-x-4">
+            <div className="hidden md:flex items-baseline space-x-4"> {/* Links hidden on small screens, shown on md+ */}
                 <NavItem label="Dashboard" viewName="dashboard" isActive={currentView === 'dashboard'} onClick={onNavigate} />
                 <NavItem label="Insights" viewName="insights" isActive={currentView === 'insights'} onClick={onNavigate} />
                 <NavItem label="Goal Tracking" viewName="goals" isActive={currentView === 'goals'} onClick={onNavigate} isDisabled={true} />
@@ -56,21 +67,35 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
             </div>
           </div>
 
+          {/* Right side: Sync, User Info, Logout */}
           <div className="flex items-center space-x-3">
-            {onSyncData && (
+            {onSyncData && ( // Only show sync options if onSyncData is provided
+              <div className="flex items-center space-x-2">
+                <select
+                  value={selectedSyncPeriod}
+                  onChange={(e) => setSelectedSyncPeriod(e.target.value as SyncPeriod)}
+                  disabled={isSyncing}
+                  className="text-xs border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 disabled:bg-gray-100"
+                  style={{paddingRight: '2rem', paddingLeft: '0.5rem', paddingTop: '0.4rem', paddingBottom: '0.4rem', height: '2.125rem' }} // Adjusted padding for aesthetics
+                >
+                  {SYNC_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
                 <button
-                    onClick={onSyncData}
+                    onClick={handleSyncClick}
                     disabled={isSyncing}
-                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors h-[2.125rem] ${ // Matched height
                         isSyncing
                         ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
                         : 'bg-green-500 hover:bg-green-600 text-white'
                     }`}
                 >
-                    {isSyncing ? '🔄 Syncing...' : '🔄 Sync New Data'}
+                    {isSyncing ? '🔄 Syncing...' : 'Start Sync'}
                 </button>
+              </div>
             )}
-            {userName && <span className="text-sm text-gray-700">Hi, {userName.split(' ')[0]}</span>}
+            {userName && <span className="hidden md:inline text-sm text-gray-700">Hi, {userName.split(' ')[0]}</span>}
             {onLogout && (
               <button
                 onClick={onLogout}
@@ -85,3 +110,11 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
     </nav>
   );
 };
+
+const SYNC_OPTIONS: { label: string; value: SyncPeriod }[] = [
+    { label: "Last 7 Days", value: 7 },
+    { label: "Last 30 Days", value: 30 },
+    { label: "Last 90 Days", value: 90 },
+    { label: "Last 180 Days", value: 180 },
+    { label: "All Time", value: 'all' },
+];
