@@ -83,12 +83,29 @@ export const SimpleDashboard: React.FC<SimpleDashboardProps> = ({
 
   // The main content of the dashboard, without its own distinct header
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Welcome message can be part of the page content if desired */}
-      <div className="mb-6 p-4 bg-white shadow rounded-lg">
-        <h2 className="text-xl font-semibold text-gray-700">
-          Dashboard Overview for {user.name}
-        </h2>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center">
+              <Activity className="w-8 h-8 text-blue-600 mr-3" />
+              <h1 className="text-2xl font-bold text-gray-900">RunSight</h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-600">
+                Welcome, {user.email.split('@')[0]}
+              </span>
+              <button
+                onClick={onLogout}
+                className="flex items-center text-gray-600 hover:text-gray-900"
+              >
+                <LogOut className="w-4 h-4 mr-1" />
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {runs.length === 0 ? (
