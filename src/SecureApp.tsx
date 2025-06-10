@@ -5,10 +5,8 @@ import SecureStravaCallback from './components/SecureStravaCallback';
 import { NavigationBar } from './components/NavigationBar';
 import { SimpleDashboard } from './components/SimpleDashboard';
 import { InsightsPage } from './components/InsightsPage';
-import { User, EnrichedRun, RunSplit, RunStats } from './types'; // Use our main types
-// Remove direct supabase client import if no longer used here
-// import { supabase } from './lib/supabase';
-import { apiClient } from './lib/secure-api-client'; // For ALL data operations
+import { User, EnrichedRun, RunStats } from './types'; // RunSplit might not be needed here anymore for top-level state
+import { apiClient } from './lib/secure-api-client';
 
 // View type consistent with NavigationBar and App.tsx's previous definition
 type View = 'dashboard' | 'insights' | 'welcome' | 'callback' | 'loading' | 'goals' | 'settings';
@@ -26,12 +24,12 @@ const SecureApp: React.FC = () => {
 
   // Adapt user object from useSecureAuth if its structure is different, primarily for display name
   // For now, assume components will adapt to use `authUser.name`
-  const user = authUser as User | null; // Cast or map if User types differ significantly
+  const user = authUser as User | null;
 
   const [currentView, setCurrentView] = useState<View>('loading');
   const [runs, setRuns] = useState<EnrichedRun[]>([]);
-  const [splits, setSplits] = useState<RunSplit[]>([]);
-  const [stats, setStats] = useState<RunStats | null>(null); // Optional: to store stats
+  // REMOVED: const [splits, setSplits] = useState<RunSplit[]>([]);
+  const [stats, setStats] = useState<RunStats | null>(null);
   const [dataLoading, setDataLoading] = useState<boolean>(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -61,7 +59,7 @@ const SecureApp: React.FC = () => {
     if (!user || !user.id) {
       setDataError("User ID is missing, cannot fetch data.");
       setRuns([]);
-      setSplits([]);
+      // REMOVED: setSplits([]);
       setStats(null);
       setDataLoading(false);
       return;
@@ -71,20 +69,20 @@ const SecureApp: React.FC = () => {
     setDataError(null);
     try {
       console.log(`SecureApp: Calling apiClient.getUserRuns for user ${user.id}`);
-      const { runs: fetchedRuns, stats: fetchedStats, splits: fetchedSplits } = await apiClient.getUserRuns(user.id);
+      // apiClient.getUserRuns now returns { runs, stats, count }
+      const { runs: fetchedRuns, stats: fetchedStats, count } = await apiClient.getUserRuns(user.id);
 
-      // The Run type from apiClient should be compatible with EnrichedRun
       setRuns(fetchedRuns as EnrichedRun[]);
-      setSplits(fetchedSplits as RunSplit[]);
-      setStats(fetchedStats); // Store stats
+      setStats(fetchedStats);
+      // REMOVED: setSplits(fetchedSplits as RunSplit[]);
 
-      console.log(`SecureApp: Data fetched. Runs: ${fetchedRuns.length}, Splits: ${fetchedSplits.length}, Stats:`, fetchedStats);
+      console.log(`SecureApp: Data fetched. Runs: ${fetchedRuns.length}, Stats:`, fetchedStats, `Count from API: ${count}`);
 
     } catch (err: any) {
       console.error("SecureApp: Error fetching data via apiClient:", err);
       setDataError(err.message || 'Failed to load activity data via apiClient.');
       setRuns([]);
-      setSplits([]);
+      // REMOVED: setSplits([]);
       setStats(null);
     } finally {
       setDataLoading(false);
@@ -102,7 +100,7 @@ const SecureApp: React.FC = () => {
     secureLogout();
     setCurrentView('welcome');
     setRuns([]);
-    setSplits([]);
+    // REMOVED: setSplits([]);
     setStats(null);
   };
 
@@ -175,9 +173,9 @@ const SecureApp: React.FC = () => {
         {currentView === 'dashboard' && (
           <SimpleDashboard
             user={user}
-            onLogout={handleLogout} // Kept if SimpleDashboard has specific logout needs, else remove
+            onLogout={handleLogout}
             runs={runs}
-            splits={splits} // Pass splits to SimpleDashboard
+            // REMOVED: splits={splits} prop
             isLoading={dataLoading}
             error={dataError}
             // stats={stats} // Optionally pass stats if SimpleDashboard is adapted
@@ -186,7 +184,7 @@ const SecureApp: React.FC = () => {
         {currentView === 'insights' && (
           <InsightsPage
             user={user}
-            runs={runs} // InsightsPage uses runs to calculate its own internal stats
+            runs={runs}
             isLoading={dataLoading}
             error={dataError}
           />
