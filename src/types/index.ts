@@ -1,33 +1,82 @@
+// src/types/index.ts
 export interface User {
-  id: string;
-  strava_id: number;
-  email: string;
-  first_name: string;
-  last_name: string;
-  profile_medium: string;
-  access_token: string;
-  refresh_token: string;
-  expires_at: number;
-  created_at: string;
-  updated_at: string;
+  id: string; // Supabase auth user ID (uuid)
+  strava_id: number; // Strava athlete ID
+  name: string; // User's full name from Strava/auth provider
+  // Optional fields that might be used by components, ensure they are truly optional
+  email?: string;
+  first_name?: string; // Will be derived from 'name' or removed if 'name' is sole source
+  last_name?: string;  // Will be derived from 'name' or removed
+  profile_medium?: string;
+  // Fields from old User type that might be relevant from useSimpleAuth if it was more comprehensive
+  access_token?: string;
+  refresh_token?: string;
+  expires_at?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface Activity {
+export interface EnrichedRun { // This should be compatible with 'Run' from secure-api-client
   id: string;
-  strava_id: number;
   user_id: string;
+  strava_id: number;
   name: string;
   distance: number;
   moving_time: number;
   elapsed_time: number;
-  total_elevation_gain: number;
-  type: string;
   start_date: string;
   start_date_local: string;
+  start_latlng?: string | null;
+  end_latlng?: string | null;
+  average_speed: number;
+  max_speed?: number | null;
+  average_heartrate?: number | null;
+  max_heartrate?: number | null;
+  total_elevation_gain?: number | null;
+  weather_data?: any;
+  strava_data?: any;
+  created_at?: string;
+  updated_at?: string;
+  workout_type?: string | null; // from strava_data.workout_type
+}
+
+export interface RunSplit {
+  id: string;
+  enriched_run_id: string;
+  user_id: string;
+  split_number: number;
+  distance: number;
+  elapsed_time: number;
+  // Add other relevant fields from your 'run_splits' table
+}
+
+// Add RunStats if it's to be passed around, though SimpleDashboard calculates its own
+export interface RunStats {
+  total_runs: number;
+  total_distance: number;
+  total_time: number;
+  average_pace: number;
+  average_distance: number;
+}
+
+
+// Keep existing types that are not User, EnrichedRun, RunSplit, RunStats
+export interface Activity { // This was the old type for runs from useSimpleAuth, may be different from EnrichedRun
+  id: string;
+  strava_id: number; // This was athlete_id in some Strava contexts, but activity_id here
+  user_id: string; // Supabase user ID
+  name: string;
+  distance: number; // meters
+  moving_time: number; // seconds
+  elapsed_time: number; // seconds
+  total_elevation_gain: number; // meters
+  type: string; // e.g. "Run"
+  start_date: string; // ISO 8601
+  start_date_local: string; // ISO 8601
   timezone: string;
   utc_offset: number;
-  start_latlng: [number, number] | null;
-  end_latlng: [number, number] | null;
+  start_latlng: [number, number] | null; // [lat, lng]
+  end_latlng: [number, number] | null;   // [lat, lng]
   location_city: string | null;
   location_state: string | null;
   location_country: string | null;
@@ -36,13 +85,13 @@ export interface Activity {
   comment_count: number;
   athlete_count: number;
   photo_count: number;
-  average_speed: number;
-  max_speed: number;
-  average_heartrate: number | null;
-  max_heartrate: number | null;
+  average_speed: number; // m/s
+  max_speed: number; // m/s
+  average_heartrate: number | null; // bpm
+  max_heartrate: number | null; // bpm
   suffer_score: number | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string; // ISO 8601
+  updated_at: string; // ISO 8601
 }
 
 export interface Weather {
@@ -92,7 +141,7 @@ export interface StravaAuthResponse {
   };
 }
 
-export interface ActivityStats {
+export interface ActivityStats { // This was an old summary type, distinct from new RunStats
   totalRuns: number;
   totalDistance: number;
   totalTime: number;
@@ -104,16 +153,16 @@ export interface ActivityStats {
   bestPace: number;
 }
 
-export interface StravaDetailedActivity {
-  id: number; // Strava ID
+export interface StravaDetailedActivity { // This is for raw Strava data, distinct from EnrichedRun
+  id: number;
   name: string;
   distance: number;
   moving_time: number;
   elapsed_time: number;
   total_elevation_gain: number;
   type: string;
-  start_date: string; // ISO 8601 datetime
-  start_date_local: string; // ISO 8601 datetime
+  start_date: string;
+  start_date_local: string;
   timezone: string;
   utc_offset: number;
   start_latlng: [number, number] | null;
@@ -129,13 +178,13 @@ export interface StravaDetailedActivity {
   map: {
     id: string;
     summary_polyline: string | null;
-    polyline: string | null; // Detailed polyline, often very large
+    polyline: string | null;
   } | null;
   trainer: boolean;
   commute: boolean;
   manual: boolean;
   private: boolean;
-  visibility: string; // "followers_only", "everyone", "only_me"
+  visibility: string;
   average_speed: number;
   max_speed: number;
   has_heartrate: boolean;
@@ -143,29 +192,29 @@ export interface StravaDetailedActivity {
   max_heartrate: number | null;
   suffer_score: number | null;
   device_name: string | null;
-  gear_id: string | null; // ID of the gear used
+  gear_id: string | null;
   external_id: string | null;
-  upload_id: number | null; // Legacy upload ID
-  upload_id_str?: string; // Sometimes Strava returns upload_id as a string
+  upload_id: number | null;
+  upload_id_str?: string;
   splits_metric: Array<{
-    distance: number; // meters
-    elapsed_time: number; // seconds
-    elevation_difference: number | null; // meters
-    moving_time: number; // seconds
-    split: number; // 1-based index
-    average_speed?: number; // m/s
-    average_heartrate?: number | null; // bpm
-    pace_seconds?: number; // seconds per km
+    distance: number;
+    elapsed_time: number;
+    elevation_difference: number | null;
+    moving_time: number;
+    split: number;
+    average_speed?: number;
+    average_heartrate?: number | null;
+    pace_seconds?: number;
   }> | null;
   splits_standard: Array<{
-    distance: number; // meters (convert to miles if needed, Strava provides it in meters)
-    elapsed_time: number; // seconds
-    elevation_difference: number | null; // meters
-    moving_time: number; // seconds
-    split: number; // 1-based index
-    average_speed?: number; // m/s
-    average_heartrate?: number | null; // bpm
-    pace_seconds?: number; // seconds per mile
+    distance: number;
+    elapsed_time: number;
+    elevation_difference: number | null;
+    moving_time: number;
+    split: number;
+    average_speed?: number;
+    average_heartrate?: number | null;
+    pace_seconds?: number;
   }> | null;
   laps: Array<{
     id: number;
@@ -183,18 +232,12 @@ export interface StravaDetailedActivity {
     total_elevation_gain: number;
     average_speed: number;
     max_speed: number;
-    average_cadence?: number; // If available
-    device_watts?: boolean; // If power meter used for laps
-    average_watts?: number; // Average power for the lap
+    average_cadence?: number;
+    device_watts?: boolean;
+    average_watts?: number;
     lap_index: number;
-    split: number; // Usually same as lap_index for simple cases
+    split: number;
     average_heartrate?: number | null;
     max_heartrate?: number | null;
   }> | null;
-  // Add any other fields that might be useful from the detailed activity object.
-  // For example:
-  // gear: any | null; // Detailed gear information
-  // photos: any | null; // Information about photos
-  // segment_efforts: any[] | null; // Detailed segment efforts
-  // best_efforts: any[] | null; // Best efforts for various distances
 }
