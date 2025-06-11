@@ -43,6 +43,10 @@ export interface EnrichedRun { // This should be compatible with 'Run' from secu
   splits_standard?: any;  // JSONB column for standard (mile) splits
   laps?: any;             // JSONB column for lap data
 
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+
   created_at?: string;
   updated_at?: string;
   workout_type?: string | null; // from strava_data.workout_type or a direct column

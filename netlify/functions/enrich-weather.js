@@ -58,33 +58,77 @@ exports.handler = async (event, context) => {
           }
 
           const weatherData = await weatherResponse.json();
-
           console.log(`✅ Enriched activity ${activity.id} with weather data`);
+
+          const currentActivityWeatherData = {
+            temperature: weatherData.data[0]?.temp,
+            feels_like: weatherData.data[0]?.feels_like,
+            humidity: weatherData.data[0]?.humidity,
+            pressure: weatherData.data[0]?.pressure,
+            wind_speed: weatherData.data[0]?.wind_speed,
+            wind_deg: weatherData.data[0]?.wind_deg,
+            weather: weatherData.data[0]?.weather[0],
+            visibility: weatherData.data[0]?.visibility,
+            uvi: weatherData.data[0]?.uvi
+          };
+
+          // Geocoding logic starts here
+          let city = null;
+          let state = null;
+          let country = null;
+
+          if (activity.start_latlng && activity.start_latlng.length === 2) {
+            const geoLat = activity.start_latlng[0];
+            const geoLng = activity.start_latlng[1];
+            // Ensure OPENWEATHER_API_KEY is accessible here, it's defined at the function's top scope
+            const geocodingUrl = `http://api.openweathermap.org/geo/1.0/reverse?lat=${geoLat}&lon=${geoLng}&limit=1&appid=${OPENWEATHER_API_KEY}`;
+
+            try {
+              const geoResponse = await fetch(geocodingUrl);
+              if (geoResponse.ok) {
+                const geoData = await geoResponse.json();
+                if (geoData && geoData.length > 0) {
+                  const location = geoData[0];
+                  city = location.name || null;
+                  state = location.state || null;
+                  country = location.country || null; // This is usually the country code
+                  console.log(`🌍 Geocoded activity ${activity.id}: ${city}, ${state}, ${country}`);
+                } else {
+                  console.log(`⚠️ Geocoding API returned no data for activity ${activity.id}`);
+                }
+              } else {
+                const errorBody = await geoResponse.text();
+                console.log(`⚠️ Geocoding API failed for activity ${activity.id}: ${geoResponse.status} - ${errorBody}`);
+              }
+            } catch (geoError) {
+              console.error(`❌ Geocoding fetch error for activity ${activity.id}:`, geoError.message);
+            }
+          }
 
           return {
             ...activity,
-            weather_data: {
-              temperature: weatherData.data[0]?.temp,
-              feels_like: weatherData.data[0]?.feels_like,
-              humidity: weatherData.data[0]?.humidity,
-              pressure: weatherData.data[0]?.pressure,
-              wind_speed: weatherData.data[0]?.wind_speed,
-              wind_deg: weatherData.data[0]?.wind_deg,
-              weather: weatherData.data[0]?.weather[0],
-              visibility: weatherData.data[0]?.visibility,
-              uvi: weatherData.data[0]?.uvi
-            }
+            weather_data: currentActivityWeatherData,
+            city,
+            state,
+            country
           };
 
         } catch (error) {
-          console.error(`❌ Failed to enrich activity ${activity.id}:`, error.message);
-          return { ...activity, weather_data: null };
+          console.error(`❌ Failed to enrich activity ${activity.id} (weather or geo):`, error.message);
+          // Return activity with null for weather and geo if any error occurs during enrichment
+          return {
+            ...activity,
+            weather_data: null,
+            city: null,
+            state: null,
+            country: null
+          };
         }
       })
     );
 
-    const successCount = enrichedActivities.filter(a => a.weather_data !== null).length;
-    console.log(`✅ Successfully enriched ${successCount}/${activities.length} activities`);
+    const enrichedCount = enrichedActivities.filter(a => a.weather_data !== null || a.city !== null).length;
+    console.log(`✅ Successfully enriched (weather or geo) ${enrichedCount}/${activities.length} activities`);
 
     return {
       statusCode: 200,
@@ -92,7 +136,7 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         success: true,
         activities: enrichedActivities,
-        enriched_count: successCount,
+        enriched_count: enrichedCount, // Changed from successCount to enrichedCount
         total_count: activities.length
       })
     };

@@ -30,6 +30,9 @@ export interface Run {
   splits_metric?: any; // Example if it's a direct column
   splits_standard?: any; // Example if it's a direct column
   laps?: any; // Example if it's a direct column
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
 }
 
 export interface RunStats {

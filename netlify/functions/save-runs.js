@@ -89,6 +89,11 @@ exports.handler = async (event, context) => {
           total_elevation_gain: activity.total_elevation_gain,
           weather_data: activity.weather_data, // Assuming this is a JSON object
           strava_data: activity, // Store the whole activity object as JSON
+
+          // Add the new geocoding fields
+          city: activity.city || null,
+          state: activity.state || null,
+          country: activity.country || null
         });
       }
     }
