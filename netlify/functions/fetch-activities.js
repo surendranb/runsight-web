@@ -68,62 +68,12 @@ exports.handler = async (event, context) => {
     // Check if token needs refresh
     if (expiresAt && Date.now() / 1000 > expiresAt) {
       console.log('[fetch-activities] Strava token expired, attempting refresh for user:', userId);
-
-      let stravaClientId;
-      let stravaClientSecret;
-
-      try {
-          console.log('[fetch-activities] Attempting to fetch Strava credentials from Vault for token refresh.');
-          const { data: clientIdFromVault, error: clientIdError } = await supabase.rpc('get_strava_client_id');
-          // Do not throw on error, allow fallback
-          if (clientIdError) {
-            console.warn('[fetch-activities] Error fetching Strava Client ID from Vault RPC:', clientIdError.message);
-          }
-          if (clientIdFromVault) {
-              stravaClientId = clientIdFromVault;
-          }
-
-          const { data: clientSecretFromVault, error: clientSecretError } = await supabase.rpc('get_strava_client_secret');
-          // Do not throw on error, allow fallback
-          if (clientSecretError) {
-            console.warn('[fetch-activities] Error fetching Strava Client Secret from Vault RPC:', clientSecretError.message);
-          }
-          if (clientSecretFromVault) {
-              stravaClientSecret = clientSecretFromVault;
-          }
-      } catch (rpcError) {
-          console.warn('[fetch-activities] Error fetching Strava credentials from Vault:', rpcError.message, 'Falling back to environment variables for token refresh.');
-          stravaClientId = null; // Ensure fallback is triggered if partial fetch
-          stravaClientSecret = null;
-      }
-
-      if (stravaClientId && stravaClientSecret) {
-          console.log('[fetch-activities] Using Strava credentials from Vault for token refresh.');
-      } else {
-          console.log('[fetch-activities] Strava credentials not fully retrieved from Vault. Attempting fallback to environment variables for token refresh.');
-          // Fallback to environment variables
-          if (!stravaClientId) {
-              stravaClientId = process.env.STRAVA_CLIENT_ID;
-          }
-          if (!stravaClientSecret) {
-              stravaClientSecret = process.env.STRAVA_CLIENT_SECRET;
-          }
-
-          if (stravaClientId && stravaClientSecret) {
-              console.log('[fetch-activities] Using Strava credentials from environment variables for token refresh.');
-          } else {
-              // If still not found, this is a critical configuration error for token refresh
-              console.error('[fetch-activities] Strava Client ID or Secret is missing from both Vault and environment variables (STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET). Cannot refresh token.');
-              throw new Error('Strava API credentials for token refresh are not configured in Vault or environment variables.');
-          }
-      }
-
       const refreshResponse = await fetch('https://www.strava.com/oauth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          client_id: stravaClientId,
-          client_secret: stravaClientSecret,
+          client_id: process.env.STRAVA_CLIENT_ID,
+          client_secret: process.env.STRAVA_CLIENT_SECRET,
           refresh_token: refreshToken,
           grant_type: 'refresh_token'
         })

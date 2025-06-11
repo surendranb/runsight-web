@@ -18,11 +18,9 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Define Strava credential variables
-    let stravaClientId;
-    let stravaClientSecret;
-
     // Use existing VITE_ environment variables (they're available server-side too)
+    const STRAVA_CLIENT_ID = process.env.VITE_STRAVA_CLIENT_ID;
+    const STRAVA_CLIENT_SECRET = process.env.VITE_STRAVA_CLIENT_SECRET;
     const STRAVA_REDIRECT_URI = process.env.VITE_STRAVA_REDIRECT_URI || 'https://resonant-pony-ea7953.netlify.app/auth/callback';
     const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
     // Ensure SUPABASE_SERVICE_KEY is configured (use VITE_ prefix for Netlify, or direct for local)
@@ -31,88 +29,30 @@ exports.handler = async (event, context) => {
 
     console.log('[auth-strava] SUPABASE_URL configured:', !!SUPABASE_URL, '; SUPABASE_ANON_KEY configured:', !!SUPABASE_ANON_KEY, '; SUPABASE_SERVICE_KEY configured:', !!SUPABASE_SERVICE_KEY);
 
-    // Basic check for Supabase connectivity details first
-    const criticalMissingVars = [];
-    if (!SUPABASE_URL) criticalMissingVars.push('VITE_SUPABASE_URL');
-    if (!SUPABASE_SERVICE_KEY) criticalMissingVars.push('SUPABASE_SERVICE_KEY'); // Needed for Vault
-    if (!SUPABASE_ANON_KEY) criticalMissingVars.push('VITE_SUPABASE_ANON_KEY'); // Needed for public client
-    if (!STRAVA_REDIRECT_URI) criticalMissingVars.push('VITE_STRAVA_REDIRECT_URI');
-
-
-    if (criticalMissingVars.length > 0) {
-      throw new Error(`Missing critical environment variables: ${criticalMissingVars.join(', ')}. Please set these in Netlify dashboard and redeploy.`);
-    }
-
-    // Initialize Supabase Admin client for Vault and auth operations
-    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
-    // Fetch Strava credentials from Vault
-    try {
-        console.log('[auth-strava] Attempting to fetch Strava credentials from Vault...');
-        const { data: clientIdFromVault, error: clientIdError } = await supabaseAdmin.rpc('get_strava_client_id');
-        if (clientIdError) {
-            console.warn('[auth-strava] Error fetching Strava Client ID from Vault RPC:', clientIdError.message);
-            // Do not throw, allow fallback
-        }
-        if (clientIdFromVault) {
-            stravaClientId = clientIdFromVault;
-            console.log('[auth-strava] Successfully fetched Strava Client ID from Vault.');
-        } else {
-            console.log('[auth-strava] Strava Client ID not found in Vault or RPC returned null.');
-        }
-
-        const { data: clientSecretFromVault, error: clientSecretError } = await supabaseAdmin.rpc('get_strava_client_secret');
-        if (clientSecretError) {
-            console.warn('[auth-strava] Error fetching Strava Client Secret from Vault RPC:', clientSecretError.message);
-            // Do not throw, allow fallback
-        }
-        if (clientSecretFromVault) {
-            stravaClientSecret = clientSecretFromVault;
-            console.log('[auth-strava] Successfully fetched Strava Client Secret from Vault.');
-        } else {
-            console.log('[auth-strava] Strava Client Secret not found in Vault or RPC returned null.');
-        }
-    } catch (rpcError) {
-        console.warn('[auth-strava] Generic error during Strava credentials fetch from Vault:', rpcError.message, 'Falling back to environment variables.');
-        // Ensure variables are reset if only one part failed, to trigger fallback for both
-        stravaClientId = null;
-        stravaClientSecret = null;
-    }
-
-    // Fallback to Environment Variables
-    if (!stravaClientId) {
-        stravaClientId = process.env.VITE_STRAVA_CLIENT_ID;
-        if (stravaClientId) {
-            console.log('[auth-strava] Using Strava Client ID from environment variable (VITE_STRAVA_CLIENT_ID).');
-        }
-    }
-    if (!stravaClientSecret) {
-        stravaClientSecret = process.env.VITE_STRAVA_CLIENT_SECRET;
-        if (stravaClientSecret) {
-            console.log('[auth-strava] Using Strava Client Secret from environment variable (VITE_STRAVA_CLIENT_SECRET).');
-        }
-    }
-
-    // Check for missing Strava credentials after attempting Vault and Env fallback
+    // Check for missing environment variables with detailed error
     const missingVars = [];
-    if (!stravaClientId) missingVars.push('Strava Client ID (from Vault or VITE_STRAVA_CLIENT_ID)');
-    if (!stravaClientSecret) missingVars.push('Strava Client Secret (from Vault or VITE_STRAVA_CLIENT_SECRET)');
-    // Note: criticalMissingVars already checked SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY, STRAVA_REDIRECT_URI
+    if (!STRAVA_CLIENT_ID) missingVars.push('VITE_STRAVA_CLIENT_ID');
+    if (!STRAVA_CLIENT_SECRET) missingVars.push('VITE_STRAVA_CLIENT_SECRET');
+    if (!STRAVA_REDIRECT_URI) missingVars.push('VITE_STRAVA_REDIRECT_URI');
+    if (!SUPABASE_URL) missingVars.push('VITE_SUPABASE_URL');
+    if (!SUPABASE_ANON_KEY) missingVars.push('VITE_SUPABASE_ANON_KEY'); // Still check anon key for the public client
+    if (!SUPABASE_SERVICE_KEY) missingVars.push('SUPABASE_SERVICE_KEY');
+
 
     if (missingVars.length > 0) {
-      // Log which specific variables are missing (Vault or Env)
-      const detailedMessage = `Missing required configuration: ${missingVars.join(', ')}. Please set these in Netlify dashboard, ensure Vault is configured, or provide them during app setup.`;
-      console.error(`[auth-strava] ${detailedMessage}`);
-      throw new Error(detailedMessage);
+      throw new Error(`Missing required environment variables: ${missingVars.join(', ')}. Please set these in Netlify dashboard and redeploy.`);
     }
 
-    // Public client for RPC call (generate_strava_user_uuid)
+    // Public client for RPC call (if RPC permissions allow anon or user role)
+    // Note: The existing supabase client uses VITE_SUPABASE_ANON_KEY.
+    // For admin operations, a new client with SERVICE_KEY is needed.
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 
     if (event.httpMethod === 'GET') {
       // Step 1: Generate Strava authorization URL
       const authUrl = `https://www.strava.com/oauth/authorize?` +
-        `client_id=${stravaClientId}&` +
+        `client_id=${STRAVA_CLIENT_ID}&` +
         `response_type=code&` +
         `redirect_uri=${encodeURIComponent(STRAVA_REDIRECT_URI)}&` +
         `approval_prompt=force&` +
@@ -139,21 +79,15 @@ exports.handler = async (event, context) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          client_id: stravaClientId,
-          client_secret: stravaClientSecret,
+          client_id: STRAVA_CLIENT_ID,
+          client_secret: STRAVA_CLIENT_SECRET,
           code: code,
           grant_type: 'authorization_code'
         })
       });
 
       if (!tokenResponse.ok) {
-        // Log more details from Strava's error if possible
-        let errorBody = 'Unknown error from Strava';
-        try {
-            errorBody = await tokenResponse.text(); // Use text() to avoid JSON parse error if not JSON
-        } catch (e) { /* ignore */ }
-        console.error(`[auth-strava] Strava token exchange failed. Status: ${tokenResponse.status}. Body: ${errorBody}`);
-        throw new Error(`Failed to exchange code for token with Strava. Status: ${tokenResponse.status}`);
+        throw new Error('Failed to exchange code for token');
       }
 
       const tokenData = await tokenResponse.json();
@@ -162,22 +96,23 @@ exports.handler = async (event, context) => {
       // Get the Strava athlete ID
       const strava_athlete_id = tokenData.athlete.id;
 
-      // Call Supabase RPC to get or generate user UUID (using the public client 'supabase')
+      // Call Supabase RPC to get or generate user UUID (using the public client)
       const { data: generatedUuid, error: rpcError } = await supabase.rpc('generate_strava_user_uuid', { strava_id: strava_athlete_id });
       console.log('[auth-strava] generate_strava_user_uuid RPC result. UUID:', generatedUuid, 'Error:', JSON.stringify(rpcError, null, 2));
 
 
       if (rpcError) {
-        console.error('[auth-strava] Supabase RPC error (generate_strava_user_uuid):', rpcError);
+        console.error('Supabase RPC error (generate_strava_user_uuid):', rpcError); // Keep specific error for this
         throw new Error(`Failed to get user UUID from Supabase RPC: ${rpcError.message}`);
       }
 
       if (!generatedUuid) {
-        console.error('[auth-strava] Supabase RPC error: generatedUuid is null or undefined');
+        console.error('Supabase RPC error: generatedUuid is null or undefined'); // Keep specific error for this
         throw new Error('Failed to get user UUID from Supabase RPC: No data returned.');
       }
 
-      // supabaseAdmin client is already initialized above
+      // Initialize Supabase Admin client for auth operations
+      const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
       const userMetadata = {
         strava_access_token: tokenData.access_token,
@@ -266,13 +201,13 @@ exports.handler = async (event, context) => {
     };
 
   } catch (error) {
-      console.error('[auth-strava] Critical error in handler:', error.message, 'Stack:', error.stack);
+    console.error('[auth-strava] Critical error in handler:', error, 'Stack:', error.stack);
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
         error: 'Authentication failed',
-        message: error.message // Provide the actual error message to the client
+        message: error.message 
       })
     };
   }
