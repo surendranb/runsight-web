@@ -245,6 +245,56 @@ class SecureApiClient {
     }
     return response.json();
   }
+
+  async saveStravaCredentials(stravaClientId: string, stravaClientSecret: string, supabaseToken: string): Promise<{ success: boolean; message: string }> {
+    console.log('🔑 Saving Strava credentials...');
+
+    const response = await fetch(`${this.baseUrl}/save-strava-credentials`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseToken}`, // Pass the Supabase JWT for authentication
+      },
+      body: JSON.stringify({
+        strava_client_id: stravaClientId,
+        strava_client_secret: stravaClientSecret
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Failed to save Strava credentials:', data.message || 'Unknown error');
+      throw new Error(data.message || 'Failed to save Strava credentials');
+    }
+
+    console.log('✅ Strava credentials saved successfully.');
+    return data; // Should be { success: true, message: '...' }
+  }
+
+  async checkStravaKeysStatus(supabaseToken: string): Promise<{ configured: boolean; error?: string }> {
+    console.log('🔍 Checking Strava keys configuration status...');
+
+    const response = await fetch(`${this.baseUrl}/check-strava-keys-status`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseToken}`, // User's JWT
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      // The function itself might return 200 OK with { configured: false } even on some errors.
+      // This !response.ok would be for network errors or 500s from the function before it crafts a JSON response.
+      console.error('Failed to check Strava keys status:', data.message || 'Unknown server error');
+      throw new Error(data.message || 'Failed to check Strava keys status');
+    }
+
+    console.log('✅ Strava keys status:', data);
+    return data; // Expects { configured: boolean, error?: string }
+  }
 }
 
 export const apiClient = new SecureApiClient();
