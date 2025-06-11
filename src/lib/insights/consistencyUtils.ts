@@ -29,19 +29,30 @@ export const groupRunsByWeek = (runs: EnrichedRun[]): TimeGroupData[] => {
   const grouped: Record<string, TimeGroupData> = {};
 
   runs.forEach(run => {
-    const date = new Date(run.start_date_local);
-    const year = date.getFullYear();
-    const week = getISOWeek(date);
-    const key = `${year}-W${week}`;
+    const localYear = parseInt(run.start_date_local.substring(0, 4), 10);
+    const localMonth = parseInt(run.start_date_local.substring(5, 7), 10) - 1; // 0-11 for Date constructor
+    const localDay = parseInt(run.start_date_local.substring(8, 10), 10);
+
+    // Use UTC components of the local date to ensure getISOWeek works correctly
+    const activityLocalDateAsUtc = new Date(Date.UTC(localYear, localMonth, localDay));
+    const week = getISOWeek(activityLocalDateAsUtc);
+
+    // Calculate weekStartDate based on the activity's local calendar date
+    // This ensures that the week grouping is consistent with the local date
+    const tempDateForWeekCalcs = new Date(localYear, localMonth, localDay);
+    const dayOfWeek = tempDateForWeekCalcs.getDay(); // 0 (Sunday) - 6 (Saturday)
+    // Adjust diff to get Monday. If Sunday (0), subtract 6 days. If Monday (1), subtract 0 days. If Tuesday (2), subtract 1 day, etc.
+    const diffToMonday = (dayOfWeek === 0) ? 6 : (dayOfWeek - 1);
+    const weekStartDate = new Date(tempDateForWeekCalcs.setDate(tempDateForWeekCalcs.getDate() - diffToMonday));
+    weekStartDate.setHours(0, 0, 0, 0);
+
+    const weekYear = weekStartDate.getFullYear(); // Year of the week (can differ from localYear for year-end weeks)
+    const key = `${weekYear}-W${week}`;
 
     if (!grouped[key]) {
-      const weekStartDate = new Date(date);
-      weekStartDate.setDate(date.getDate() - (date.getDay() === 0 ? 6 : date.getDay() - 1)); // Monday of the week
-      weekStartDate.setHours(0,0,0,0);
-
       grouped[key] = {
         label: `Week of ${weekStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
-        year,
+        year: weekYear,
         period: week,
         totalDistance: 0,
         totalMovingTime: 0,
@@ -61,13 +72,14 @@ export const groupRunsByMonth = (runs: EnrichedRun[]): TimeGroupData[] => {
   const grouped: Record<string, TimeGroupData> = {};
 
   runs.forEach(run => {
-    const date = new Date(run.start_date_local);
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1; // 1-12
+    // Parse year and month directly from the start_date_local string
+    const year = parseInt(run.start_date_local.substring(0, 4), 10);
+    const month = parseInt(run.start_date_local.substring(5, 7), 10); // month is 1-12
     const key = `${year}-M${month}`;
 
     if (!grouped[key]) {
-      const monthStartDate = new Date(year, month - 1, 1);
+      // Create the Date object for monthStartDate using the parsed year and month
+      const monthStartDate = new Date(year, month - 1, 1); // month - 1 because Date constructor expects 0-11
       grouped[key] = {
         label: `${getMonthName(month)} ${year}`,
         year,
