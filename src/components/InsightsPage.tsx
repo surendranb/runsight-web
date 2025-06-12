@@ -7,6 +7,7 @@ import { TimeOfDayInsight } from './insights/TimeOfDayInsight';
 import { ElevationEffortInsight } from './insights/ElevationEffortInsight';
 import { WindPerformanceInsight } from './insights/WindPerformanceInsight';
 import { WorkoutTypePerformanceInsight } from './insights/WorkoutTypePerformanceInsight';
+import { MonthlySummaryTable } from './insights/MonthlySummaryTable';
 
 interface InsightsPageProps {
   user: User;
@@ -45,6 +46,8 @@ export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoadin
         <h2 className="text-2xl font-semibold text-gray-800 mb-1">Insights Hub</h2>
         <p className="text-gray-600">Welcome, {user.name}! Analyzing {runs.length} runs.</p>
       </div>
+
+      <MonthlySummaryTable runs={runs} />
 
       {runs.length === 0 && !isLoading && (
         <div className="bg-white shadow rounded-lg p-8 text-center">
