@@ -76,16 +76,19 @@ async function fetchActivitiesPage(accessToken, paginationParams) {
         console.error('[process-strava-chunk] Failed to fetch activities page from Strava. Status:', activitiesResponse.status, 'Body:', errorBody);
         throw new Error(`Failed to fetch activities page from Strava. Status: ${activitiesResponse.status}, Body: ${errorBody}`);
     }
-    const fetchedActivities = await activitiesResponse.json();
-    console.log(`[process-strava-chunk] fetchActivitiesPage successful. Raw activities fetched: ${fetchedActivities.length}`);
-    // Filter for actual running activities and ensure they have latlng
-    const filteredActivities = fetchedActivities.filter(activity =>
+    const rawActivities = await activitiesResponse.json(); // Renamed for clarity
+    console.log(`[process-strava-chunk] fetchActivitiesPage: Raw activities received from Strava: ${rawActivities.length}`);
+
+    const filteredRunActivities = rawActivities.filter(activity =>
         activity.type === 'Run' &&
         activity.start_latlng &&
         activity.start_latlng.length === 2
     );
-    console.log(`[process-strava-chunk] Filtered run activities with latlng: ${filteredActivities.length}`);
-    return filteredActivities;
+    console.log(`[process-strava-chunk] Filtered run activities with latlng: ${filteredRunActivities.length}`);
+    return {
+        filteredRuns: filteredRunActivities,
+        rawActivityCount: rawActivities.length
+    };
 }
 
 // Helper: Call enrich-weather Netlify function
@@ -198,30 +201,32 @@ exports.handler = async (event, context) => {
 
 
     const accessToken = await getStravaAccessToken(supabase, userId);
-    const activitiesFromStravaPage = await fetchActivitiesPage(accessToken, paginationParams);
+    const { filteredRuns, rawActivityCount } = await fetchActivitiesPage(accessToken, paginationParams);
 
-    const processedActivityCount = activitiesFromStravaPage.length;
+    const processedActivityCount = filteredRuns.length; // Count of runs we will actually process
     let savedCount = 0;
     let skippedCount = 0;
-    // Determine if this is the last page based on whether fewer activities were returned than requested
-    // This is Strava's way of indicating the end of results.
-    let isComplete = processedActivityCount < (paginationParams.per_page || 50);
+    // Determine if this is the last page based on whether the RAW number of activities
+    // (any type) returned by Strava was less than requested.
+    let isComplete = rawActivityCount < (paginationParams.per_page || 50);
 
     if (processedActivityCount > 0) {
-        const enrichedActivities = await enrichActivitiesWithWeather(activitiesFromStravaPage, eventOrigin);
+        const enrichedActivities = await enrichActivitiesWithWeather(filteredRuns, eventOrigin);
         if (enrichedActivities.length > 0) {
             const saveResult = await saveActivitiesToDb(userId, enrichedActivities, eventOrigin);
             savedCount = saveResult.savedCount;
             skippedCount = saveResult.skippedCount;
         } else {
-            console.log('[process-strava-chunk] No activities were enriched, skipping save to DB.');
-            // if no activities were enriched, it implies they might have been filtered out or an issue occurred.
-            // We might still have processedActivityCount > 0 from Strava, but 0 enriched.
-            // So, if enrich step returns 0, we should consider this "chunk" as processed for what could be saved.
+            console.log('[process-strava-chunk] No activities were enriched (either 0 filtered runs initially, or enricher returned 0), skipping save to DB.');
         }
-    } else {
-        console.log(`[process-strava-chunk] No activities fetched from Strava for page ${paginationParams.page}, marking as complete.`);
-        isComplete = true; // No activities found on this page, assume end of results
+    } else { // This means filteredRuns.length was 0
+        console.log(`[process-strava-chunk] No runnable activities with latlng found on page ${paginationParams.page}. Raw activities on page: ${rawActivityCount}.`);
+        // isComplete is already determined by rawActivityCount, so no need to set it here
+        // unless rawActivityCount was also 0, in which case it is indeed complete.
+        if (rawActivityCount === 0) {
+            isComplete = true;
+            console.log(`[process-strava-chunk] Confirmed completion as rawActivityCount is 0.`);
+        }
     }
 
     const nextPageParams = isComplete ? null : {
@@ -230,11 +235,12 @@ exports.handler = async (event, context) => {
     };
 
     const responseBody = {
-      processedActivityCount, // Number of activities fetched from Strava and filtered for type/latlng
-      savedCount,             // Number of activities successfully saved to DB
-      skippedCount,           // Number of activities skipped by DB (e.g., duplicates)
+      processedRunCount: processedActivityCount, // Renamed for clarity: Number of RUNS processed from this page
+      rawActivityCountOnPage: rawActivityCount, // Number of raw activities Strava returned for this page
+      savedCount,             // Number of runs successfully saved to DB from this page
+      skippedCount,           // Number of runs skipped by DB from this page (e.g., duplicates)
       nextPageParams,         // Params for the next chunk, or null if complete
-      isComplete,             // Boolean indicating if this was the last page
+      isComplete,             // Boolean indicating if Strava has more pages
     };
 
     console.log(`[process-strava-chunk] Chunk processing complete for user ${userId}, page ${paginationParams.page}. Results: ${JSON.stringify(responseBody)}`);
