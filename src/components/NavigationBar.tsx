@@ -3,7 +3,16 @@ import React, { useState } from 'react'; // Added useState
 
 type View = 'dashboard' | 'insights' | 'goals' | 'settings' | string;
 
-export type SyncPeriod = 7 | 30 | 90 | 180 | 'all'; // Exporting for SecureApp.tsx
+// Define years for sync options
+const currentYear = new Date().getFullYear();
+const startYear = 2020; // Sync options will go back to this year
+const yearValues = Array.from({ length: currentYear - startYear + 1 }, (_, i) => {
+  const year = currentYear - i;
+  return `year-${year}` as const; // e.g., "year-2024", "year-2023"
+});
+
+// Update SyncPeriod type to include day numbers and year strings
+export type SyncPeriod = 7 | 30 | 90 | 180 | typeof yearValues[number];
 
 interface NavigationBarProps {
   currentView: View;
@@ -111,10 +120,16 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
   );
 };
 
+// Generate dynamic year options
+const yearOptions = Array.from({ length: currentYear - startYear + 1 }, (_, i) => {
+  const year = currentYear - i;
+  return { label: `Sync ${year}`, value: `year-${year}` as SyncPeriod };
+});
+
 const SYNC_OPTIONS: { label: string; value: SyncPeriod }[] = [
     { label: "Last 7 Days", value: 7 },
     { label: "Last 30 Days", value: 30 },
     { label: "Last 90 Days", value: 90 },
     { label: "Last 180 Days", value: 180 },
-    { label: "All Time", value: 'all' },
+    ...yearOptions, // Add the dynamically generated year options
 ];
