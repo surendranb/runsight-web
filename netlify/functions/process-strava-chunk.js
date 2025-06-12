@@ -64,10 +64,10 @@ async function fetchActivitiesPage(accessToken, paginationParams) {
     const { page = 1, per_page = 50, after, before } = paginationParams;
 
     let stravaApiUrl = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${per_page}`;
-    if (after) {
+    if (typeof after === 'number') { // Check type to correctly handle timestamp 0
         stravaApiUrl += `&after=${after}`;
     }
-    if (before) {
+    if (typeof before === 'number') { // Check type
         stravaApiUrl += `&before=${before}`;
     }
     // Log the fully constructed URL and the parameters it was built from
@@ -241,10 +241,10 @@ exports.handler = async (event, context) => {
         per_page: paginationParams.per_page || 50,
     };
 
-    if (paginationParams.after) {
+    if (paginationParams.hasOwnProperty('after') && typeof paginationParams.after === 'number') {
         nextPagePayload.after = paginationParams.after;
     }
-    if (paginationParams.before) {
+    if (paginationParams.hasOwnProperty('before') && typeof paginationParams.before === 'number') {
         nextPagePayload.before = paginationParams.before;
     }
 
