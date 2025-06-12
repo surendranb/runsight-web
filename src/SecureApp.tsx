@@ -130,12 +130,31 @@ const SecureApp: React.FC = () => {
       }
       await fetchData(); // Refresh data after each chunk for now
     } catch (error: any) {
-      console.error('All Time Sync chunk failed:', error);
-      setDataError(error.message || 'An error occurred during "All Time" sync.');
-      setSyncProgressMessage(`Error on page ${params.page}: ${error.message}`);
+      console.error('Sync chunk processing error. Backend response:', error.response?.data, 'Full error object:', error);
+
+      const backendMessage = error.response?.data?.message;
+      const backendStage = error.response?.data?.stage;
+      let displayMessage = 'An unexpected error occurred during sync.';
+
+      if (backendMessage) {
+        displayMessage = backendMessage;
+        if (backendStage) {
+          displayMessage += ` (Stage: ${backendStage})`;
+        }
+      } else if (error.message) {
+        displayMessage = error.message;
+      }
+
+      if (params?.page) {
+        displayMessage = `Error on page ${params.page}: ${displayMessage}`;
+      }
+
+      setSyncProgressMessage(displayMessage);
+      setDataError(displayMessage);
+      alert(displayMessage); // Keep alert for immediate user feedback as per original
+
       setNextPageToSync(null); // Stop chunking on error
       setIsSyncing(false);
-      alert('Sync Error: ' + (error.message || 'Unknown error during sync.'));
     }
   }, [fetchData]); // Add other dependencies if they are used inside (like setSyncProgressMessage, etc.)
 
