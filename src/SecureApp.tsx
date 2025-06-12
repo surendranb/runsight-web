@@ -2,14 +2,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSecureAuth } from './hooks/useSecureAuth';
 import SecureStravaCallback from './components/SecureStravaCallback';
-import { NavigationBar, SyncPeriod } from './components/NavigationBar'; // Import SyncPeriod
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSecureAuth } from './hooks/useSecureAuth';
+import SecureStravaCallback from './components/SecureStravaCallback';
+import { NavigationBar, SyncPeriod } from './components/NavigationBar';
 import { SimpleDashboard } from './components/SimpleDashboard';
 import { InsightsPage } from './components/InsightsPage';
 import { User, EnrichedRun, RunStats } from './types';
-import { apiClient } from './lib/secure-api-client';
+import { apiClient, StravaPaginationParams } from './lib/secure-api-client'; // Import StravaPaginationParams
 
 // View type consistent with NavigationBar and App.tsx's previous definition
 type View = 'dashboard' | 'insights' | 'welcome' | 'callback' | 'loading' | 'goals' | 'settings';
+
+// Define NextPageParams using the imported StravaPaginationParams
+type NextPageParams = StravaPaginationParams | null;
 
 const SecureApp: React.FC = () => {
   const {
@@ -36,7 +42,7 @@ const SecureApp: React.FC = () => {
   // Sync specific states
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [syncProgressMessage, setSyncProgressMessage] = useState<string>('');
-  const [nextPageToSync, setNextPageToSync] = useState<NextPageParams>(null); // For "All Time" chunking
+  const [nextPageToSync, setNextPageToSync] = useState<NextPageParams>(null);
 
   // Effect to handle view changes based on auth state (remains mostly the same)
   useEffect(() => {
@@ -133,12 +139,12 @@ const SecureApp: React.FC = () => {
     }
   }, [fetchData]); // Add other dependencies if they are used inside (like setSyncProgressMessage, etc.)
 
-  // Effect to automatically fetch the next chunk for "All Time" sync
+  // Effect to automatically fetch the next chunk for sync
   useEffect(() => {
     if (nextPageToSync && user && user.id && isSyncing) {
       processSyncChunk(user.id, nextPageToSync);
     }
-  }, [nextPageToSync, user, isSyncing, processSyncChunk]);
+  }, [nextPageToSync, user, user?.id, isSyncing, processSyncChunk]); // Added user.id to dependencies
 
 
   const handleSyncData = async (period: SyncPeriod) => {
@@ -149,18 +155,31 @@ const SecureApp: React.FC = () => {
 
       setIsSyncing(true);
       setDataError(null);
-      setSyncProgressMessage('Starting data sync...'); // Initial message
+      setSyncProgressMessage('Starting data sync...');
 
-      if (period === 'all') {
-        setNextPageToSync({ page: 1 }); // Start chunking from page 1
-        // The useEffect for nextPageToSync will pick this up
-      } else { // Handle fixed periods (7, 30, 90, 180 days)
+      if (typeof period === 'string' && period.startsWith('year-')) {
+        const year = parseInt(period.split('-')[1], 10);
+        // UTC dates for Jan 1st and Dec 31st
+        const startDate = new Date(Date.UTC(year, 0, 1, 0, 0, 0)); // Month is 0-indexed
+        const endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59)); // Month is 0-indexed
+
+        const afterTimestamp = Math.floor(startDate.getTime() / 1000);
+        const beforeTimestamp = Math.floor(endDate.getTime() / 1000);
+
+        setSyncProgressMessage(`Preparing to sync activities for ${year}...`);
+        setNextPageToSync({
+            page: 1,
+            per_page: 50, // Default chunk size, Strava might override
+            after: afterTimestamp,
+            before: beforeTimestamp
+        });
+        // The useEffect for nextPageToSync will start the processSyncChunk
+      } else if (typeof period === 'number') { // Handle fixed periods (7, 30, 90, 180 days)
         try {
           setSyncProgressMessage(`Syncing last ${period} days...`);
-          // This apiClient method already exists and calls the full sync process (fetch, enrich, save)
-          const result = await apiClient.syncUserData(user.id, period as number);
+          const result = await apiClient.syncUserData(user.id, period); // period is already number
           alert(`Sync complete! Added ${result.savedCount} new runs, skipped ${result.skippedCount} from the last ${period} days. Data will refresh.`);
-          await fetchData(); // Re-fetch all data after sync
+          await fetchData();
         } catch (error: any) {
           console.error(`Sync for ${period} days failed:`, error);
           setDataError(error.message || `Sync for ${period} days failed.`);
@@ -169,6 +188,10 @@ const SecureApp: React.FC = () => {
           setIsSyncing(false);
           setSyncProgressMessage('');
         }
+      } else {
+        console.warn("Unsupported sync period:", period);
+        setIsSyncing(false);
+        setSyncProgressMessage('');
       }
   };
 

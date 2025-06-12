@@ -61,11 +61,18 @@ async function getStravaAccessToken(supabase, userId) {
 
 // Helper: Fetch one page of activities from Strava - similar to fetch-activities.js
 async function fetchActivitiesPage(accessToken, paginationParams) {
-    const perPage = paginationParams.per_page || 50; // Default chunk size
-    const page = paginationParams.page || 1;
+    const { page = 1, per_page = 50, after, before } = paginationParams;
 
-    const stravaApiUrl = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`;
-    console.log('[process-strava-chunk] Calling fetchActivitiesPage with params:', JSON.stringify(paginationParams), 'URL:', stravaApiUrl);
+    let stravaApiUrl = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${per_page}`;
+    if (after) {
+        stravaApiUrl += `&after=${after}`;
+    }
+    if (before) {
+        stravaApiUrl += `&before=${before}`;
+    }
+    // Log the fully constructed URL and the parameters it was built from
+    console.log('[process-strava-chunk] Calling fetchActivitiesPage with effective params:',
+                JSON.stringify({ page, per_page, after, before }), 'Generated URL:', stravaApiUrl);
 
     const activitiesResponse = await fetch(stravaApiUrl, {
         headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -229,18 +236,27 @@ exports.handler = async (event, context) => {
         }
     }
 
-    const nextPageParams = isComplete ? null : {
+    const nextPagePayload: { page: number; per_page: number; after?: number; before?: number } = {
         page: (paginationParams.page || 1) + 1,
-        per_page: paginationParams.per_page || 50
+        per_page: paginationParams.per_page || 50,
     };
 
+    if (paginationParams.after) {
+        nextPagePayload.after = paginationParams.after;
+    }
+    if (paginationParams.before) {
+        nextPagePayload.before = paginationParams.before;
+    }
+
+    const nextPageParams = isComplete ? null : nextPagePayload;
+
     const responseBody = {
-      processedRunCount: processedActivityCount, // Renamed for clarity: Number of RUNS processed from this page
-      rawActivityCountOnPage: rawActivityCount, // Number of raw activities Strava returned for this page
-      savedCount,             // Number of runs successfully saved to DB from this page
-      skippedCount,           // Number of runs skipped by DB from this page (e.g., duplicates)
-      nextPageParams,         // Params for the next chunk, or null if complete
-      isComplete,             // Boolean indicating if Strava has more pages
+      processedRunCount: processedActivityCount,
+      rawActivityCountOnPage: rawActivityCount,
+      savedCount,
+      skippedCount,
+      nextPageParams,         // This now includes after/before if they were in the initial request
+      isComplete,
     };
 
     console.log(`[process-strava-chunk] Chunk processing complete for user ${userId}, page ${paginationParams.page}. Results: ${JSON.stringify(responseBody)}`);

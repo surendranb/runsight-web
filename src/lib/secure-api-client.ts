@@ -61,9 +61,9 @@ export interface RunSplit {
 // Type for pagination parameters for chunked sync
 export interface StravaPaginationParams {
     page?: number;
-    // Could also include 'before' (timestamp) if Strava API is called with date cursors
-    // For now, page-based is simpler to start with.
     per_page?: number; // To control chunk size, defaults to Strava's default if not set
+    after?: number;   // Unix timestamp for activities after this time
+    before?: number;  // Unix timestamp for activities before this time
 }
 
 // Expected response from the chunk processing Netlify function
