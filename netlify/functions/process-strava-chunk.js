@@ -71,14 +71,19 @@ async function getStravaAccessToken(supabase, userId) {
 async function fetchActivitiesPage(accessToken, paginationParams) {
     const { page = 1, per_page = 50, after, before } = paginationParams;
 
-    let stravaApiUrl = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${per_page}`;
-    if (typeof after === 'number') { // Check type to correctly handle timestamp 0
-        stravaApiUrl += `&after=${after}`;
+    const query = new URLSearchParams(); // Use URLSearchParams for robust query string construction
+    query.append('page', page.toString());
+    query.append('per_page', per_page.toString());
+
+    if (typeof after === 'number') {
+        query.append('after', after.toString());
     }
-    if (typeof before === 'number') { // Check type
-        stravaApiUrl += `&before=${before}`;
+    if (typeof before === 'number') {
+        query.append('before', before.toString());
     }
-    // Log the fully constructed URL and the parameters it was built from
+
+    const stravaApiUrl = `https://www.strava.com/api/v3/athlete/activities?${query.toString()}`;
+
     console.log('[process-strava-chunk] Calling fetchActivitiesPage with effective params:',
                 JSON.stringify({ page, per_page, after, before }), 'Generated URL:', stravaApiUrl);
 
@@ -95,7 +100,7 @@ async function fetchActivitiesPage(accessToken, paginationParams) {
         err.details = errorBody.substring(0, 500); // Truncate
         throw err;
     }
-    const rawActivities = await activitiesResponse.json(); // Renamed for clarity
+    const rawActivities = await activitiesResponse.json();
     console.log(`[process-strava-chunk] fetchActivitiesPage: Raw activities received from Strava: ${rawActivities.length}`);
 
     const filteredRunActivities = rawActivities.filter(activity =>
@@ -116,12 +121,11 @@ async function enrichActivitiesWithWeather(activities, eventOrigin) {
         console.log('[process-strava-chunk] enrichActivitiesWithWeather: No activities to enrich.');
         return [];
     }
-    // Construct the full URL for the enrich-weather function
     const enrichWeatherUrl = `${eventOrigin}/.netlify/functions/enrich-weather`;
     console.log(`[process-strava-chunk] Calling enrichActivitiesWithWeather for ${activities.length} activities. Target URL: ${enrichWeatherUrl}`);
     const response = await fetch(enrichWeatherUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, // Add any necessary auth headers if enrich-weather is protected
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ activities }),
     });
     if (!response.ok) {
@@ -129,7 +133,7 @@ async function enrichActivitiesWithWeather(activities, eventOrigin) {
         console.error(`[process-strava-chunk] enrichActivitiesWithWeather failed. Status: ${response.status}, Response: ${errorText}, URL: ${enrichWeatherUrl}`);
         const err = new Error(`Failed to enrich activities with weather. Status: ${response.status}`);
         err.isEnrichWeatherError = true;
-        err.details = errorText.substring(0, 500); // Truncate
+        err.details = errorText.substring(0, 500);
         throw err;
     }
     const data = await response.json();
@@ -142,14 +146,13 @@ async function enrichActivitiesWithWeather(activities, eventOrigin) {
 async function saveActivitiesToDb(userId, activities, eventOrigin) {
     if (!activities || activities.length === 0) {
         console.log('[process-strava-chunk] saveActivitiesToDb: No activities to save.');
-        return { savedCount: 0, skippedCount: 0, individualSaveFailuresCount: 0 }; // Include default for new field
+        return { savedCount: 0, skippedCount: 0, individualSaveFailuresCount: 0 };
     }
-    // Construct the full URL for the save-runs function
     const saveRunsUrl = `${eventOrigin}/.netlify/functions/save-runs`;
     console.log(`[process-strava-chunk] Calling saveActivitiesToDb for ${activities.length} activities. Target URL: ${saveRunsUrl}`);
     const response = await fetch(saveRunsUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, // Add any necessary auth headers if save-runs is protected
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, activities }),
     });
     if (!response.ok) {
@@ -157,19 +160,17 @@ async function saveActivitiesToDb(userId, activities, eventOrigin) {
         console.error(`[process-strava-chunk] saveActivitiesToDb failed. Status: ${response.status}, Response: ${errorText}, URL: ${saveRunsUrl}`);
         const err = new Error(`Failed to save runs. Status: ${response.status}`);
         err.isSaveRunsError = true;
-        err.details = errorText.substring(0, 500); // Truncate
+        err.details = errorText.substring(0, 500);
         throw err;
     }
     const data = await response.json();
-    // Log the new count as well
     console.log(`[process-strava-chunk] saveActivitiesToDb successful. Saved: ${data.saved_count || 0}, Skipped: ${data.skipped_count || 0}, SaveFailures: ${data.individual_save_failures_count || 0}`);
     return {
       savedCount: data.saved_count || 0,
       skippedCount: data.skipped_count || 0,
-      individualSaveFailuresCount: data.individual_save_failures_count || 0 // Add this
+      individualSaveFailuresCount: data.individual_save_failures_count || 0
     };
 }
-
 
 exports.handler = async (event, context) => {
   let errorStage = 'STAGE_INITIALIZATION';
@@ -180,7 +181,7 @@ exports.handler = async (event, context) => {
   }
 
   const headers = {
-    'Access-Control-Allow-Origin': '*', // Adjust for production
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json',
@@ -212,7 +213,6 @@ exports.handler = async (event, context) => {
     if (userId) userIdForLogging = userId;
     console.log('[process-strava-chunk] Parsed event body. userId:', userIdForLogging, 'paginationParams:', JSON.stringify(paginationParams));
 
-
     if (!userId) {
       console.error('[process-strava-chunk] User ID is missing from request body.');
       throw new Error('User ID is required.');
@@ -223,10 +223,9 @@ exports.handler = async (event, context) => {
     }
 
     errorStage = 'STAGE_DETERMINE_ORIGIN';
-    // Determine the origin for calling other Netlify functions
     let eventOrigin = '';
     if (process.env.NETLIFY_DEV) {
-        eventOrigin = process.env.URL || 'http://localhost:8888'; // process.env.URL is Netlify's standard for the site's URL
+        eventOrigin = process.env.URL || 'http://localhost:8888';
         console.warn(`[process-strava-chunk] Running in Netlify Dev, using origin from process.env.URL: ${eventOrigin}.`);
     } else {
         const scheme = event.headers['x-forwarded-proto'] || 'https';
@@ -235,17 +234,16 @@ exports.handler = async (event, context) => {
     }
     console.log('[process-strava-chunk] Calculated eventOrigin:', eventOrigin);
 
-
     errorStage = 'STAGE_GET_STRAVA_TOKEN';
     const accessToken = await getStravaAccessToken(supabase, userId);
 
     errorStage = 'STAGE_FETCH_ACTIVITIES';
     const { filteredRuns, rawActivityCount } = await fetchActivitiesPage(accessToken, paginationParams);
 
-    const processedActivityCount = filteredRuns.length; // Count of runs we will actually process
+    const processedActivityCount = filteredRuns.length;
     let savedCount = 0;
     let skippedCount = 0;
-    let individualSaveFailuresCount = 0; // Initialize new counter
+    let individualSaveFailuresCount = 0;
     let isComplete = rawActivityCount < (paginationParams.per_page || 50);
 
     if (processedActivityCount > 0) {
@@ -256,9 +254,9 @@ exports.handler = async (event, context) => {
             const saveResult = await saveActivitiesToDb(userId, enrichedActivities, eventOrigin);
             savedCount = saveResult.savedCount;
             skippedCount = saveResult.skippedCount;
-            individualSaveFailuresCount = saveResult.individualSaveFailuresCount; // Assign new count
+            individualSaveFailuresCount = saveResult.individualSaveFailuresCount;
         } else {
-            console.log('[process-strava-chunk] No activities were enriched (either 0 filtered runs initially, or enricher returned 0), skipping save to DB.');
+            console.log('[process-strava-chunk] No activities were enriched, skipping save to DB.');
         }
     } else {
         console.log(`[process-strava-chunk] No runnable activities with latlng found on page ${paginationParams.page}. Raw activities on page: ${rawActivityCount}.`);
@@ -288,7 +286,7 @@ exports.handler = async (event, context) => {
       rawActivityCountOnPage: rawActivityCount,
       savedCount: savedCount,
       skippedCount: skippedCount,
-      individualSaveFailuresCount: individualSaveFailuresCount, // Add to response
+      individualSaveFailuresCount: individualSaveFailuresCount,
       nextPageParams,
       isComplete,
     };
@@ -307,9 +305,8 @@ exports.handler = async (event, context) => {
     let finalStatusCode = 500;
     let userMessage = 'An unexpected error occurred while processing your request.';
 
-    // Determine finalStatusCode and userMessage based on errorStage and error properties
     if (errorStage === 'STAGE_INITIALIZATION' || errorStage === 'STAGE_SETUP_SUPABASE' || errorStage === 'STAGE_PARSE_BODY') {
-        finalStatusCode = 400; // Bad Request for early stage errors
+        finalStatusCode = 400;
         userMessage = 'There was an issue with your request. Please check the input and try again.';
     } else if (error.isUserNotFoundError) {
         finalStatusCode = 404;
@@ -318,21 +315,20 @@ exports.handler = async (event, context) => {
         finalStatusCode = 401;
         userMessage = 'Authentication failed. Please reconnect your Strava account.';
     } else if (error.isStravaApiError) {
-        finalStatusCode = error.stravaApiStatus && typeof error.stravaApiStatus === 'number' ? error.stravaApiStatus : 502; // Use specific status or Bad Gateway
+        finalStatusCode = error.stravaApiStatus && typeof error.stravaApiStatus === 'number' ? error.stravaApiStatus : 502;
         userMessage = `Error communicating with Strava (status ${finalStatusCode}). Please try again later.`;
         if (finalStatusCode === 401) userMessage = 'Strava authentication failed. Please reconnect your account.';
     } else if (error.isEnrichWeatherError || error.isSaveRunsError) {
-        finalStatusCode = 502; // Bad Gateway for dependent service failures
+        finalStatusCode = 502;
         userMessage = 'A dependent service failed to process your request. Please try again later.';
     }
-    // Default is 500, userMessage already set
 
     return {
       statusCode: finalStatusCode,
       headers,
       body: JSON.stringify({
         message: userMessage,
-        errorDetails: (error.details || error.toString()).substring(0,1000), // Truncate errorDetails
+        errorDetails: (error.details || error.toString()).substring(0,1000),
         stage: errorStage
       }),
     };
