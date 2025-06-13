@@ -146,9 +146,9 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         error: 'Failed to enrich with weather data',
-        message: error.message 
+        message: error.message
       })
     };
   }
