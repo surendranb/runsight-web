@@ -95,9 +95,9 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         error: 'Failed to fetch user runs', // Updated error message
-        message: error.message 
+        message: error.message
       })
     };
   }
