@@ -98,45 +98,77 @@ exports.handler = async (event, context) => {
       }
     }
 
-    let savedRunsResponse = [];
+    let savedRunsResponse = []; // To store successfully saved run data
     let savedCount = 0;
+    let individualSaveFailuresCount = 0;
+    // Optional: let individualSaveFailureDetails = [];
 
     if (activitiesToInsert.length > 0) {
       console.log(`[save-runs] Attempting to batch insert ${activitiesToInsert.length} new runs for user ${userId}.`);
-      const { data: insertedRuns, error: insertError } = await supabase
+      const { data: batchInsertedRuns, error: batchInsertError } = await supabase
         .from('runs')
         .insert(activitiesToInsert)
-        .select(); // Select the inserted rows
+        .select();
 
-      if (insertError) {
-        console.error('Error batch inserting runs:', insertError);
-        // Decide if partial success is acceptable or throw error for the whole batch
-        // For simplicity here, we'll throw, but you might want more granular error handling
-        throw new Error(`Batch insert failed: ${insertError.message}`);
+      if (batchInsertError) {
+        console.warn('[save-runs] Batch insert failed:', batchInsertError.message, '- Attempting individual inserts.');
+        // Fallback to individual inserts
+        for (const activityToInsert of activitiesToInsert) {
+          try {
+            const { data: individualInsertData, error: individualInsertError } = await supabase
+              .from('runs')
+              .insert(activityToInsert) // Insert one by one
+              .select();
+
+            if (individualInsertError) {
+              individualSaveFailuresCount++;
+              // Optional: individualSaveFailureDetails.push({ strava_id: activityToInsert.strava_id, error: individualInsertError.message });
+              console.error(`[save-runs] Failed to insert activity ${activityToInsert.strava_id} individually:`, individualInsertError.message);
+            } else {
+              if (individualInsertData && individualInsertData.length > 0) {
+                savedRunsResponse.push(...individualInsertData); // Add successfully saved run
+                savedCount++;
+              } else {
+                // This case should ideally not happen if insert didn't error but returned no data
+                individualSaveFailuresCount++;
+                console.error(`[save-runs] Failed to insert activity ${activityToInsert.strava_id} individually: No data returned despite no error.`);
+              }
+            }
+          } catch (individualCatchError) {
+            // Catch any unexpected error during the individual insert attempt itself
+            individualSaveFailuresCount++;
+            console.error(`[save-runs] Unexpected error inserting activity ${activityToInsert.strava_id} individually:`, individualCatchError.message);
+          }
+        }
+        if (savedCount > 0) {
+            console.log(`[save-runs] ✅ Individual inserts completed. Saved ${savedCount} runs, ${individualSaveFailuresCount} failures.`);
+        } else {
+            console.warn(`[save-runs] ⚠️ Individual inserts completed. No runs saved. ${individualSaveFailuresCount} failures.`);
+        }
+      } else {
+        // Batch insert was successful
+        savedRunsResponse = batchInsertedRuns || [];
+        savedCount = savedRunsResponse.length;
+        console.log(`[save-runs] ✅ Batch insert successful. Saved ${savedCount} runs.`);
       }
-      savedRunsResponse = insertedRuns || [];
-      savedCount = savedRunsResponse.length;
-      console.log(`[save-runs] ✅ Batch insert successful. Saved ${savedCount} runs.`);
     } else {
       console.log(`[save-runs] No new runs to insert for user ${userId}.`);
     }
 
+    // Update the response body
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         success: true,
         saved_count: savedCount,
-        skipped_count: skippedCount,
-        total_processed: activities.length,
-        // The 'saved_runs' detail might be less relevant now or could be simplified
-        // as we don't have individual save results in the same way.
-        // For now, returning the saved runs from the batch insert.
-        saved_runs: savedRunsResponse.map(run => ({
-            id: run.id, // Supabase ID
-            strava_id: run.strava_id, // Strava ID
-            name: run.name
-        }))
+        skipped_count: skippedCount, // This is from pre-existing check, remains the same
+        individual_save_failures_count: individualSaveFailuresCount, // New field
+        // Optional: individual_save_failure_details: individualSaveFailureDetails,
+        total_processed_for_db: activitiesToInsert.length, // How many were attempted for DB insert
+        message: `Saved ${savedCount} runs. Skipped ${skippedCount} already existing. Failed to save ${individualSaveFailuresCount} runs during DB operation.`
+        // saved_runs detail can be simplified or kept as is
+        // saved_runs: savedRunsResponse.map(run => ({ id: run.id, strava_id: run.strava_id, name: run.name }))
       })
     };
 

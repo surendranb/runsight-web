@@ -3,16 +3,8 @@ import React, { useState } from 'react'; // Added useState
 
 type View = 'dashboard' | 'insights' | 'goals' | 'settings' | string;
 
-// Define years for sync options
-const currentYear = new Date().getFullYear();
-const startYear = 2020; // Sync options will go back to this year
-const yearValues = Array.from({ length: currentYear - startYear + 1 }, (_, i) => {
-  const year = currentYear - i;
-  return `year-${year}` as const; // e.g., "year-2024", "year-2023"
-});
-
-// Update SyncPeriod type to include day numbers and year strings
-export type SyncPeriod = 7 | 30 | 90 | 180 | typeof yearValues[number];
+// Update SyncPeriod type to include specific string literals
+export type SyncPeriod = "14days" | "30days" | "60days" | "90days" | "thisYear" | "lastYear" | "allTime";
 
 interface NavigationBarProps {
   currentView: View;
@@ -53,7 +45,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
     onSyncData,
     isSyncing
 }) => {
-  const [selectedSyncPeriod, setSelectedSyncPeriod] = useState<SyncPeriod>(30); // Default to 30 days
+  const [selectedSyncPeriod, setSelectedSyncPeriod] = useState<SyncPeriod>("30days"); // Default to "30days"
 
   const handleSyncClick = () => {
     if (onSyncData) {
@@ -120,16 +112,12 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
   );
 };
 
-// Generate dynamic year options
-const yearOptions = Array.from({ length: currentYear - startYear + 1 }, (_, i) => {
-  const year = currentYear - i;
-  return { label: `Sync ${year}`, value: `year-${year}` as SyncPeriod };
-});
-
 const SYNC_OPTIONS: { label: string; value: SyncPeriod }[] = [
-    { label: "Last 7 Days", value: 7 },
-    { label: "Last 30 Days", value: 30 },
-    { label: "Last 90 Days", value: 90 },
-    { label: "Last 180 Days", value: 180 },
-    ...yearOptions, // Add the dynamically generated year options
+  { label: "Last 14 Days", value: "14days" },
+  { label: "Last 30 Days", value: "30days" },
+  { label: "Last 60 Days", value: "60days" },
+  { label: "Last 90 Days", value: "90days" },
+  { label: "This Year", value: "thisYear" },
+  { label: "Last Year", value: "lastYear" },
+  { label: "All Time", value: "allTime" },
 ];
