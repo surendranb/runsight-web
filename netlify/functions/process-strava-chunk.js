@@ -142,7 +142,7 @@ async function enrichActivitiesWithWeather(activities, eventOrigin) {
 async function saveActivitiesToDb(userId, activities, eventOrigin) {
     if (!activities || activities.length === 0) {
         console.log('[process-strava-chunk] saveActivitiesToDb: No activities to save.');
-        return { savedCount: 0, skippedCount: 0 };
+        return { savedCount: 0, skippedCount: 0, individualSaveFailuresCount: 0 }; // Include default for new field
     }
     // Construct the full URL for the save-runs function
     const saveRunsUrl = `${eventOrigin}/.netlify/functions/save-runs`;
@@ -161,8 +161,13 @@ async function saveActivitiesToDb(userId, activities, eventOrigin) {
         throw err;
     }
     const data = await response.json();
-    console.log(`[process-strava-chunk] saveActivitiesToDb successful. Saved: ${data.saved_count || 0}, Skipped: ${data.skipped_count || 0}`);
-    return { savedCount: data.saved_count || 0, skippedCount: data.skipped_count || 0 };
+    // Log the new count as well
+    console.log(`[process-strava-chunk] saveActivitiesToDb successful. Saved: ${data.saved_count || 0}, Skipped: ${data.skipped_count || 0}, SaveFailures: ${data.individual_save_failures_count || 0}`);
+    return {
+      savedCount: data.saved_count || 0,
+      skippedCount: data.skipped_count || 0,
+      individualSaveFailuresCount: data.individual_save_failures_count || 0 // Add this
+    };
 }
 
 
@@ -240,6 +245,7 @@ exports.handler = async (event, context) => {
     const processedActivityCount = filteredRuns.length; // Count of runs we will actually process
     let savedCount = 0;
     let skippedCount = 0;
+    let individualSaveFailuresCount = 0; // Initialize new counter
     let isComplete = rawActivityCount < (paginationParams.per_page || 50);
 
     if (processedActivityCount > 0) {
@@ -250,6 +256,7 @@ exports.handler = async (event, context) => {
             const saveResult = await saveActivitiesToDb(userId, enrichedActivities, eventOrigin);
             savedCount = saveResult.savedCount;
             skippedCount = saveResult.skippedCount;
+            individualSaveFailuresCount = saveResult.individualSaveFailuresCount; // Assign new count
         } else {
             console.log('[process-strava-chunk] No activities were enriched (either 0 filtered runs initially, or enricher returned 0), skipping save to DB.');
         }
@@ -279,8 +286,9 @@ exports.handler = async (event, context) => {
     const responseBody = {
       processedRunCount: processedActivityCount,
       rawActivityCountOnPage: rawActivityCount,
-      savedCount,
-      skippedCount,
+      savedCount: savedCount,
+      skippedCount: skippedCount,
+      individualSaveFailuresCount: individualSaveFailuresCount, // Add to response
       nextPageParams,
       isComplete,
     };

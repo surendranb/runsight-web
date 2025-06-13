@@ -68,9 +68,11 @@ export interface StravaPaginationParams {
 
 // Expected response from the chunk processing Netlify function
 export interface ProcessChunkResponse {
-    processedActivityCount: number; // Number of activities received from Strava in this chunk
+    processedActivityCount: number; // Number of activities received from Strava in this chunk (after filtering for runs with latlng)
+    rawActivityCountOnPage: number; // Raw number of activities fetched from Strava for that page before filtering
     savedCount: number;
     skippedCount: number;
+    individualSaveFailuresCount?: number; // Number of runs that failed to save during individual insert attempts
     nextPageParams: StravaPaginationParams | null; // Params for the next chunk, or null if done
     isComplete: boolean; // True if this was the last chunk or no more activities
 }

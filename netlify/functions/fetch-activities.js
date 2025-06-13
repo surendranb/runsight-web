@@ -112,17 +112,48 @@ exports.handler = async (event, context) => {
     const perPage = params.per_page || 50;
     queryParams.append('per_page', perPage.toString());
 
-    if (params.days) {
-      const afterTimestamp = Math.floor((Date.now() - (params.days * 24 * 60 * 60 * 1000)) / 1000);
-      queryParams.append('after', afterTimestamp.toString());
-      console.log(`[fetch-activities] Fetching for last ${params.days} days (after: ${afterTimestamp})`);
-    } else if (params.page) {
+    // Page parameter
+    if (params.page) {
       queryParams.append('page', params.page.toString());
-      console.log(`[fetch-activities] Fetching page ${params.page}`);
     } else {
-      // Default behavior if no specific params: fetch first page of recent activities
-      queryParams.append('page', '1');
-      console.log('[fetch-activities] No specific period/page, fetching page 1 by default.');
+      queryParams.append('page', '1'); // Default to page 1
+    }
+
+    // 'after' timestamp parameter
+    if (params.after && typeof params.after === 'number') {
+      queryParams.append('after', String(params.after));
+      console.log(`[fetch-activities] Applying 'after' filter: ${new Date(params.after * 1000).toISOString()}`);
+    } else if (params.after) {
+      // Attempt to parse if it's a string number
+      const afterTimestamp = parseInt(params.after, 10);
+      if (!isNaN(afterTimestamp)) {
+        queryParams.append('after', String(afterTimestamp));
+        console.log(`[fetch-activities] Applying 'after' filter (parsed from string): ${new Date(afterTimestamp * 1000).toISOString()}`);
+      } else {
+        console.log('[fetch-activities] Ignoring invalid "after" parameter:', params.after);
+      }
+    }
+
+    // 'before' timestamp parameter
+    if (params.before && typeof params.before === 'number') {
+      queryParams.append('before', String(params.before));
+      console.log(`[fetch-activities] Applying 'before' filter: ${new Date(params.before * 1000).toISOString()}`);
+    } else if (params.before) {
+      const beforeTimestamp = parseInt(params.before, 10);
+      if (!isNaN(beforeTimestamp)) {
+        queryParams.append('before', String(beforeTimestamp));
+        console.log(`[fetch-activities] Applying 'before' filter (parsed from string): ${new Date(beforeTimestamp * 1000).toISOString()}`);
+      } else {
+        console.log('[fetch-activities] Ignoring invalid "before" parameter, defaulting to now for "before".');
+        const nowTimestamp = Math.floor(Date.now() / 1000);
+        queryParams.append('before', nowTimestamp.toString());
+        console.log(`[fetch-activities] Applying 'before' filter (defaulted to now): ${new Date(nowTimestamp * 1000).toISOString()}`);
+      }
+    } else {
+      // Default to now if 'before' is not provided at all
+      const nowTimestamp = Math.floor(Date.now() / 1000);
+      queryParams.append('before', nowTimestamp.toString());
+      console.log(`[fetch-activities] Applying 'before' filter (defaulted to now as none provided): ${new Date(nowTimestamp * 1000).toISOString()}`);
     }
 
     stravaApiUrl += `?${queryParams.toString()}`;

@@ -2,9 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSecureAuth } from './hooks/useSecureAuth';
 import SecureStravaCallback from './components/SecureStravaCallback';
-import React, { useState, useEffect, useCallback } from 'react';
-import { useSecureAuth } from './hooks/useSecureAuth';
-import SecureStravaCallback from './components/SecureStravaCallback';
+// Duplicate imports for React, useSecureAuth, SecureStravaCallback removed
 import { NavigationBar, SyncPeriod } from './components/NavigationBar';
 import { SimpleDashboard } from './components/SimpleDashboard';
 import { InsightsPage } from './components/InsightsPage';
@@ -165,8 +163,56 @@ const SecureApp: React.FC = () => {
     }
   }, [nextPageToSync, user, user?.id, isSyncing, processSyncChunk]); // Added user.id to dependencies
 
+const getTimestamps = (period: SyncPeriod): { after: number; before: number } => {
+  const now = new Date();
+  let startDate: Date;
+  let endDate: Date = new Date(); // Default end date is now for most cases
 
-  const handleSyncData = async (period: SyncPeriod) => {
+  switch (period) {
+    case "14days":
+      startDate = new Date();
+      startDate.setDate(now.getDate() - 14);
+      break;
+    case "30days":
+      startDate = new Date();
+      startDate.setDate(now.getDate() - 30);
+      break;
+    case "60days":
+      startDate = new Date();
+      startDate.setDate(now.getDate() - 60);
+      break;
+    case "90days":
+      startDate = new Date();
+      startDate.setDate(now.getDate() - 90);
+      break;
+    case "thisYear":
+      startDate = new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0)); // Jan 1st current year UTC
+      endDate = new Date(); // Sync up to now for "thisYear"
+      break;
+    case "lastYear":
+      startDate = new Date(Date.UTC(now.getUTCFullYear() - 1, 0, 1, 0, 0, 0)); // Jan 1st last year UTC
+      endDate = new Date(Date.UTC(now.getUTCFullYear() - 1, 11, 31, 23, 59, 59)); // Dec 31st last year UTC
+      break;
+    case "allTime":
+    default: // Default to allTime if somehow an invalid period is passed
+      startDate = new Date(Date.UTC(2000, 0, 1, 0, 0, 0)); // Jan 1, 2000 UTC as a far-back date
+      endDate = new Date(); // Sync up to now
+      break;
+  }
+
+  // Ensure start date is at the beginning of the day for day-based calculations for consistency
+  if (["14days", "30days", "60days", "90days"].includes(period)) {
+       startDate.setUTCHours(0,0,0,0);
+  }
+
+  const afterEpochSec = Math.floor(startDate.getTime() / 1000);
+  const beforeEpochSec = Math.floor(endDate.getTime() / 1000);
+
+  return { after: afterEpochSec, before: beforeEpochSec };
+};
+
+  // Revised structure for handleSyncData
+  const handleSyncData = async (period: SyncPeriod) => { // Make sure SyncPeriod is imported from NavigationBar
       if (!user || !user.id) {
           alert("Please log in to sync data.");
           return;
@@ -174,44 +220,35 @@ const SecureApp: React.FC = () => {
 
       setIsSyncing(true);
       setDataError(null);
-      setSyncProgressMessage('Starting data sync...');
+      // setSyncProgressMessage('Preparing to sync...'); // Initial message is now more specific
 
-      if (typeof period === 'string' && period.startsWith('year-')) {
-        const year = parseInt(period.split('-')[1], 10);
-        // UTC dates for Jan 1st and Dec 31st
-        const startDate = new Date(Date.UTC(year, 0, 1, 0, 0, 0)); // Month is 0-indexed
-        const endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59)); // Month is 0-indexed
+      try {
+          setSyncProgressMessage(`Calculating time period for sync: ${period}...`); // Adjusted message
 
-        const afterTimestamp = Math.floor(startDate.getTime() / 1000);
-        const beforeTimestamp = Math.floor(endDate.getTime() / 1000);
+          const { after, before } = getTimestamps(period); // Directly proceed to timestamp calculation
 
-        setSyncProgressMessage(`Preparing to sync activities for ${year}...`);
-        setNextPageToSync({
-            page: 1,
-            per_page: 50, // Default chunk size, Strava might override
-            after: afterTimestamp,
-            before: beforeTimestamp
-        });
-        // The useEffect for nextPageToSync will start the processSyncChunk
-      } else if (typeof period === 'number') { // Handle fixed periods (7, 30, 90, 180 days)
-        try {
-          setSyncProgressMessage(`Syncing last ${period} days...`);
-          const result = await apiClient.syncUserData(user.id, period); // period is already number
-          alert(`Sync complete! Added ${result.savedCount} new runs, skipped ${result.skippedCount} from the last ${period} days. Data will refresh.`);
-          await fetchData();
-        } catch (error: any) {
-          console.error(`Sync for ${period} days failed:`, error);
-          setDataError(error.message || `Sync for ${period} days failed.`);
-          alert(`Sync failed for ${period} days: ` + (error.message || 'Unknown error'));
-        } finally {
+          let readableAfter = new Date(after * 1000).toLocaleDateString();
+          let readableBefore = new Date(before * 1000).toLocaleDateString();
+          if (period === "allTime") readableAfter = "beginning of time"; // Or a specific date like "Jan 1, 2000"
+
+          setSyncProgressMessage(`Syncing from ${readableAfter} to ${readableBefore}. Starting chunk processing...`);
+
+          setNextPageToSync({
+              page: 1,
+              per_page: 50,
+              after: after,
+              before: before
+          });
+          // The useEffect for nextPageToSync will start processSyncChunk
+      } catch (error: any) {
+          // ... error handling for timestamp calculation or other initial setup before chunking
+          console.error('Error during sync preparation (timestamp calculation):', error);
+          setDataError(error.message || 'Failed to prepare sync.');
+          alert('Sync preparation failed: ' + (error.message || 'Unknown error'));
           setIsSyncing(false);
           setSyncProgressMessage('');
-        }
-      } else {
-        console.warn("Unsupported sync period:", period);
-        setIsSyncing(false);
-        setSyncProgressMessage('');
       }
+      // No finally block to reset isSyncing here, as processSyncChunk handles it
   };
 
 
