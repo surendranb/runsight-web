@@ -173,8 +173,8 @@ exports.handler = async (event, context) => {
 
     // Filter for actual running activities and ensure they have latlng
     const filteredRuns = fetchedActivities.filter(activity =>
-      activity.type === 'Run' && 
-      activity.start_latlng && 
+      activity.type === 'Run' &&
+      activity.start_latlng &&
       activity.start_latlng.length === 2
     );
 
@@ -195,9 +195,9 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         error: 'Failed to fetch activities',
-        message: error.message 
+        message: error.message
       })
     };
   }
