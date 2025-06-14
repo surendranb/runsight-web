@@ -70,10 +70,10 @@ export interface RunSplit {
 // Add RunStats if it's to be passed around, though SimpleDashboard calculates its own
 export interface RunStats {
   total_runs: number;
-  total_distance: number;
-  total_time: number;
-  average_pace: number;
-  average_distance: number;
+  total_distance: number; // in meters
+  total_moving_time: number; // in seconds
+  average_pace_seconds_per_km: number;
+  average_distance_per_run_meters: number;
 }
 
 
