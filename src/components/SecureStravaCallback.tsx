@@ -3,110 +3,67 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useSecureAuth } from '../hooks/useSecureAuth';
-import { apiClient } from '../lib/secure-api-client';
+// import { apiClient } from '../lib/secure-api-client'; // No longer needed here
 
 interface CallbackState {
-  step: 'authenticating' | 'syncing' | 'complete' | 'error';
+  step: 'authenticating' | 'redirecting' | 'error'; // Simplified steps
   message: string;
-  progress: number;
+  progress: number; // Can be simplified or removed if steps are too few/fast
   error?: string;
 }
 
 const SecureStravaCallback: React.FC = () => {
-  const { handleStravaCallback, user } = useSecureAuth();
+  const { handleStravaCallback } = useSecureAuth(); // user not needed here anymore
   const [state, setState] = useState<CallbackState>({
     step: 'authenticating',
     message: 'Authenticating with Strava...',
-    progress: 10
+    progress: 25 // Initial progress
   });
   const hasProcessed = useRef(false);
 
   useEffect(() => {
-    // Prevent multiple executions
     if (hasProcessed.current) return;
     hasProcessed.current = true;
     
     const processCallback = async () => {
       try {
         console.log('🔄 Starting callback processing...');
-        
-        // Get authorization code from URL
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         const error = urlParams.get('error');
-        
         console.log('📋 URL params:', { code: code?.substring(0, 10) + '...', error });
 
-        if (error) {
-          throw new Error(`Strava authorization failed: ${error}`);
-        }
+        if (error) throw new Error(`Strava authorization failed: ${error}`);
+        if (!code) throw new Error('No authorization code received from Strava');
 
-        if (!code) {
-          throw new Error('No authorization code received from Strava');
-        }
-
-        // Step 1: Authenticate (server-side)
-        setState({
-          step: 'authenticating',
-          message: 'Authenticating with Strava...',
-          progress: 20
-        });
-
+        setState({ step: 'authenticating', message: 'Securely authenticating your Strava account...', progress: 50 });
         console.log('🔐 Calling handleStravaCallback...');
-        const authenticatedUser = await handleStravaCallback(code);
-        console.log('✅ Authentication successful:', authenticatedUser);
+        await handleStravaCallback(code); // authenticatedUser not directly used here anymore
+        console.log('✅ Authentication successful.');
 
-        setState({
-          step: 'syncing',
-          message: 'Fetching your running data...',
-          progress: 40
-        });
-
-        // Step 2: Sync data (server-side)
-        const syncResult = await apiClient.syncUserData(authenticatedUser.id, 14);
-
-        setState({
-          step: 'syncing',
-          message: `Processing ${syncResult.activities.length} activities...`,
-          progress: 70
-        });
-
-        // Small delay to show progress
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        setState({
-          step: 'complete',
-          message: `Successfully imported ${syncResult.savedCount} runs!`,
-          progress: 100
-        });
-
-        // Redirect to dashboard after success
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 2000);
+        setState({ step: 'redirecting', message: 'Authentication successful! Redirecting to your dashboard...', progress: 100 });
+        setTimeout(() => { window.location.href = '/'; }, 1500); // Shortened delay
 
       } catch (error) {
         console.error('Callback processing failed:', error);
         setState({
           step: 'error',
-          message: 'Authentication failed',
+          message: 'Authentication failed. Please try again.', // Slightly more user-friendly
           progress: 0,
-          error: error instanceof Error ? error.message : 'Unknown error occurred'
+          error: error instanceof Error ? error.message : 'An unknown error occurred during authentication.'
         });
       }
     };
 
     processCallback();
-  }, []); // Run only once on mount
+  }, [handleStravaCallback]); // Added handleStravaCallback to dependencies
 
   const getStepIcon = () => {
     switch (state.step) {
       case 'authenticating':
         return '🔐';
-      case 'syncing':
-        return '🔄';
-      case 'complete':
-        return '✅';
+      case 'redirecting':
+        return '✅'; // Using success icon for redirecting state
       case 'error':
         return '❌';
       default:
@@ -116,11 +73,11 @@ const SecureStravaCallback: React.FC = () => {
 
   const getStepColor = () => {
     switch (state.step) {
-      case 'complete':
+      case 'redirecting': // Success color for redirecting
         return '#10b981';
       case 'error':
         return '#ef4444';
-      default:
+      default: // Default/authenticating color
         return '#3b82f6';
     }
   };
@@ -156,7 +113,7 @@ const SecureStravaCallback: React.FC = () => {
           color: '#1f2937',
           marginBottom: '16px'
         }}>
-          {state.step === 'error' ? 'Authentication Failed' : 'Setting Up Your Account'}
+          {state.step === 'error' ? 'Authentication Failed' : 'Finalizing Authentication'}
         </h1>
 
         <p style={{
@@ -167,7 +124,8 @@ const SecureStravaCallback: React.FC = () => {
           {state.message}
         </p>
 
-        {state.step !== 'error' && (
+        {/* Simplified or remove progress bar if deemed too quick */}
+        {state.step !== 'error' && state.step !== 'redirecting' && (
           <div style={{
             width: '100%',
             height: '8px',
@@ -181,8 +139,26 @@ const SecureStravaCallback: React.FC = () => {
               height: '100%',
               backgroundColor: getStepColor(),
               borderRadius: '4px',
-              transition: 'width 0.5s ease-in-out'
+              transition: 'width 0.3s ease-in-out' // Faster transition
             }} />
+          </div>
+        )}
+
+        {state.step === 'redirecting' && (
+           <div style={{
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            borderRadius: '8px',
+            padding: '16px',
+            marginBottom: '24px'
+          }}>
+            <p style={{
+              color: '#166534',
+              fontSize: '14px',
+              margin: 0
+            }}>
+              You will be redirected shortly...
+            </p>
           </div>
         )}
 
@@ -195,32 +171,17 @@ const SecureStravaCallback: React.FC = () => {
             marginBottom: '24px'
           }}>
             <p style={{
-              color: '#dc2626',
+              color: '#dc2626', // Error text color
               fontSize: '14px',
-              margin: 0
+              margin: 0,
+              textAlign: 'left' // Align error details to the left for readability
             }}>
-              {state.error}
+              <strong>Details:</strong> {state.error}
             </p>
           </div>
         )}
 
-        {state.step === 'complete' && (
-          <div style={{
-            background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
-            borderRadius: '8px',
-            padding: '16px',
-            marginBottom: '24px'
-          }}>
-            <p style={{
-              color: '#166534',
-              fontSize: '14px',
-              margin: 0
-            }}>
-              Redirecting to your dashboard...
-            </p>
-          </div>
-        )}
+        {/* Removed the specific 'complete' state message block as 'redirecting' covers it */}
 
         {state.step === 'error' && (
           <button
