@@ -33,10 +33,12 @@ export const SimpleDashboard: React.FC<SimpleDashboardProps> = ({
   useEffect(() => {
     let tempFilteredRuns = [...runs];
 
+    // Apply GPS Filter
     if (gpsFilter === 'has_gps') {
-      tempFilteredRuns = tempFilteredRuns.filter(run => run.start_latlng && run.start_latlng.length === 2);
+      tempFilteredRuns = tempFilteredRuns.filter(run => run.start_latlng !== null && run.start_latlng !== undefined && run.start_latlng.trim() !== "");
+      // Check for null, undefined, and also handle empty string just in case, though null is expected for no GPS.
     } else if (gpsFilter === 'no_gps') {
-      tempFilteredRuns = tempFilteredRuns.filter(run => !run.start_latlng || run.start_latlng.length !== 2);
+      tempFilteredRuns = tempFilteredRuns.filter(run => run.start_latlng === null || run.start_latlng === undefined || run.start_latlng.trim() === "");
     }
 
     if (dateRangeFilter.start) {
