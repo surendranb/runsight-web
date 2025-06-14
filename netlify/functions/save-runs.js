@@ -1,207 +1,141 @@
 // netlify/functions/save-runs.js
 const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-exports.handler = async (event, context) => {
-  const headers = {
-    'Access-Control-Allow-Origin': '*', // Adjust for production
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Content-Type': 'application/json',
-  };
+// Helper function to validate run data
+function validateRun(run) {
+    if (!run || typeof run !== 'object') return false;
+    return (
+        run.strava_id && 
+        run.user_id && 
+        typeof run.distance === 'number' && 
+        run.distance >= 0 &&
+        run.start_date &&
+        run.type === 'Run'
+    );
+}
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
-  }
+exports.handler = async (event) => {
+    console.log('[save-runs] Starting save-runs function');
 
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: 'Method not allowed. Please use POST.' }),
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Content-Type': 'application/json',
     };
-  }
 
-  const { VITE_SUPABASE_URL: SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env;
-
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    console.error('[save-runs] Missing Supabase URL or Service Key.');
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Server configuration error: Supabase details not found.' }),
-    };
-  }
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
-  try {
-    const { userId, activities } = JSON.parse(event.body);
-
-    if (!userId) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'User ID is required.' }) };
-    }
-    if (!activities || !Array.isArray(activities)) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Activities array is required.' }) };
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
     }
 
-    if (activities.length === 0) {
-      console.log('[save-runs] No activities provided to save.');
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          success: true,
-          saved_count: 0,
-          skipped_count: 0,
-          individual_save_failures_count: 0,
-          total_processed_for_db: 0,
-          message: "No activities to process."
-        }),
-      };
+    if (event.httpMethod !== 'POST') {
+        return {
+            statusCode: 405,
+            headers,
+            body: JSON.stringify({ error: 'Method not allowed. Please use POST.' }),
+        };
     }
 
-    console.log(`[save-runs] Received ${activities.length} activities for userId: ${userId}.`);
-
-    const incomingStravaIds = activities.map(act => act.id);
-    let existingStravaIds = new Set();
-
-    if (incomingStravaIds.length > 0) {
-        const { data: existingRunsData, error: fetchExistingError } = await supabase
-          .from('runs')
-          .select('strava_id')
-          .eq('user_id', userId)
-          .in('strava_id', incomingStravaIds);
-
-        if (fetchExistingError) {
-          console.error('[save-runs] Error fetching existing runs:', fetchExistingError);
-          // Depending on policy, you might allow proceeding or return an error
-          // For now, let's throw, as this is a critical check to avoid duplicates properly
-          throw new Error(`Failed to check for existing runs: ${fetchExistingError.message}`);
+    try {
+        const { runs, userId } = JSON.parse(event.body);
+        
+        if (!runs || !Array.isArray(runs) || !userId) {
+            throw new Error('Invalid request: Missing required parameters');
         }
-        existingStravaIds = new Set(existingRunsData.map(run => run.strava_id));
-        console.log(`[save-runs] Found ${existingStravaIds.size} existing runs among the provided activities for user ${userId}.`);
-    }
+        
+        console.log(`[save-runs] Processing ${runs.length} runs for user ${userId}`);
+        
+        // Validate all runs first
+        const validRuns = runs.filter(validateRun);
+        if (validRuns.length !== runs.length) {
+            console.warn(`[save-runs] Filtered out ${runs.length - validRuns.length} invalid runs`);
+        }
 
+        if (validRuns.length === 0) {
+            console.log('[save-runs] No valid runs to process');
+            return {
+                statusCode: 200,
+                headers,
+                body: JSON.stringify({
+                    savedCount: 0,
+                    skippedCount: 0,
+                    totalProcessed: 0
+                })
+            };
+        }
 
-    const activitiesToInsert = [];
-    let skippedCount = 0;
+        // Get existing Strava IDs in chunks to avoid URL length issues
+        const stravaIds = [...new Set(validRuns.map(r => r.strava_id))];
+        const chunkSize = 100;
+        const existingIds = new Set();
+        
+        console.log(`[save-runs] Checking for existing runs in ${Math.ceil(stravaIds.length / chunkSize)} chunks`);
+        
+        for (let i = 0; i < stravaIds.length; i += chunkSize) {
+            const chunk = stravaIds.slice(i, i + chunkSize);
+            const { data: existingChunk, error } = await supabase
+                .from('runs')
+                .select('strava_id')
+                .eq('user_id', userId)
+                .in('strava_id', chunk);
+                
+            if (error) throw error;
+            
+            existingChunk.forEach(run => existingIds.add(run.strava_id));
+        }
+        
+        // Filter out existing runs
+        const newRuns = validRuns.filter(run => !existingIds.has(run.strava_id));
+        console.log(`[save-runs] Found ${newRuns.length} new runs to save (${existingIds.size} already exist)`);
 
-    for (const activity of activities) {
-      // Ensure activity and activity.id are valid before attempting to access activity.id
-      if (!activity || typeof activity.id === 'undefined') {
-          console.warn('[save-runs] Skipping an invalid activity object (missing id):', activity);
-          // Decide how to count this - perhaps a new counter for "malformed_activities_skipped"
-          // For now, it won't be added to activitiesToInsert nor increment skippedCount for existing.
-          continue;
-      }
-
-      if (existingStravaIds.has(activity.id)) {
-        skippedCount++;
-      } else {
-        // Prepare run data for new activities
-        // Ensure all fields are correctly mapped and handle potential nulls from enrichment
-        const weatherData = activity.weather_data || {}; // Default to empty object if null/undefined
-
-        activitiesToInsert.push({
-          user_id: userId,
-          strava_id: activity.id,
-          name: activity.name || 'Unnamed Run',
-          distance: activity.distance || 0,
-          moving_time: activity.moving_time || 0,
-          elapsed_time: activity.elapsed_time || 0,
-          start_date: activity.start_date, // Assuming this is always present and valid ISO string
-          start_date_local: activity.start_date_local, // Assuming this is always present
-          start_latlng: activity.start_latlng ? `(${activity.start_latlng[1]},${activity.start_latlng[0]})` : null, // Swapped order for PostGIS point
-          end_latlng: activity.end_latlng ? `(${activity.end_latlng[1]},${activity.end_latlng[0]})` : null, // Swapped order for PostGIS point
-          average_speed: activity.average_speed || 0,
-          max_speed: activity.max_speed || 0,
-          average_heartrate: activity.average_heartrate || null,
-          max_heartrate: activity.max_heartrate || null,
-          total_elevation_gain: activity.total_elevation_gain || 0,
-          weather_data: activity.weather_data, // Store the whole enriched weather object (or null)
-          strava_data: activity.strava_data || activity, // Store the original Strava activity, or the activity itself if strava_data field is missing
-          city: activity.city || null,
-          state: activity.state || null,
-          country: activity.country || null,
-          // created_at and updated_at will be handled by db defaults or triggers if set up
-        });
-      }
-    }
-
-    console.log(`[save-runs] Prepared ${activitiesToInsert.length} new activities for insertion. Skipped ${skippedCount} existing activities.`);
-
-    let savedRunsData = []; // To store data of successfully saved runs (e.g., IDs)
-    let savedCount = 0;
-    let individualSaveFailuresCount = 0;
-
-    if (activitiesToInsert.length > 0) {
-      console.log(`[save-runs] Attempting to batch insert ${activitiesToInsert.length} new runs for user ${userId}.`);
-      const { data: batchInsertedRuns, error: batchInsertError } = await supabase
-        .from('runs')
-        .insert(activitiesToInsert)
-        .select('id, strava_id, name'); // Select only minimal data
-
-      if (batchInsertError) {
-        console.warn('[save-runs] Batch insert failed:', batchInsertError.message, '- Attempting individual inserts.');
-        for (const activityToSave of activitiesToInsert) {
-          try {
-            const { data: individualInsertData, error: individualInsertError } = await supabase
-              .from('runs')
-              .insert(activityToSave)
-              .select('id, strava_id, name');
-
-            if (individualInsertError) {
-              individualSaveFailuresCount++;
-              console.error(`[save-runs] Failed to insert activity ${activityToSave.strava_id} individually:`, individualInsertError.message);
-            } else {
-              if (individualInsertData && individualInsertData.length > 0) {
-                savedRunsData.push(...individualInsertData);
-                savedCount++;
-              } else {
-                individualSaveFailuresCount++; // Should not happen if no error, but good to count
-                console.error(`[save-runs] Insert for activity ${activityToSave.strava_id} returned no error but no data.`);
-              }
+        // Insert in chunks to avoid hitting limits
+        const insertChunkSize = 50;
+        let savedCount = 0;
+        let insertedRuns = [];
+        
+        console.log(`[save-runs] Inserting ${newRuns.length} runs in chunks of ${insertChunkSize}`);
+        
+        for (let i = 0; i < newRuns.length; i += insertChunkSize) {
+            const chunk = newRuns.slice(i, i + insertChunkSize);
+            const { data: chunkResults, error: chunkError } = await supabase
+                .from('runs')
+                .insert(chunk)
+                .select();
+                
+            if (chunkError) {
+                console.error(`[save-runs] Error inserting chunk ${i / insertChunkSize + 1}:`, chunkError);
+                throw chunkError;
             }
-          } catch (indCatchError) {
-             individualSaveFailuresCount++;
-             console.error(`[save-runs] Critical error during individual insert for activity ${activityToSave.strava_id}:`, indCatchError.message);
-          }
+            
+            savedCount += chunkResults.length;
+            insertedRuns = [...insertedRuns, ...chunkResults];
+            console.log(`[save-runs] Inserted ${chunkResults.length} runs (${savedCount}/${newRuns.length} total)`);
         }
-        if (savedCount > 0) {
-            console.log(`[save-runs] ✅ Individual inserts partially successful. Saved ${savedCount} runs, ${individualSaveFailuresCount} failures.`);
-        } else {
-            console.warn(`[save-runs] ⚠️ Individual inserts failed for all ${individualSaveFailuresCount} remaining runs.`);
-        }
-      } else {
-        savedRunsData = batchInsertedRuns || [];
-        savedCount = savedRunsData.length;
-        console.log(`[save-runs] ✅ Batch insert successful. Saved ${savedCount} runs.`);
-      }
-    }
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        success: true,
-        saved_count: savedCount,
-        skipped_count: skippedCount,
-        individual_save_failures_count: individualSaveFailuresCount,
-        total_processed_for_db: activitiesToInsert.length,
-        message: `Saved ${savedCount} new runs. Skipped ${skippedCount} (already existing). Failed to save ${individualSaveFailuresCount} runs during DB operation.`,
-        // saved_runs_details: savedRunsData // Optionally return details of saved runs
-      }),
-    };
-
-  } catch (error) {
-    console.error('[save-runs] Critical error in handler:', error);
-    if (error instanceof SyntaxError && error.message.includes("JSON.parse")) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: "Invalid request body: Not valid JSON."}) };
+        const result = {
+            savedCount,
+            skippedCount: validRuns.length - newRuns.length,
+            totalProcessed: validRuns.length
+        };
+        
+        console.log('[save-runs] Sync complete:', result);
+        
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify(result)
+        };
+        
+    } catch (error) {
+        console.error('[save-runs] Error:', error);
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ 
+                error: 'Failed to save runs',
+                details: error.message 
+            })
+        };
     }
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Failed to save runs due to an unexpected server error', message: error.message }),
-    };
-  }
 };
