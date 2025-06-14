@@ -1,6 +1,18 @@
 // netlify/functions/save-runs.js
 const { createClient } = require('@supabase/supabase-js');
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
+// Get environment variables with fallbacks
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.error('Missing Supabase configuration');
+    console.log('SUPABASE_URL:', SUPABASE_URL ? 'Set' : 'Missing');
+    console.log('SUPABASE_KEY:', SUPABASE_KEY ? 'Set' : 'Missing');
+    throw new Error('Missing required Supabase configuration');
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Helper function to validate run data
 function validateRun(run) {
