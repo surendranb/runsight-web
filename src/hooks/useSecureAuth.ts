@@ -28,11 +28,22 @@ export const useSecureAuth = () => {
       const storedUser = localStorage.getItem('runsight_user');
       if (storedUser) {
         const user = JSON.parse(storedUser);
-        setAuthState({
-          user,
-          isLoading: false,
-          error: null
-        });
+        // Validate user object
+        if (user && user.id && typeof user.id === 'string' && user.id.trim() !== '') {
+          setAuthState({
+            user,
+            isLoading: false,
+            error: null
+          });
+        } else {
+          console.warn('Invalid or corrupted user session data found in localStorage. Clearing session.');
+          localStorage.removeItem('runsight_user');
+          setAuthState({
+            user: null,
+            isLoading: false,
+            error: 'Invalid session data. Please log in again.'
+          });
+        }
       } else {
         setAuthState({
           user: null,
