@@ -121,17 +121,55 @@ async function fetchStravaActivities(userId, paginationParams = {}) {
             const activities = await response.json();
             console.log(`[process-strava-chunk] Fetched ${activities.length} activities from Strava`);
             
-            // Filter for runs only and add user_id
+            // Filter for runs only and explicitly map to schema fields
             const runs = activities
                 .filter(activity => activity.type === 'Run')
-                .map(run => ({
-                    ...run,
-                    user_id: userId,
-                    strava_id: run.id,
-                    strava_data: run // Store the full Strava data
-                }));
+                .map(stravaActivity => {
+                    // stravaActivity is the raw object from Strava
+                    const mappedRun = {
+                        // Fields from 'runs' table schema that come from Strava
+                        strava_id: stravaActivity.id, // Use Strava's 'id' for our 'strava_id' column
+                        name: stravaActivity.name,
+                        distance: stravaActivity.distance,
+                        moving_time: stravaActivity.moving_time,
+                        elapsed_time: stravaActivity.elapsed_time,
+                        start_date: stravaActivity.start_date,
+                        start_date_local: stravaActivity.start_date_local,
+                        average_speed: stravaActivity.average_speed,
+                        max_speed: stravaActivity.max_speed,
+                        average_heartrate: stravaActivity.average_heartrate,
+                        max_heartrate: stravaActivity.max_heartrate,
+                        total_elevation_gain: stravaActivity.total_elevation_gain,
+
+                        // Location data - will be formatted later in save-runs.js
+                        // Ensure these are passed as arrays if they exist, or null
+                        start_latlng: stravaActivity.start_latlng || null,
+                        end_latlng: stravaActivity.end_latlng || null,
+
+                        // Fields to be added by our system
+                        user_id: userId, // The Supabase auth user ID
+                        strava_data: stravaActivity, // Store the full original Strava activity
+
+                        // weather_data, city, state, country will be added by enrich-weather.js later
+                        // id (primary key), created_at, updated_at are handled by the database
+                    };
+
+                    // The prompt mentioned that Supabase client handles undefined keys by omitting them,
+                    // which is generally fine for nullable columns.
+                    // The `stravaActivity.start_latlng || null` pattern already handles undefined for these specific fields.
+                    // If explicit null conversion or key deletion for other undefined fields were strictly needed,
+                    // it could be done here, for example:
+                    // Object.keys(mappedRun).forEach(key => {
+                    //   if (mappedRun[key] === undefined) {
+                    //     mappedRun[key] = null; // Or delete mappedRun[key];
+                    //   }
+                    // });
+                    // For now, relying on Supabase client's default behavior for other undefined fields.
+
+                    return mappedRun;
+                });
             
-            console.log(`[process-strava-chunk] Filtered to ${runs.length} runs`);
+            console.log(`[process-strava-chunk] Filtered to ${runs.length} runs, mapped to schema.`);
             
             return {
                 runs,
