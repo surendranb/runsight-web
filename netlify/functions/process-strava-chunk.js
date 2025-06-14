@@ -3,51 +3,88 @@ const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js');
 
 // Initialize Supabase client with environment variables
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL; // VITE_SUPABASE_URL fallback is okay for URL if it's also used by client
+const SUPABASE_SERVICE_KEY_VAR = process.env.SUPABASE_SERVICE_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error('Missing Supabase configuration');
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY_VAR) {
+    console.error('Missing Supabase URL or Service Key');
     console.log('SUPABASE_URL:', SUPABASE_URL ? 'Set' : 'Missing');
-    console.log('SUPABASE_KEY:', SUPABASE_KEY ? 'Set' : 'Missing');
-    throw new Error('Missing required Supabase configuration');
+    console.log('SUPABASE_SERVICE_KEY:', SUPABASE_SERVICE_KEY_VAR ? 'Set' : 'Missing');
+    throw new Error('Missing required Supabase URL or Service Key configuration for admin operations.');
 }
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY_VAR);
 
 // Helper function to fetch activities for a user from Strava
 async function fetchStravaActivities(userId, paginationParams = {}) {
     console.log(`[process-strava-chunk] Fetching Strava activities for user ${userId} with params:`, paginationParams);
     
-    console.log(`[process-strava-chunk] Fetching user data from Supabase for user ID: ${userId}`);
-    console.log(`[process-strava-chunk] Supabase URL: ${SUPABASE_URL}`);
+    console.log(`[process-strava-chunk] Fetching Strava activities for user ${userId} with params:`, paginationParams);
     
     try {
-        const { data: user, error: userError } = await supabase
-            .from('users')
-            .select('id, strava_access_token, email, strava_id')
-            .eq('id', userId)
-            .single();
+        // New Token Retrieval and Refresh Logic
+        const { data: userAuthData, error: authUserError } = await supabase.auth.admin.getUserById(userId);
 
-        console.log('[process-strava-chunk] Supabase response - User data:', user);
-        console.log('[process-strava-chunk] Supabase error:', userError);
+        if (authUserError || !userAuthData || !userAuthData.user) {
+            console.error(`[process-strava-chunk/fetchStravaActivities] User not found or error fetching auth user for ID ${userId}:`, authUserError);
+            throw new Error(`User not found or error fetching auth user: ${authUserError?.message || 'Unknown error'}`);
+        }
+        const authUser = userAuthData.user;
+        let accessToken = authUser.user_metadata?.strava_access_token;
+        const refreshToken = authUser.user_metadata?.strava_refresh_token;
+        const expiresAt = authUser.user_metadata?.strava_expires_at;
 
-        if (userError) {
-            console.error('[process-strava-chunk] Error fetching user data:', userError);
-            throw new Error(`Database error: ${userError.message}`);
+        if (!accessToken || !refreshToken) {
+            console.error(`[process-strava-chunk/fetchStravaActivities] Strava access or refresh token not found for user ${userId}.`);
+            throw new Error('Strava token not found for user. Please re-authenticate.');
         }
 
-        if (!user) {
-            console.error(`[process-strava-chunk] No user found with ID: ${userId}`);
-            throw new Error(`No user found with ID: ${userId}`);
-        }
+        if (expiresAt && (Date.now() / 1000) > expiresAt) {
+            console.log(`[process-strava-chunk/fetchStravaActivities] Strava token expired for user ${userId}, attempting refresh.`);
+            const { VITE_STRAVA_CLIENT_ID: STRAVA_CLIENT_ID, VITE_STRAVA_CLIENT_SECRET: STRAVA_CLIENT_SECRET } = process.env;
 
-        if (!user.strava_access_token) {
-            console.error('[process-strava-chunk] No Strava access token found for user:', userId);
-            throw new Error('No Strava access token found for user');
-        }
+            if (!STRAVA_CLIENT_ID || !STRAVA_CLIENT_SECRET) {
+                console.error('[process-strava-chunk/fetchStravaActivities] Missing Strava client ID or secret for token refresh.');
+                throw new Error('Server configuration error: Strava client credentials missing for token refresh.');
+            }
 
-        const { strava_access_token } = user;
+            const refreshResponse = await fetch('https://www.strava.com/oauth/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    client_id: STRAVA_CLIENT_ID,
+                    client_secret: STRAVA_CLIENT_SECRET,
+                    refresh_token: refreshToken,
+                    grant_type: 'refresh_token',
+                }),
+            });
+
+            if (!refreshResponse.ok) {
+                const errorBody = await refreshResponse.json().catch(() => ({ message: 'Failed to refresh Strava token, and error response was not JSON.' }));
+                console.error(`[process-strava-chunk/fetchStravaActivities] Failed to refresh Strava token for user ${userId}. Status: ${refreshResponse.status}`, errorBody);
+                throw new Error(`Failed to refresh Strava token: ${errorBody.message || refreshResponse.statusText}`);
+            }
+
+            const refreshData = await refreshResponse.json();
+            accessToken = refreshData.access_token;
+
+            const newMetadata = {
+                ...authUser.user_metadata,
+                strava_access_token: refreshData.access_token,
+                strava_refresh_token: refreshData.refresh_token || refreshToken, // Keep old refresh token if new one isn't provided
+                strava_expires_at: refreshData.expires_at,
+            };
+
+            const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+                user_metadata: newMetadata,
+            });
+
+            if (updateError) {
+                console.error(`[process-strava-chunk/fetchStravaActivities] Failed to update user ${userId} with new Strava tokens:`, updateError);
+                // Log error but proceed with the new token for this session.
+            } else {
+                console.log(`[process-strava-chunk/fetchStravaActivities] Strava token refreshed and updated successfully for user ${userId}.`);
+            }
+        }
         
         // Build the Strava API URL with pagination parameters
         const url = new URL('https://www.strava.com/api/v3/athlete/activities');
@@ -71,7 +108,7 @@ async function fetchStravaActivities(userId, paginationParams = {}) {
         try {
             const response = await fetch(url.toString(), {
                 headers: {
-                    'Authorization': `Bearer ${strava_access_token}`
+                    'Authorization': `Bearer ${accessToken}` // Ensure this uses the potentially refreshed token
                 }
             });
             
@@ -304,13 +341,42 @@ exports.handler = async (event) => {
             };
         }
         
-        // Save runs to the database one at a time
+        // Attempt to enrich runs with weather data
+        let enrichedRuns = runs; // Default to original runs
+        if (runs.length > 0) {
+            console.log(`[process-strava-chunk] Attempting to enrich ${runs.length} runs with weather data.`);
+            try {
+                const enrichmentUrl = `${process.env.URL || 'http://localhost:8888'}/.netlify/functions/enrich-weather`;
+                const enrichmentResponse = await fetch(enrichmentUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ activities: runs }),
+                });
+
+                if (enrichmentResponse.ok) {
+                    const enrichmentResult = await enrichmentResponse.json();
+                    if (enrichmentResult.success && enrichmentResult.activities) {
+                        enrichedRuns = enrichmentResult.activities;
+                        console.log(`[process-strava-chunk] Successfully enriched activities. Enriched count: ${enrichmentResult.enriched_count}, Geocoded count: ${enrichmentResult.geocoded_count}`);
+                    } else {
+                        console.warn('[process-strava-chunk] Weather enrichment call succeeded but returned non-success or no activities. Proceeding with un-enriched data for this batch.', enrichmentResult);
+                    }
+                } else {
+                    const errorBody = await enrichmentResponse.text(); // Use text() in case of non-JSON error
+                    console.error(`[process-strava-chunk] Weather enrichment function call failed with status ${enrichmentResponse.status}. Response: ${errorBody.substring(0, 500)}. Proceeding with un-enriched data for this batch.`);
+                }
+            } catch (enrichError) {
+                console.error('[process-strava-chunk] Exception during weather enrichment call:', enrichError.message, '. Proceeding with un-enriched data for this batch.');
+            }
+        }
+
+        // Save runs to the database one at a time (using potentially enriched runs)
         const { 
             savedCount, 
             skippedCount, 
             individualSaveFailuresCount = 0,
             results = []
-        } = await saveRuns(userId, runs);
+        } = await saveRuns(userId, enrichedRuns); // Use enrichedRuns here
         
         // Log summary of results
         const successfulSaves = results.filter(r => r.saved).length;

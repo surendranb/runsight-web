@@ -1,18 +1,17 @@
 // netlify/functions/save-runs.js
 const { createClient } = require('@supabase/supabase-js');
 
-// Get environment variables with fallbacks
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+// Get environment variables
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL; // VITE_SUPABASE_URL fallback is okay for URL
+const SUPABASE_SERVICE_KEY_VAR = process.env.SUPABASE_SERVICE_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error('Missing Supabase configuration');
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY_VAR) {
+    console.error('Missing Supabase URL or Service Key');
     console.log('SUPABASE_URL:', SUPABASE_URL ? 'Set' : 'Missing');
-    console.log('SUPABASE_KEY:', SUPABASE_KEY ? 'Set' : 'Missing');
-    throw new Error('Missing required Supabase configuration');
+    console.log('SUPABASE_SERVICE_KEY:', SUPABASE_SERVICE_KEY_VAR ? 'Set' : 'Missing');
+    throw new Error('Missing required Supabase URL or Service Key configuration for admin operations.');
 }
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY_VAR);
 
 // Simple validation for run data
 function isValidRun(run) {
@@ -157,8 +156,39 @@ exports.handler = async (event) => {
             };
         }
 
+        // Format start_latlng and end_latlng for PostgreSQL point type
+        if (runToSave.start_latlng && Array.isArray(runToSave.start_latlng) && runToSave.start_latlng.length === 2) {
+            const [lat, lng] = runToSave.start_latlng;
+            if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
+                runToSave.start_latlng = `(${lng},${lat})`; // Format as (longitude,latitude) string
+            } else {
+                console.warn(`[save-runs] Invalid lat/lng values in start_latlng for Strava ID ${runToSave.strava_id}:`, runToSave.start_latlng);
+                runToSave.start_latlng = null; // Set to null if values are not valid numbers
+            }
+        } else if (runToSave.start_latlng) { // If it exists but isn't in the expected [lat,lng] format
+            console.warn(`[save-runs] Unexpected format for start_latlng for Strava ID ${runToSave.strava_id}:`, runToSave.start_latlng);
+            runToSave.start_latlng = null; // Nullify if format is unexpected
+        } else {
+            runToSave.start_latlng = null; // Ensure it's null if not present
+        }
+
+        if (runToSave.end_latlng && Array.isArray(runToSave.end_latlng) && runToSave.end_latlng.length === 2) {
+            const [lat, lng] = runToSave.end_latlng;
+            if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
+                runToSave.end_latlng = `(${lng},${lat})`; // Format as (longitude,latitude) string
+            } else {
+                console.warn(`[save-runs] Invalid lat/lng values in end_latlng for Strava ID ${runToSave.strava_id}:`, runToSave.end_latlng);
+                runToSave.end_latlng = null; // Set to null if values are not valid numbers
+            }
+        } else if (runToSave.end_latlng) { // If it exists but isn't in the expected [lat,lng] format
+            console.warn(`[save-runs] Unexpected format for end_latlng for Strava ID ${runToSave.strava_id}:`, runToSave.end_latlng);
+            runToSave.end_latlng = null; // Nullify if format is unexpected
+        } else {
+            runToSave.end_latlng = null; // Ensure it's null if not present
+        }
+
         // Insert the new run
-        console.log(`[save-runs] Inserting new run ${runToSave.strava_id} for user ${userId}`);
+        console.log(`[save-runs] Inserting new run ${runToSave.strava_id} for user ${userId}. LatLngs: start=${runToSave.start_latlng}, end=${runToSave.end_latlng}`);
         const { data: savedRun, error: saveError } = await supabase
             .from('runs')
             .insert(runToSave)
