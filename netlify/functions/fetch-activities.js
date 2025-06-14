@@ -131,7 +131,9 @@ exports.handler = async (event, context) => {
     }
 
     const stravaApiUrl = `https://www.strava.com/api/v3/athlete/activities?${queryParams.toString()}`;
-    console.log('[fetch-activities] Calling Strava API URL:', stravaApiUrl);
+    // ADDED LOGGING:
+    console.log(`[fetch-activities-DEBUG] Strava API Call Details: URL=${stravaApiUrl}, AccessTokenPresent=${!!accessToken}`);
+    console.log(`[fetch-activities-DEBUG] Params received by fetch-activities: page=${params.page}, per_page=${params.per_page}, after=${params.after ? new Date(params.after * 1000).toISOString() : 'N/A'}, before=${params.before ? new Date(params.before * 1000).toISOString() : 'N/A'}`);
 
     const activitiesResponse = await fetch(stravaApiUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -144,6 +146,8 @@ exports.handler = async (event, context) => {
     }
 
     const fetchedActivities = await activitiesResponse.json();
+    // ADDED LOGGING:
+    console.log(`[fetch-activities-DEBUG] Raw activities from Strava (page ${params.page || 1}, count ${fetchedActivities.length}): IDs = ${fetchedActivities.slice(0, 5).map(a => a.id).join(', ')}...`);
 
     // Filter for actual running activities and ensure they have latlng
     const filteredRuns = fetchedActivities.filter(activity =>
@@ -151,6 +155,8 @@ exports.handler = async (event, context) => {
       activity.start_latlng &&
       activity.start_latlng.length === 2
     );
+    // ADDED LOGGING:
+    console.log(`[fetch-activities-DEBUG] Filtered runs (page ${params.page || 1}, count ${filteredRuns.length}): IDs = ${filteredRuns.slice(0, 5).map(a => a.id).join(', ')}...`);
 
     console.log(`[fetch-activities] Fetched ${filteredRuns.length} runs (after filtering) for user ${userId}. Original count from Strava this page: ${fetchedActivities.length}.`);
 

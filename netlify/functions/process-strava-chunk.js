@@ -29,7 +29,10 @@ exports.handler = async (event, context) => {
     const { userId, paginationParams } = body;
 
     if (userId) userIdForLogging = userId;
-    console.log(`[process-strava-chunk] Function Entry for user ${userIdForLogging}. Received paginationParams:`, JSON.stringify(paginationParams));
+    // console.log(`[process-strava-chunk] Function Entry for user ${userIdForLogging}. Received paginationParams:`, JSON.stringify(paginationParams));
+    // ADDED LOGGING for initial params:
+    console.log(`[process-strava-chunk-DEBUG] Invoked with paginationParams: page=${paginationParams.page}, per_page=${paginationParams.per_page}, after=${paginationParams.after ? new Date(paginationParams.after * 1000).toISOString() : 'N/A'}, before=${paginationParams.before ? new Date(paginationParams.before * 1000).toISOString() : 'N/A'}`);
+
 
     if (!userId) {
       console.error('[process-strava-chunk] User ID is missing from request body.');
@@ -69,9 +72,11 @@ exports.handler = async (event, context) => {
     const fetchResult = await fetchResponse.json();
     const activitiesToProcess = fetchResult.activities || [];
     const rawActivityCountOnPage = fetchResult.rawCountThisPage || 0; // From fetch-activities response
+    // ADDED LOGGING for fetch result:
+    console.log(`[process-strava-chunk-DEBUG] Page ${paginationParams.page}: fetch-activities rawCountThisPage=${rawActivityCountOnPage}, processedRunsToEnrich=${activitiesToProcess.length}`);
     const processedRunCount = activitiesToProcess.length; // Runs with latlng
 
-    console.log(`[process-strava-chunk] fetch-activities returned ${processedRunCount} runs to process (raw on page: ${rawActivityCountOnPage}).`);
+    // console.log(`[process-strava-chunk] fetch-activities returned ${processedRunCount} runs to process (raw on page: ${rawActivityCountOnPage}).`); // Original log, can be removed or kept
 
     let enrichedActivities = activitiesToProcess;
     if (processedRunCount > 0) {
@@ -130,6 +135,8 @@ exports.handler = async (event, context) => {
     // If fewer raw activities were returned by Strava than requested, it's the last page for this time range.
     const perPageRequested = paginationParams.per_page || 50;
     const isComplete = rawActivityCountOnPage < perPageRequested;
+    // ADDED LOGGING for completion check:
+    console.log(`[process-strava-chunk-DEBUG] Page ${paginationParams.page}: Completion check: rawActivityCountOnPage=${rawActivityCountOnPage}, perPageRequested=${perPageRequested}, isComplete=${isComplete}`);
 
     const nextPagePayload = {
       page: (paginationParams.page || 1) + 1,
@@ -139,6 +146,12 @@ exports.handler = async (event, context) => {
       ...(typeof paginationParams.before === 'number' && { before: paginationParams.before }),
     };
     const nextPageParams = isComplete ? null : nextPagePayload;
+    // ADDED LOGGING for next page params
+    if (nextPageParams) {
+        console.log(`[process-strava-chunk-DEBUG] Page ${paginationParams.page}: Next page params generated: page=${nextPageParams.page}, after=${nextPageParams.after ? new Date(nextPageParams.after * 1000).toISOString() : 'N/A'}, before=${nextPageParams.before ? new Date(nextPageParams.before * 1000).toISOString() : 'N/A'}`);
+    } else {
+        console.log(`[process-strava-chunk-DEBUG] Page ${paginationParams.page}: No next page. Sync for this period should be complete.`);
+    }
 
     const responseBody = {
       processedRunCount: processedRunCount, // Number of runs with latlng from fetch-activities
