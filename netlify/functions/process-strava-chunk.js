@@ -19,76 +19,97 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 async function fetchStravaActivities(userId, paginationParams = {}) {
     console.log(`[process-strava-chunk] Fetching Strava activities for user ${userId} with params:`, paginationParams);
     
-    const { data: user, error: userError } = await supabase
-        .from('users')
-        .select('strava_access_token')
-        .eq('id', userId)
-        .single();
-
-    if (userError || !user) {
-        console.error('Error fetching user data:', userError);
-        throw new Error('User not found or error fetching user data');
-    }
-
-    const { strava_access_token } = user;
-    
-    // Build the Strava API URL with pagination parameters
-    const url = new URL('https://www.strava.com/api/v3/athlete/activities');
-    
-    // Set default pagination if not provided
-    const defaultParams = {
-        page: 1,
-        per_page: 10, // Process smaller batches
-        ...paginationParams
-    };
-    
-    // Add all parameters to the URL
-    Object.entries(defaultParams).forEach(([key, value]) => {
-        if (value !== undefined) {
-            url.searchParams.append(key, value.toString());
-        }
-    });
-    
-    console.log(`[process-strava-chunk] Fetching from URL: ${url.toString()}`);
+    console.log(`[process-strava-chunk] Fetching user data from Supabase for user ID: ${userId}`);
+    console.log(`[process-strava-chunk] Supabase URL: ${SUPABASE_URL}`);
     
     try {
-        const response = await fetch(url.toString(), {
-            headers: {
-                'Authorization': `Bearer ${strava_access_token}`
+        const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('id, strava_access_token, email, strava_id')
+            .eq('id', userId)
+            .single();
+
+        console.log('[process-strava-chunk] Supabase response - User data:', user);
+        console.log('[process-strava-chunk] Supabase error:', userError);
+
+        if (userError) {
+            console.error('[process-strava-chunk] Error fetching user data:', userError);
+            throw new Error(`Database error: ${userError.message}`);
+        }
+
+        if (!user) {
+            console.error(`[process-strava-chunk] No user found with ID: ${userId}`);
+            throw new Error(`No user found with ID: ${userId}`);
+        }
+
+        if (!user.strava_access_token) {
+            console.error('[process-strava-chunk] No Strava access token found for user:', userId);
+            throw new Error('No Strava access token found for user');
+        }
+
+        const { strava_access_token } = user;
+        
+        // Build the Strava API URL with pagination parameters
+        const url = new URL('https://www.strava.com/api/v3/athlete/activities');
+        
+        // Set default pagination if not provided
+        const defaultParams = {
+            page: 1,
+            per_page: 10, // Process smaller batches
+            ...paginationParams
+        };
+    
+        // Add all parameters to the URL
+        Object.entries(defaultParams).forEach(([key, value]) => {
+            if (value !== undefined) {
+                url.searchParams.append(key, value.toString());
             }
         });
         
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`[process-strava-chunk] Error fetching activities: ${response.status} ${response.statusText}`, errorText);
-            throw new Error(`Failed to fetch activities: ${response.status} ${response.statusText}`);
+        console.log(`[process-strava-chunk] Fetching from URL: ${url.toString()}`);
+        
+        try {
+            const response = await fetch(url.toString(), {
+                headers: {
+                    'Authorization': `Bearer ${strava_access_token}`
+                }
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`[process-strava-chunk] Error fetching activities: ${response.status} ${response.statusText}`, errorText);
+                throw new Error(`Failed to fetch activities: ${response.status} ${response.statusText}`);
+            }
+            
+            const activities = await response.json();
+            console.log(`[process-strava-chunk] Fetched ${activities.length} activities from Strava`);
+            
+            // Filter for runs only and add user_id
+            const runs = activities
+                .filter(activity => activity.type === 'Run')
+                .map(run => ({
+                    ...run,
+                    user_id: userId,
+                    strava_id: run.id,
+                    strava_data: run // Store the full Strava data
+                }));
+            
+            console.log(`[process-strava-chunk] Filtered to ${runs.length} runs`);
+            
+            return {
+                runs,
+                nextPage: activities.length > 0 ? {
+                    ...defaultParams,
+                    page: defaultParams.page + 1
+                } : null
+            };
+        } catch (error) {
+            console.error('[process-strava-chunk] Error in fetchStravaActivities:', error);
+            throw new Error(`Failed to fetch activities: ${error.message}`);
         }
-        
-        const activities = await response.json();
-        console.log(`[process-strava-chunk] Fetched ${activities.length} activities from Strava`);
-        
-        // Filter for runs only and add user_id
-        const runs = activities
-            .filter(activity => activity.type === 'Run')
-            .map(run => ({
-                ...run,
-                user_id: userId,
-                strava_id: run.id,
-                strava_data: run // Store the full Strava data
-            }));
-        
-        console.log(`[process-strava-chunk] Filtered to ${runs.length} runs`);
-        
-        return {
-            runs,
-            nextPage: activities.length > 0 ? {
-                ...defaultParams,
-                page: defaultParams.page + 1
-            } : null
-        };
     } catch (error) {
-        console.error('[process-strava-chunk] Error in fetchStravaActivities:', error);
-        throw new Error(`Failed to fetch activities: ${error.message}`);
+        console.error('[process-strava-chunk] Error in fetchStravaActivities (outer):', error);
+        throw error; // Re-throw the error to be handled by the caller
     }
 }
 
