@@ -462,26 +462,42 @@ exports.handler = async (event) => {
         };
         
     } catch (error) {
-        console.error('[process-strava-chunk] Unhandled error:', error);
-        
-        // Include the error stage in the response for better debugging
+        // Log the full error object for detailed server-side debugging
+        console.error('[process-strava-chunk] FULL UNHANDLED ERROR OBJECT:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        // Also log standard error properties if the above stringification fails or is too verbose for quick glance
+        console.error('[process-strava-chunk] Unhandled error message:', error.message);
+        if (error.stack) {
+            console.error('[process-strava-chunk] Unhandled error stack:', error.stack);
+        }
+
         let errorStage = 'unknown';
-        if (error.message.includes('fetching activities')) errorStage = 'fetch_activities';
-        else if (error.message.includes('saving runs')) errorStage = 'save_runs';
+        const errorMessage = String(error.message || 'No error message available'); // Ensure message is a string
+
+        if (errorMessage.includes('fetching activities')) errorStage = 'fetch_activities';
+        else if (errorMessage.includes('saving runs')) errorStage = 'save_runs';
+        else if (errorMessage.includes('token')) errorStage = 'token_error';
+        else if (errorMessage.includes('enrichment')) errorStage = 'enrichment_error';
+
+
+        const responseBody = {
+            error: 'Failed to process Strava activities',
+            message: errorMessage,
+            stage: errorStage,
+            details: {
+                name: String(error.name || 'UnknownError'),
+                code: error.code ? String(error.code) : undefined
+            }
+        };
         
+        // Only include stack in development for brevity in production client responses, but it's logged server-side above.
+        if (process.env.NODE_ENV === 'development' && error.stack) {
+            responseBody.stack = error.stack;
+        }
+
         return {
             statusCode: 500,
             headers,
-            body: JSON.stringify({
-                error: 'Failed to process Strava activities',
-                message: error.message,
-                stage: errorStage,
-                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-                details: {
-                    name: error.name,
-                    code: error.code
-                }
-            })
+            body: JSON.stringify(responseBody)
         };
     }
 };
