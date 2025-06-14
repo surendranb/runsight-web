@@ -150,11 +150,7 @@ exports.handler = async (event, context) => {
     console.log(`[fetch-activities-DEBUG] Raw activities from Strava (page ${params.page || 1}, count ${fetchedActivities.length}): IDs = ${fetchedActivities.slice(0, 5).map(a => a.id).join(', ')}...`);
 
     // Filter for actual running activities and ensure they have latlng
-    const filteredRuns = fetchedActivities.filter(activity =>
-      activity.type === 'Run' &&
-      activity.start_latlng &&
-      activity.start_latlng.length === 2
-    );
+    const filteredRuns = fetchedActivities.filter(activity => activity.type === 'Run');
     // ADDED LOGGING:
     console.log(`[fetch-activities-DEBUG] Filtered runs (page ${params.page || 1}, count ${filteredRuns.length}): IDs = ${filteredRuns.slice(0, 5).map(a => a.id).join(', ')}...`);
 
