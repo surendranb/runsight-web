@@ -37,10 +37,10 @@ export interface Run {
 
 export interface RunStats {
   total_runs: number;
-  total_distance: number;
-  total_time: number;
-  average_pace: number; // seconds per km
-  average_distance: number; // meters
+  total_distance: number; // in meters
+  total_moving_time: number; // in seconds
+  average_pace_seconds_per_km: number;
+  average_distance_per_run_meters: number;
 }
 
 // RunSplit interface can remain for potential client-side parsing,
@@ -206,33 +206,8 @@ class SecureApiClient {
     };
   }
 
-  // Existing syncUserData for fixed day periods
-  async syncUserData(userId: string, days: number): Promise<{
-    activities: any[];
-    savedCount: number;
-    skippedCount: number;
-  }> {
-    console.log(`🔄 Starting data sync for last ${days} days...`);
-    try {
-      // Pass days in the params object to fetchUserActivities
-      const activities = await this.fetchUserActivities(userId, { days });
-      console.log(`✅ Fetched ${activities.length} activities for last ${days} days`);
-      if (activities.length === 0) {
-        return { activities: [], savedCount: 0, skippedCount: 0 };
-      }
-      const enrichedActivities = await this.enrichWithWeather(activities);
-      console.log(`✅ Enriched activities with weather data`);
-
-      const { savedCount, skippedCount } = await this.saveRuns(userId, enrichedActivities);
-      console.log(`✅ Saved ${savedCount} runs, skipped ${skippedCount}`);
-      return { activities: enrichedActivities, savedCount, skippedCount };
-    } catch (error) {
-      console.error(`❌ Data sync for ${days} days failed:`, error);
-      throw error;
-    }
-  }
-
   // NEW method for processing a single chunk of "All Time" sync
+  // The syncUserData method has been removed.
   async processStravaActivityChunk(userId: string, paginationParams: StravaPaginationParams): Promise<ProcessChunkResponse> {
     console.log(`🔄 Processing Strava activity chunk for user ${userId}, params:`, paginationParams);
     const response = await fetch(`${this.baseUrl}/process-strava-chunk`, {
