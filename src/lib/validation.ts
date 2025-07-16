@@ -283,17 +283,17 @@ export function validateSyncSession(session: any): Partial<SyncSession> {
   }
 
   const validSyncTypes = ['full', 'incremental', 'date_range'];
-  if (!validSyncTypes.includes(session.sync_type)) {
+  if (session.sync_type && !validSyncTypes.includes(session.sync_type)) {
     errors.push('Invalid sync type');
   }
 
   const validStatuses = ['initiated', 'fetching', 'enriching', 'storing', 'completed', 'failed', 'cancelled'];
-  if (!validStatuses.includes(session.status)) {
+  if (session.status && !validStatuses.includes(session.status)) {
     errors.push('Invalid sync status');
   }
 
   const validPhases = ['fetching', 'enriching', 'storing'];
-  if (!validPhases.includes(session.current_phase)) {
+  if (session.current_phase && !validPhases.includes(session.current_phase)) {
     errors.push('Invalid current phase');
   }
 

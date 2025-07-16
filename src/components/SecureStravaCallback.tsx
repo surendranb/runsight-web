@@ -62,21 +62,33 @@ const SecureStravaCallback: React.FC = () => {
           progress: 40
         });
 
-        // Step 2: Sync data (server-side)
-        const syncResult = await apiClient.syncUserData(authenticatedUser.id, 14);
+        // Step 2: Sync data using new robust sync system
+        const syncResult = await apiClient.startSync(authenticatedUser.id, {
+          timeRange: {
+            after: Math.floor((Date.now() - 14 * 24 * 60 * 60 * 1000) / 1000) // Last 14 days
+          },
+          options: {
+            batchSize: 50,
+            skipWeatherEnrichment: false
+          }
+        });
 
         setState({
           step: 'syncing',
-          message: `Processing ${syncResult.activities.length} activities...`,
+          message: `Processing your activities...`,
           progress: 70
         });
 
         // Small delay to show progress
         await new Promise(resolve => setTimeout(resolve, 1000));
 
+        const results = syncResult.results;
+        const totalProcessed = results?.total_processed || 0;
+        const saved = results?.activities_saved || 0;
+
         setState({
           step: 'complete',
-          message: `Successfully imported ${syncResult.savedCount} runs!`,
+          message: `Successfully imported ${saved} runs from ${totalProcessed} activities!`,
           progress: 100
         });
 
