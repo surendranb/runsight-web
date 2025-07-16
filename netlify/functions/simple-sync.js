@@ -42,11 +42,11 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Check environment variables
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-    const stravaClientId = process.env.STRAVA_CLIENT_ID;
-    const stravaClientSecret = process.env.STRAVA_CLIENT_SECRET;
+    // Check environment variables - use the VITE_ prefixed ones that are already configured
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY; // This one doesn't have VITE_ prefix
+    const stravaClientId = process.env.VITE_STRAVA_CLIENT_ID;
+    const stravaClientSecret = process.env.VITE_STRAVA_CLIENT_SECRET;
 
     console.log('[simple-sync] Environment check:', {
       hasSupabaseUrl: !!supabaseUrl,
