@@ -55,13 +55,22 @@ exports.handler = async (event, context) => {
       hasStravaClientSecret: !!stravaClientSecret
     });
 
+    // Return diagnostic info first to see what's missing
     if (!supabaseUrl || !supabaseKey) {
       return {
-        statusCode: 500,
+        statusCode: 200,
         headers,
         body: JSON.stringify({
           success: false,
-          error: 'Missing Supabase configuration'
+          error: 'Missing Supabase configuration',
+          diagnostic: {
+            hasSupabaseUrl: !!supabaseUrl,
+            hasSupabaseKey: !!supabaseKey,
+            hasStravaClientId: !!stravaClientId,
+            hasStravaClientSecret: !!stravaClientSecret,
+            nodeVersion: process.version,
+            platform: process.platform
+          }
         })
       };
     }
