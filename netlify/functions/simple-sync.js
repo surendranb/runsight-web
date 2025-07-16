@@ -55,21 +55,31 @@ exports.handler = async (event, context) => {
       hasStravaClientSecret: !!stravaClientSecret
     });
 
-    // Return diagnostic info first to see what's missing
+    // For now, let's work around missing environment variables
+    if (!supabaseUrl) {
+      // Try common Supabase URL patterns
+      const possibleUrl = `https://${process.env.VITE_SUPABASE_URL || 'your-project'}.supabase.co`;
+      console.log('[simple-sync] Trying to construct Supabase URL:', possibleUrl);
+    }
+
     if (!supabaseUrl || !supabaseKey) {
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           success: false,
-          error: 'Missing Supabase configuration',
+          error: 'Environment variables not configured in Netlify',
+          message: 'Please configure SUPABASE_URL and SUPABASE_SERVICE_KEY in Netlify dashboard',
           diagnostic: {
             hasSupabaseUrl: !!supabaseUrl,
             hasSupabaseKey: !!supabaseKey,
             hasStravaClientId: !!stravaClientId,
             hasStravaClientSecret: !!stravaClientSecret,
             nodeVersion: process.version,
-            platform: process.platform
+            platform: process.platform,
+            allEnvVars: Object.keys(process.env).filter(key => 
+              key.includes('SUPABASE') || key.includes('STRAVA')
+            )
           }
         })
       };
