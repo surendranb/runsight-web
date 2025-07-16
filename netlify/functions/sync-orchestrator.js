@@ -5,8 +5,19 @@ let syncOrchestrator;
 
 async function getSyncOrchestrator() {
   if (!syncOrchestrator) {
-    const module = await import('../../src/lib/sync-orchestrator.ts');
-    syncOrchestrator = module.syncOrchestrator;
+    try {
+      console.log('[sync-orchestrator] Loading sync orchestrator module...');
+      const module = await import('../../src/lib/sync-orchestrator.ts');
+      console.log('[sync-orchestrator] Module loaded, keys:', Object.keys(module));
+      syncOrchestrator = module.syncOrchestrator;
+      if (!syncOrchestrator) {
+        throw new Error('syncOrchestrator not found in module exports');
+      }
+      console.log('[sync-orchestrator] Sync orchestrator loaded successfully');
+    } catch (error) {
+      console.error('[sync-orchestrator] Failed to load sync orchestrator:', error);
+      throw new Error(`Failed to load sync orchestrator: ${error.message}`);
+    }
   }
   return syncOrchestrator;
 }
@@ -183,17 +194,24 @@ async function startSync(headers, userId, requestBody) {
   } catch (error) {
     console.error(`[sync-orchestrator] Sync failed for user ${userId}:`, error);
 
+    // Handle different error types safely
+    const errorMessage = error?.message || error?.toString() || 'Unknown error occurred';
+    const errorType = error?.constructor?.name || 'Error';
+    const errorCode = error?.code || 'UNKNOWN_ERROR';
+    const errorPhase = error?.phase || 'unknown';
+
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
         success: false,
         error: 'Sync failed',
-        message: error.message,
+        message: errorMessage,
         details: {
-          type: error.constructor.name,
-          code: error.code,
-          phase: error.phase
+          type: errorType,
+          code: errorCode,
+          phase: errorPhase,
+          stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
         }
       })
     };
