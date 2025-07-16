@@ -106,20 +106,43 @@ exports.handler = async (event, context) => {
         const supabase = createClient(supabaseUrl, supabaseKey);
 
         // Get user's Strava token
+        console.log(`[sync-orchestrator] Looking up user ${userId} in database...`);
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('strava_access_token, strava_refresh_token, strava_id')
+          .select('strava_access_token, strava_refresh_token, strava_id, created_at, updated_at')
           .eq('id', userId)
           .single();
 
-        if (userError || !userData || !userData.strava_access_token) {
+        console.log(`[sync-orchestrator] User lookup result:`, {
+          found: !!userData,
+          hasAccessToken: !!userData?.strava_access_token,
+          hasRefreshToken: !!userData?.strava_refresh_token,
+          stravaId: userData?.strava_id,
+          error: userError?.message
+        });
+
+        if (userError || !userData) {
           return {
             statusCode: 401,
             headers,
             body: JSON.stringify({
               success: false,
-              error: 'Authentication required',
-              message: 'Please re-authenticate with Strava'
+              error: 'User not found',
+              message: 'User not found in database. Please re-authenticate with Strava.',
+              debug: { userError: userError?.message, userId }
+            })
+          };
+        }
+
+        if (!userData.strava_access_token) {
+          return {
+            statusCode: 401,
+            headers,
+            body: JSON.stringify({
+              success: false,
+              error: 'No access token',
+              message: 'No Strava access token found. Please re-authenticate with Strava.',
+              debug: { hasRefreshToken: !!userData.strava_refresh_token }
             })
           };
         }
