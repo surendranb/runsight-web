@@ -6,6 +6,7 @@ import SecureStravaCallback from './components/SecureStravaCallback';
 import { NavigationBar, SyncPeriod } from './components/NavigationBar';
 import { SimpleDashboard } from './components/SimpleDashboard';
 import { InsightsPage } from './components/InsightsPage';
+import { DebugConsole } from './components/DebugConsole';
 import { User, EnrichedRun, RunStats } from './types';
 import { apiClient, StravaPaginationParams } from './lib/secure-api-client'; // Import StravaPaginationParams
 
@@ -41,6 +42,9 @@ const SecureApp: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [syncProgressMessage, setSyncProgressMessage] = useState<string>('');
   const [nextPageToSync, setNextPageToSync] = useState<NextPageParams>(null);
+
+  // Debug console state
+  const [debugConsoleOpen, setDebugConsoleOpen] = useState<boolean>(false);
 
   // Effect to handle view changes based on auth state (remains mostly the same)
   useEffect(() => {
@@ -93,6 +97,19 @@ const SecureApp: React.FC = () => {
       fetchData(authLoading);
     }
   }, [user, user?.id, currentView, fetchData, authLoading]);
+
+  // Debug console keyboard shortcut (Ctrl+Shift+D or Cmd+Shift+D)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'D') {
+        event.preventDefault();
+        setDebugConsoleOpen(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
 
   const handleLogout = () => {
@@ -309,6 +326,12 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
               </div>
           </main>
         )}
+
+        {/* Debug Console */}
+        <DebugConsole 
+          isOpen={debugConsoleOpen} 
+          onClose={() => setDebugConsoleOpen(false)} 
+        />
       </div>
     );
   }

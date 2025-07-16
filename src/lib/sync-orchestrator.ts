@@ -19,6 +19,8 @@ import {
   ErrorCollector, 
   withRetry 
 } from './errors';
+import { errorHandler } from './debug/error-handler';
+import { debugLogger } from './debug/debug-logger';
 
 export interface SyncOrchestrationOptions {
   batchSize?: number;
@@ -44,97 +46,136 @@ export class SyncOrchestrator {
   // Main sync orchestration method
   async orchestrateSync(request: SyncRequest): Promise<SyncResponse> {
     const { userId, timeRange, options = {} } = request;
+    const correlationId = debugLogger.newCorrelation();
     
-    console.log(`[SyncOrchestrator] Starting sync for user ${userId}`);
-    console.log(`[SyncOrchestrator] Time range:`, timeRange);
-    console.log(`[SyncOrchestrator] Options:`, options);
-
-    // Check if user can start a new sync
-    const canStart = await syncStateManager.canStartNewSync(userId);
-    if (!canStart.canStart) {
-      throw new SyncError(
-        canStart.reason || 'Cannot start new sync',
-        'SYNC_ALREADY_ACTIVE',
-        'unknown_error',
-        'fetching',
-        false,
-        { userId }
-      );
-    }
-
-    // Create sync session
-    const syncSession = await syncStateManager.createSyncSession(
-      userId,
-      timeRange ? 'date_range' : 'full',
-      timeRange?.after ? new Date(timeRange.after * 1000).toISOString() : undefined,
-      timeRange?.before ? new Date(timeRange.before * 1000).toISOString() : undefined
+    debugLogger.info(
+      `Starting sync orchestration for user ${userId}`,
+      'SyncOrchestrator',
+      { userId, timeRange, options, correlationId }
     );
 
-    console.log(`[SyncOrchestrator] Created sync session: ${syncSession.id}`);
+    return await errorHandler.handleAsyncError(async () => {
+      // Check if user can start a new sync
+      const canStart = await syncStateManager.canStartNewSync(userId);
+      if (!canStart.canStart) {
+        throw new SyncError(
+          canStart.reason || 'Cannot start new sync',
+          'SYNC_ALREADY_ACTIVE',
+          'unknown_error',
+          'fetching',
+          false,
+          { userId }
+        );
+      }
 
-    try {
-      // Execute the sync phases
-      const results = await this.executeSyncPhases(syncSession, {
-        ...this.options,
-        ...options
-      });
-
-      // Mark session as completed
-      await syncStateManager.completeSyncSession(
-        syncSession.id,
+      // Create sync session
+      const syncSession = await syncStateManager.createSyncSession(
         userId,
-        {
-          activities_stored: results.activities_saved + results.activities_updated,
-          activities_failed: results.activities_failed
-        }
+        timeRange ? 'date_range' : 'full',
+        timeRange?.after ? new Date(timeRange.after * 1000).toISOString() : undefined,
+        timeRange?.before ? new Date(timeRange.before * 1000).toISOString() : undefined
       );
 
-      console.log(`[SyncOrchestrator] Sync completed successfully:`, results);
+      debugLogger.info(
+        `Created sync session: ${syncSession.id}`,
+        'SyncOrchestrator',
+        { syncSessionId: syncSession.id, userId }
+      );
 
-      return {
-        syncId: syncSession.id,
-        status: 'completed',
-        progress: {
-          total_activities: results.total_processed,
-          processed_activities: results.total_processed,
-          current_phase: 'storing',
-          phase_progress: {
-            fetching: { status: 'completed', processed: results.total_processed, total: results.total_processed, errors: 0 },
-            enriching: { status: 'completed', processed: results.weather_enriched, total: results.total_processed, errors: 0 },
-            storing: { status: 'completed', processed: results.activities_saved + results.activities_updated, total: results.total_processed, errors: results.activities_failed }
+      try {
+        // Execute the sync phases
+        const results = await this.executeSyncPhases(syncSession, {
+          ...this.options,
+          ...options
+        });
+
+        // Mark session as completed
+        await syncStateManager.completeSyncSession(
+          syncSession.id,
+          userId,
+          {
+            activities_stored: results.activities_saved + results.activities_updated,
+            activities_failed: results.activities_failed
+          }
+        );
+
+        debugLogger.info(
+          `Sync completed successfully`,
+          'SyncOrchestrator',
+          { syncSessionId: syncSession.id, results }
+        );
+
+        return {
+          syncId: syncSession.id,
+          status: 'completed',
+          progress: {
+            total_activities: results.total_processed,
+            processed_activities: results.total_processed,
+            current_phase: 'storing',
+            phase_progress: {
+              fetching: { status: 'completed', processed: results.total_processed, total: results.total_processed, errors: 0 },
+              enriching: { status: 'completed', processed: results.weather_enriched, total: results.total_processed, errors: 0 },
+              storing: { status: 'completed', processed: results.activities_saved + results.activities_updated, total: results.total_processed, errors: results.activities_failed }
+            },
+            start_time: syncSession.started_at,
+            percentage_complete: 100
           },
-          start_time: syncSession.started_at,
-          percentage_complete: 100
-        },
-        results
-      };
+          results
+        };
 
-    } catch (error) {
-      console.error(`[SyncOrchestrator] Sync failed:`, error);
-      
-      const syncError = classifyError(error, 'fetching');
-      
-      // Mark session as failed
-      await syncStateManager.failSyncSession(syncSession.id, userId, syncError);
+      } catch (error) {
+        const analysis = errorHandler.handleError(error as Error, {
+          component: 'SyncOrchestrator',
+          context: {
+            userId,
+            sessionId: syncSession.id,
+            url: 'sync-orchestration',
+            requestData: { timeRange, options }
+          }
+        });
+        
+        const syncError = classifyError(error, 'fetching');
+        
+        // Mark session as failed
+        await syncStateManager.failSyncSession(syncSession.id, userId, syncError);
 
-      return {
-        syncId: syncSession.id,
-        status: 'failed',
-        progress: {
-          total_activities: 0,
-          processed_activities: 0,
-          current_phase: 'fetching',
-          phase_progress: {
-            fetching: { status: 'failed', processed: 0, total: 0, errors: 1 },
-            enriching: { status: 'pending', processed: 0, total: 0, errors: 0 },
-            storing: { status: 'pending', processed: 0, total: 0, errors: 0 }
+        return {
+          syncId: syncSession.id,
+          status: 'failed',
+          progress: {
+            total_activities: 0,
+            processed_activities: 0,
+            current_phase: 'fetching',
+            phase_progress: {
+              fetching: { status: 'failed', processed: 0, total: 0, errors: 1 },
+              enriching: { status: 'pending', processed: 0, total: 0, errors: 0 },
+              storing: { status: 'pending', processed: 0, total: 0, errors: 0 }
+            },
+            start_time: syncSession.started_at,
+            percentage_complete: 0
           },
-          start_time: syncSession.started_at,
-          percentage_complete: 0
+          error: syncError
+        };
+      }
+    }, {
+      component: 'SyncOrchestrator',
+      context: { userId, timeRange, options }
+    }) || {
+      syncId: 'unknown',
+      status: 'failed',
+      progress: {
+        total_activities: 0,
+        processed_activities: 0,
+        current_phase: 'fetching',
+        phase_progress: {
+          fetching: { status: 'failed', processed: 0, total: 0, errors: 1 },
+          enriching: { status: 'pending', processed: 0, total: 0, errors: 0 },
+          storing: { status: 'pending', processed: 0, total: 0, errors: 0 }
         },
-        error: syncError
-      };
-    }
+        start_time: new Date().toISOString(),
+        percentage_complete: 0
+      }
+    };
   }
 
   // Execute all sync phases in sequence
