@@ -1,5 +1,4 @@
-// Secure API Client - No credentials exposed to frontend
-// All sensitive operations happen in Netlify Functions
+// New Secure API Client - Uses the robust sync orchestrator
 
 export interface User {
   id: string;
@@ -24,12 +23,8 @@ export interface Run {
   average_heartrate: number | null;
   max_heartrate: number | null;
   total_elevation_gain: number;
-  weather_data: any; // Contains weather details
-  strava_data: any;  // Contains full Strava activity, including splits_metric, laps etc.
-  // Potentially also direct columns like splits_metric, splits_standard, laps if defined on the 'runs' table
-  splits_metric?: any; // Example if it's a direct column
-  splits_standard?: any; // Example if it's a direct column
-  laps?: any; // Example if it's a direct column
+  weather_data: any;
+  strava_data: any;
   city?: string | null;
   state?: string | null;
   country?: string | null;
@@ -37,56 +32,55 @@ export interface Run {
 
 export interface RunStats {
   total_runs: number;
-  total_distance: number; // in meters
-  total_moving_time: number; // in seconds
+  total_distance: number;
+  total_moving_time: number;
   average_pace_seconds_per_km: number;
   average_distance_per_run_meters: number;
 }
 
-// RunSplit interface can remain for potential client-side parsing,
-// but it's not directly part of getUserRuns response structure anymore.
-export interface RunSplit {
-  id: string;
-  enriched_run_id: string;
-  user_id: string;
-  split_number: number;
-  distance: number;
-  elapsed_time: number;
-  moving_time?: number;
-  average_speed?: number;
-  average_heartrate?: number | null;
-  total_elevation_gain?: number | null;
+export interface SyncRequest {
+  timeRange?: {
+    after?: number;
+    before?: number;
+  };
+  options?: {
+    batchSize?: number;
+    maxRetries?: number;
+    skipWeatherEnrichment?: boolean;
+  };
 }
 
-// Type for pagination parameters for chunked sync
-export interface StravaPaginationParams {
-    page?: number;
-    per_page?: number; // To control chunk size, defaults to Strava's default if not set
-    after?: number;   // Unix timestamp for activities after this time
-    before?: number;  // Unix timestamp for activities before this time
+export interface SyncResponse {
+  success: boolean;
+  syncId: string;
+  status: string;
+  progress: {
+    total_activities: number;
+    processed_activities: number;
+    current_phase: string;
+    percentage_complete: number;
+  };
+  results?: {
+    total_processed: number;
+    activities_saved: number;
+    activities_updated: number;
+    activities_skipped: number;
+    activities_failed: number;
+    weather_enriched: number;
+    geocoded: number;
+    duration_seconds: number;
+  };
+  error?: any;
 }
-
-// Expected response from the chunk processing Netlify function
-export interface ProcessChunkResponse {
-    processedActivityCount: number; // Number of activities received from Strava in this chunk (after filtering for runs with latlng)
-    rawActivityCountOnPage: number; // Raw number of activities fetched from Strava for that page before filtering
-    savedCount: number;
-    skippedCount: number;
-    individualSaveFailuresCount?: number; // Number of runs that failed to save during individual insert attempts
-    nextPageParams: StravaPaginationParams | null; // Params for the next chunk, or null if done
-    isComplete: boolean; // True if this was the last chunk or no more activities
-}
-
 
 class SecureApiClient {
   private baseUrl: string;
 
   constructor() {
-    // Only the Netlify Functions URL - no sensitive credentials!
     this.baseUrl = '/.netlify/functions';
   }
 
-  // Authentication flow
+  // Authentication flow (keeping existing methods for compatibility)
   async getStravaAuthUrl(): Promise<string> {
     console.log('🔗 Getting Strava authorization URL...');
     
@@ -123,69 +117,94 @@ class SecureApiClient {
     };
   }
 
-  // fetchUserActivities is called by syncUserData and will be called by processStravaActivityChunk
-  // It needs to correctly pass pagination to the 'fetch-activities' Netlify function
-  async fetchUserActivities(userId: string, params: { days?: number; page?: number; per_page?: number }): Promise<any[]> {
-    console.log(`📥 Fetching activities for user ${userId} with params:`, params);
+  // NEW: Start a sync using the robust sync orchestrator
+  async startSync(userId: string, syncRequest: SyncRequest = {}): Promise<SyncResponse> {
+    console.log(`🔄 Starting sync for user ${userId}`, syncRequest);
     
-    const response = await fetch(`${this.baseUrl}/fetch-activities`, {
+    const response = await fetch(`${this.baseUrl}/sync-orchestrator?userId=${userId}&action=sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Body now sends a structured object for params
-      body: JSON.stringify({ userId, params }),
+      body: JSON.stringify(syncRequest),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch activities');
+      throw new Error(error.message || 'Failed to start sync');
     }
 
-    const data = await response.json();
-    return data.activities || []; // activities, not runs, as per previous use in syncUserData
+    return await response.json();
   }
 
-  async enrichWithWeather(activities: any[]): Promise<any[]> {
-    console.log(`🌤️ Enriching ${activities.length} activities with weather data...`);
+  // NEW: Get sync status
+  async getSyncStatus(userId: string, syncId: string): Promise<SyncResponse> {
+    console.log(`📊 Getting sync status for ${syncId}`);
     
-    const response = await fetch(`${this.baseUrl}/enrich-weather`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ activities }),
+    const response = await fetch(`${this.baseUrl}/sync-orchestrator?userId=${userId}&syncId=${syncId}&action=status`, {
+      method: 'GET',
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to enrich with weather');
+      throw new Error(error.message || 'Failed to get sync status');
     }
 
-    const data = await response.json();
-    return data.activities;
+    return await response.json();
   }
 
-  async saveRuns(userId: string, activities: any[]): Promise<{ savedCount: number; skippedCount: number }> {
-    console.log(`💾 Saving ${activities.length} runs to database...`);
+  // NEW: Cancel sync
+  async cancelSync(userId: string, syncId: string): Promise<void> {
+    console.log(`❌ Cancelling sync ${syncId}`);
     
-    const response = await fetch(`${this.baseUrl}/save-runs`, {
+    const response = await fetch(`${this.baseUrl}/sync-orchestrator?userId=${userId}&action=cancel`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, activities }),
+      body: JSON.stringify({ syncId }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to save runs');
+      throw new Error(error.message || 'Failed to cancel sync');
+    }
+  }
+
+  // NEW: Resume failed sync
+  async resumeSync(userId: string, syncId: string): Promise<SyncResponse> {
+    console.log(`🔄 Resuming sync ${syncId}`);
+    
+    const response = await fetch(`${this.baseUrl}/sync-orchestrator?userId=${userId}&action=resume`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ syncId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to resume sync');
+    }
+
+    return await response.json();
+  }
+
+  // NEW: Get sync history
+  async getSyncHistory(userId: string): Promise<any[]> {
+    console.log(`📜 Getting sync history for user ${userId}`);
+    
+    const response = await fetch(`${this.baseUrl}/sync-orchestrator?userId=${userId}&action=history`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to get sync history');
     }
 
     const data = await response.json();
-    return {
-      savedCount: data.saved_count,
-      skippedCount: data.skipped_count
-    };
+    return data.history || [];
   }
 
-  // MODIFIED: getUserRuns - removed splits from direct return type
-  async getUserRuns(userId: string): Promise<{ runs: Run[]; stats: RunStats; count?: number }> { // count is also in response
-    console.log(`📖 Fetching runs and stats for user ${userId}...`); // Updated log
+  // Get user runs (updated to use new data store)
+  async getUserRuns(userId: string): Promise<{ runs: Run[]; stats: RunStats; count?: number }> {
+    console.log(`📖 Fetching runs and stats for user ${userId}...`);
     
     const response = await fetch(`${this.baseUrl}/get-user-runs?userId=${userId}`, {
       method: 'GET',
@@ -193,36 +212,45 @@ class SecureApiClient {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch user runs and stats'); // Updated error
+      throw new Error(error.message || 'Failed to fetch user runs and stats');
     }
 
     const data = await response.json();
-    // The Netlify function now returns: { success, runs, stats, count }
     return {
       runs: data.runs || [],
       stats: data.stats,
-      count: data.count // Keep count as it's provided by the function
-      // 'splits' field is no longer expected here
+      count: data.count
     };
   }
 
-  // NEW method for processing a single chunk of "All Time" sync
-  // The syncUserData method has been removed.
-  async processStravaActivityChunk(userId: string, paginationParams: StravaPaginationParams): Promise<ProcessChunkResponse> {
-    console.log(`🔄 Processing Strava activity chunk for user ${userId}, params:`, paginationParams);
-    const response = await fetch(`${this.baseUrl}/process-strava-chunk`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, paginationParams }),
-    });
+  // DEPRECATED: Old chunked sync method (for backward compatibility)
+  async processStravaActivityChunk(userId: string, paginationParams: any): Promise<any> {
+    console.warn('⚠️ processStravaActivityChunk is deprecated. Use startSync() instead.');
+    
+    // Convert old pagination params to new sync request format
+    const syncRequest: SyncRequest = {
+      timeRange: {
+        after: paginationParams.after,
+        before: paginationParams.before
+      },
+      options: {
+        batchSize: paginationParams.per_page || 50
+      }
+    };
 
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Failed to process activity chunk and parse error response' }));
-        throw new Error(errorData.message || 'Failed to process activity chunk');
-    }
-    return response.json();
+    const response = await this.startSync(userId, syncRequest);
+    
+    // Convert new response format to old format for compatibility
+    return {
+      processedActivityCount: response.results?.total_processed || 0,
+      savedCount: response.results?.activities_saved || 0,
+      skippedCount: response.results?.activities_skipped || 0,
+      isComplete: response.status === 'completed',
+      processedCount: response.results?.total_processed || 0
+    };
   }
 }
 
-export const apiClient = new SecureApiClient();
-export type { User, Run, RunStats, RunSplit, StravaPaginationParams, ProcessChunkResponse };
+// Create and export the API client instance
+const apiClient = new SecureApiClient();
+export { apiClient };

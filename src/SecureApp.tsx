@@ -104,115 +104,75 @@ const SecureApp: React.FC = () => {
     setSyncProgressMessage('');
   };
 
-  const processSyncChunk = useCallback(async (userId: string, params: NextPageParams) => {
-    if (!params) { // Should not happen if called correctly
-        setIsSyncing(false);
-        setSyncProgressMessage('');
-        await fetchData(); // Final data refresh
-        return;
-    }
-
-    setSyncProgressMessage(`Syncing page ${params.page}...`);
-    try {
-      // This apiClient method will be created in the next step
-      const result = await apiClient.processStravaActivityChunk(userId, params);
-
-      if (result.isComplete) {
-        setSyncProgressMessage('All activities synced!');
-        setNextPageToSync(null);
-        setIsSyncing(false); // Mark overall sync as complete
-        alert(`Full sync complete! Processed ${result.processedCount} activities in this final chunk (Saved: ${result.savedCount}, Skipped: ${result.skippedCount}). Data will now refresh.`);
-      } else {
-        setSyncProgressMessage(`Page ${params.page} synced (${result.processedCount} activities). Fetching next...`);
-        setNextPageToSync(result.nextPageParams); // Trigger next chunk via useEffect
-      }
-      await fetchData(); // Refresh data after each chunk for now
-    } catch (error: any) {
-      console.error('Sync chunk processing error. Backend response:', error.response?.data, 'Full error object:', error);
-
-      const backendMessage = error.response?.data?.message;
-      const backendStage = error.response?.data?.stage;
-      let displayMessage = 'An unexpected error occurred during sync.';
-
-      if (backendMessage) {
-        displayMessage = backendMessage;
-        if (backendStage) {
-          displayMessage += ` (Stage: ${backendStage})`;
-        }
-      } else if (error.message) {
-        displayMessage = error.message;
-      }
-
-      if (params?.page) {
-        displayMessage = `Error on page ${params.page}: ${displayMessage}`;
-      }
-
-      setSyncProgressMessage(displayMessage);
-      setDataError(displayMessage);
-      alert(displayMessage); // Keep alert for immediate user feedback as per original
-
-      setNextPageToSync(null); // Stop chunking on error
-      setIsSyncing(false);
-    }
-  }, [fetchData]); // Add other dependencies if they are used inside (like setSyncProgressMessage, etc.)
-
-  // Effect to automatically fetch the next chunk for sync
-  useEffect(() => {
-    if (nextPageToSync && user && user.id && isSyncing) {
-      processSyncChunk(user.id, nextPageToSync);
-    }
-  }, [nextPageToSync, user, user?.id, isSyncing, processSyncChunk]); // Added user.id to dependencies
+  // OLD CODE REMOVED - No longer needed with new sync orchestrator
 
 const getTimestamps = (period: SyncPeriod): { after: number; before: number } => {
+  // Always work in UTC to avoid timezone issues
   const now = new Date();
+  const nowUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  
   let startDate: Date;
-  let endDate: Date = new Date(); // Default end date is now for most cases
+  let endDate: Date = now; // Default end date is now for most cases
+
+  console.log(`[getTimestamps] Period: ${period}, Local time: ${now.toISOString()}, UTC time: ${nowUTC.toISOString()}`);
 
   switch (period) {
     case "14days":
-      startDate = new Date();
-      startDate.setDate(now.getDate() - 14);
+      startDate = new Date(now);
+      startDate.setUTCDate(now.getUTCDate() - 14);
+      startDate.setUTCHours(0, 0, 0, 0);
       break;
     case "30days":
-      startDate = new Date();
-      startDate.setDate(now.getDate() - 30);
+      startDate = new Date(now);
+      startDate.setUTCDate(now.getUTCDate() - 30);
+      startDate.setUTCHours(0, 0, 0, 0);
       break;
     case "60days":
-      startDate = new Date();
-      startDate.setDate(now.getDate() - 60);
+      startDate = new Date(now);
+      startDate.setUTCDate(now.getUTCDate() - 60);
+      startDate.setUTCHours(0, 0, 0, 0);
       break;
     case "90days":
-      startDate = new Date();
-      startDate.setDate(now.getDate() - 90);
+      startDate = new Date(now);
+      startDate.setUTCDate(now.getUTCDate() - 90);
+      startDate.setUTCHours(0, 0, 0, 0);
       break;
     case "thisYear":
-      startDate = new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0)); // Jan 1st current year UTC
-      endDate = new Date(); // Sync up to now for "thisYear"
+      // Jan 1st of current year at 00:00:00 UTC
+      startDate = new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0));
+      // End at current time to include today's activities
+      endDate = new Date();
+      console.log(`[getTimestamps] thisYear range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
       break;
     case "lastYear":
-      startDate = new Date(Date.UTC(now.getUTCFullYear() - 1, 0, 1, 0, 0, 0)); // Jan 1st last year UTC
-      endDate = new Date(Date.UTC(now.getUTCFullYear() - 1, 11, 31, 23, 59, 59)); // Dec 31st last year UTC
+      const lastYear = now.getUTCFullYear() - 1;
+      // Jan 1st at 00:00:00 UTC
+      startDate = new Date(Date.UTC(lastYear, 0, 1, 0, 0, 0));
+      // Dec 31st at 23:59:59 UTC
+      endDate = new Date(Date.UTC(lastYear, 11, 31, 23, 59, 59));
+      console.log(`[getTimestamps] lastYear range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
       break;
     case "allTime":
-    default: // Default to allTime if somehow an invalid period is passed
-      startDate = new Date(Date.UTC(2000, 0, 1, 0, 0, 0)); // Jan 1, 2000 UTC as a far-back date
-      endDate = new Date(); // Sync up to now
+    default:
+      // Jan 1, 2000 00:00:00 UTC as a far-back date
+      startDate = new Date(Date.UTC(2000, 0, 1, 0, 0, 0));
+      // Current time
+      endDate = new Date();
+      console.log(`[getTimestamps] allTime range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
       break;
-  }
-
-  // Ensure start date is at the beginning of the day for day-based calculations for consistency
-  if (["14days", "30days", "60days", "90days"].includes(period)) {
-       startDate.setUTCHours(0,0,0,0);
   }
 
   const afterEpochSec = Math.floor(startDate.getTime() / 1000);
   const beforeEpochSec = Math.floor(endDate.getTime() / 1000);
 
+  console.log(`[getTimestamps] Returning timestamps - after: ${afterEpochSec} (${new Date(afterEpochSec * 1000).toISOString()}), ` +
+    `before: ${beforeEpochSec} (${new Date(beforeEpochSec * 1000).toISOString()})`);
+
   return { after: afterEpochSec, before: beforeEpochSec };
 };
 
-  // Revised structure for handleSyncData
-  const handleSyncData = async (period: SyncPeriod) => { // Make sure SyncPeriod is imported from NavigationBar
+  // NEW: Simplified sync using the robust sync orchestrator
+  const handleSyncData = async (period: SyncPeriod) => {
       if (!user || !user.id) {
           alert("Please log in to sync data.");
           return;
@@ -220,35 +180,56 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
 
       setIsSyncing(true);
       setDataError(null);
-      // setSyncProgressMessage('Preparing to sync...'); // Initial message is now more specific
+      setSyncProgressMessage('Starting sync...');
 
       try {
-          setSyncProgressMessage(`Calculating time period for sync: ${period}...`); // Adjusted message
-
-          const { after, before } = getTimestamps(period); // Directly proceed to timestamp calculation
+          const { after, before } = getTimestamps(period);
 
           let readableAfter = new Date(after * 1000).toLocaleDateString();
           let readableBefore = new Date(before * 1000).toLocaleDateString();
-          if (period === "allTime") readableAfter = "beginning of time"; // Or a specific date like "Jan 1, 2000"
+          if (period === "allTime") readableAfter = "beginning of time";
 
-          setSyncProgressMessage(`Syncing from ${readableAfter} to ${readableBefore}. Starting chunk processing...`);
+          setSyncProgressMessage(`Syncing from ${readableAfter} to ${readableBefore}...`);
 
-          setNextPageToSync({
-              page: 1,
-              per_page: 50,
-              after: after,
-              before: before
+          // Use the new sync orchestrator
+          const response = await apiClient.startSync(user.id, {
+              timeRange: { after, before },
+              options: {
+                  batchSize: 50,
+                  skipWeatherEnrichment: false
+              }
           });
-          // The useEffect for nextPageToSync will start processSyncChunk
+
+          if (response.success && response.status === 'completed') {
+              setSyncProgressMessage('Sync completed successfully!');
+              
+              const results = response.results;
+              if (results) {
+                  alert(`Sync complete! Processed ${results.total_processed} activities:\n` +
+                        `• Saved: ${results.activities_saved}\n` +
+                        `• Updated: ${results.activities_updated}\n` +
+                        `• Skipped: ${results.activities_skipped}\n` +
+                        `• Weather enriched: ${results.weather_enriched}\n` +
+                        `• Duration: ${results.duration_seconds}s`);
+              }
+              
+              // Refresh data
+              await fetchData();
+          } else {
+              throw new Error(response.error?.message || 'Sync failed');
+          }
+
       } catch (error: any) {
-          // ... error handling for timestamp calculation or other initial setup before chunking
-          console.error('Error during sync preparation (timestamp calculation):', error);
-          setDataError(error.message || 'Failed to prepare sync.');
-          alert('Sync preparation failed: ' + (error.message || 'Unknown error'));
+          console.error('Sync failed:', error);
+          const errorMessage = error.message || 'Sync failed with unknown error';
+          setDataError(errorMessage);
+          setSyncProgressMessage(`Sync failed: ${errorMessage}`);
+          alert(`Sync failed: ${errorMessage}`);
+      } finally {
           setIsSyncing(false);
-          setSyncProgressMessage('');
+          // Clear progress message after a delay
+          setTimeout(() => setSyncProgressMessage(''), 3000);
       }
-      // No finally block to reset isSyncing here, as processSyncChunk handles it
   };
 
 
