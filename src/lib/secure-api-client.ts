@@ -202,6 +202,20 @@ class SecureApiClient {
     return data.history || [];
   }
 
+  // NEW: Clean up stuck sync sessions
+  async cleanupStuckSessions(userId: string): Promise<void> {
+    console.log(`🧹 Cleaning up stuck sessions for user ${userId}`);
+    
+    const response = await fetch(`${this.baseUrl}/sync-orchestrator?userId=${userId}&action=cleanup`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to cleanup stuck sessions');
+    }
+  }
+
   // Get user runs (updated to use new data store)
   async getUserRuns(userId: string): Promise<{ runs: Run[]; stats: RunStats; count?: number }> {
     console.log(`📖 Fetching runs and stats for user ${userId}...`);

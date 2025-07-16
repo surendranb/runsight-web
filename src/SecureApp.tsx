@@ -221,7 +221,25 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
 
       } catch (error: any) {
           console.error('Sync failed:', error);
-          const errorMessage = error.message || 'Sync failed with unknown error';
+          let errorMessage = error.message || 'Sync failed with unknown error';
+          
+          // Handle specific error cases
+          if (errorMessage.includes('sync session(s) already in progress')) {
+              errorMessage = 'Another sync is already running. Please wait for it to complete or try refreshing the page.';
+              
+              // Offer to clean up stuck sessions
+              if (confirm('Would you like to cancel any stuck sync sessions and try again?')) {
+                  try {
+                      await apiClient.cleanupStuckSessions(user.id);
+                      setSyncProgressMessage('Cleaned up stuck sessions. Please try syncing again.');
+                      setTimeout(() => setSyncProgressMessage(''), 3000);
+                      return;
+                  } catch (cleanupError) {
+                      console.error('Failed to cleanup sessions:', cleanupError);
+                  }
+              }
+          }
+          
           setDataError(errorMessage);
           setSyncProgressMessage(`Sync failed: ${errorMessage}`);
           alert(`Sync failed: ${errorMessage}`);
