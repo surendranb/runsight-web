@@ -117,11 +117,11 @@ class SecureApiClient {
     };
   }
 
-  // NEW: Start a sync using the simple sync function
+  // NEW: Start a sync using the working sync-orchestrator function
   async startSync(userId: string, syncRequest: SyncRequest = {}): Promise<SyncResponse> {
     console.log(`🔄 Starting sync for user ${userId}`, syncRequest);
     
-    const response = await fetch(`${this.baseUrl}/simple-sync?userId=${userId}`, {
+    const response = await fetch(`${this.baseUrl}/sync-orchestrator?userId=${userId}&action=sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(syncRequest),
@@ -134,18 +134,18 @@ class SecureApiClient {
 
     const data = await response.json();
     
-    // Convert simple response to expected format
+    // Return the response as-is since sync-orchestrator returns the right format
     return {
       success: data.success,
-      syncId: `sync_${Date.now()}`,
-      status: data.success ? 'completed' : 'failed',
-      progress: {
+      syncId: data.syncId || `sync_${Date.now()}`,
+      status: data.status || (data.success ? 'completed' : 'failed'),
+      progress: data.progress || {
         total_activities: 0,
         processed_activities: 0,
         current_phase: 'completed',
         percentage_complete: 100
       },
-      results: {
+      results: data.results || {
         total_processed: 0,
         activities_saved: 0,
         activities_updated: 0,
