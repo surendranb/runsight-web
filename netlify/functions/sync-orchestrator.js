@@ -50,11 +50,13 @@ exports.handler = async (event, context) => {
           environment: {
             nodeVersion: process.version,
             platform: process.platform,
-            hasSupabaseUrl: !!process.env.SUPABASE_URL,
+            hasSupabaseUrl: !!(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL),
             hasSupabaseKey: !!process.env.SUPABASE_SERVICE_KEY,
-            hasStravaClientId: !!process.env.STRAVA_CLIENT_ID,
-            hasStravaClientSecret: !!process.env.STRAVA_CLIENT_SECRET,
-            hasOpenWeatherKey: !!process.env.OPENWEATHER_API_KEY
+            hasStravaClientId: !!(process.env.VITE_STRAVA_CLIENT_ID || process.env.STRAVA_CLIENT_ID),
+            hasStravaClientSecret: !!(process.env.VITE_STRAVA_CLIENT_SECRET || process.env.STRAVA_CLIENT_SECRET),
+            hasOpenWeatherKey: !!(process.env.VITE_OPENWEATHER_API_KEY || process.env.OPENWEATHER_API_KEY),
+            viteSupabaseUrl: !!process.env.VITE_SUPABASE_URL,
+            regularSupabaseUrl: !!process.env.SUPABASE_URL
           }
         })
       };
@@ -88,7 +90,7 @@ exports.handler = async (event, context) => {
         const { createClient } = require('@supabase/supabase-js');
         
         // Use the VITE_ prefixed environment variables
-        const supabaseUrl = process.env.VITE_SUPABASE_URL;
+        const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
         if (!supabaseUrl || !supabaseKey) {
