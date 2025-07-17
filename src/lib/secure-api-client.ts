@@ -123,14 +123,22 @@ class SecureApiClient {
   }
 
   // NEW: Start a sync using the simplified sync-data function with chunked processing
-  async startSync(userId: string | number, syncRequest: SyncRequest = {}): Promise<SyncResponse> {
+  async startSync(
+    userId: string | number, 
+    syncRequest: SyncRequest = {}, 
+    onProgress?: (message: string, progress?: number) => void
+  ): Promise<SyncResponse> {
     console.log(`🔄 Starting sync for user ${userId}`, syncRequest);
     
-    return await this.executeChunkedSync(userId, syncRequest);
+    return await this.executeChunkedSync(userId, syncRequest, onProgress);
   }
 
   // Execute chunked sync to handle large datasets elegantly
-  private async executeChunkedSync(userId: string | number, syncRequest: SyncRequest = {}): Promise<SyncResponse> {
+  private async executeChunkedSync(
+    userId: string | number, 
+    syncRequest: SyncRequest = {}, 
+    onProgress?: (message: string, progress?: number) => void
+  ): Promise<SyncResponse> {
     let chunkIndex = 0;
     let hasMoreChunks = true;
     let totalResults = {
@@ -145,6 +153,7 @@ class SecureApiClient {
     };
 
     console.log(`🔄 Starting chunked sync for user ${userId}`);
+    onProgress?.('🔄 Starting chunked sync...', 0);
 
     while (hasMoreChunks) {
       const requestBody = {
@@ -156,6 +165,7 @@ class SecureApiClient {
       };
       
       console.log(`🔄 Processing chunk ${chunkIndex + 1}...`);
+      onProgress?.(`🔄 Processing chunk ${chunkIndex + 1}...`, undefined);
       
       const response = await fetch(`${this.baseUrl}/sync-data`, {
         method: 'POST',
@@ -187,14 +197,24 @@ class SecureApiClient {
         hasMoreChunks = true;
         chunkIndex = data.chunking.nextChunkIndex;
         
-        console.log(`✅ Chunk ${chunkIndex} completed. Processing chunk ${chunkIndex + 1} of ${data.chunking.totalChunks}...`);
-        console.log(`📊 Progress: ${data.chunking.processedSoFar}/${data.chunking.totalActivities} activities processed`);
+        const progressPercent = Math.round((data.chunking.processedSoFar / data.chunking.totalActivities) * 100);
+        const progressMessage = `✅ Chunk ${chunkIndex} completed! Processing chunk ${chunkIndex + 1} of ${data.chunking.totalChunks} (${data.chunking.processedSoFar}/${data.chunking.totalActivities} activities)`;
+        
+        console.log(progressMessage);
+        onProgress?.(progressMessage, progressPercent);
+        
+        // Show detailed results for this chunk
+        if (data.results.weather_enriched > 0) {
+          onProgress?.(`🌤️ Weather enriched: ${totalResults.weather_enriched} runs, Geocoded: ${totalResults.geocoded} locations`, progressPercent);
+        }
         
         // Small delay between chunks to be gentle on the server
         await new Promise(resolve => setTimeout(resolve, 500));
       } else {
         hasMoreChunks = false;
-        console.log(`✅ All chunks completed! Total processed: ${totalResults.total_processed} activities`);
+        const finalMessage = `✅ All chunks completed! Total processed: ${totalResults.total_processed} activities`;
+        console.log(finalMessage);
+        onProgress?.(finalMessage, 100);
       }
     }
     

@@ -207,7 +207,7 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
 
           setSyncProgressMessage(`Fetching activities from ${readableAfter} to ${readableBefore}...`);
 
-          // Use the simplified sync function
+          // Use the simplified sync function with progress updates
           const response = await apiClient.startSync(user.id, {
               userId: user.id,
               timeRange: { after, before },
@@ -215,6 +215,9 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
                   batchSize: 50,
                   skipWeatherEnrichment: false
               }
+          }, (message: string, progress?: number) => {
+              // Update UI with real-time progress
+              setSyncProgressMessage(message);
           });
 
           if (response.success && response.status === 'completed') {
