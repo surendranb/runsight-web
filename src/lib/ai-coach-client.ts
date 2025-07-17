@@ -35,12 +35,33 @@ export interface ProgressAssessment {
 
 class AICoachClient {
   private baseUrl: string;
+  private lastRequestTime: number = 0;
+  private requestCount: number = 0;
+  private readonly MIN_REQUEST_INTERVAL = 5000; // 5 seconds between requests
+  private readonly MAX_REQUESTS_PER_HOUR = 10; // Limit to 10 requests per hour
+  private requestTimes: number[] = [];
 
   constructor() {
     this.baseUrl = '/.netlify/functions';
   }
 
   private async makeRequest(action: string, data: any): Promise<AICoachResponse> {
+    // Rate limiting check
+    const now = Date.now();
+    
+    // Check minimum interval between requests
+    if (now - this.lastRequestTime < this.MIN_REQUEST_INTERVAL) {
+      throw new Error('Rate limit: Please wait a few seconds between AI Coach requests');
+    }
+    
+    // Clean old request times (older than 1 hour)
+    this.requestTimes = this.requestTimes.filter(time => now - time < 60 * 60 * 1000);
+    
+    // Check hourly request limit
+    if (this.requestTimes.length >= this.MAX_REQUESTS_PER_HOUR) {
+      throw new Error('Rate limit: Maximum AI Coach requests per hour exceeded. Please try again later.');
+    }
+
     try {
       const response = await fetch(`${this.baseUrl}/ai-coach`, {
         method: 'POST',
@@ -59,6 +80,10 @@ class AICoachClient {
         }
         throw new Error(`HTTP ${response.status}: ${responseData.message || response.statusText}`);
       }
+
+      // Update rate limiting tracking on successful request
+      this.lastRequestTime = now;
+      this.requestTimes.push(now);
 
       return responseData;
     } catch (error) {

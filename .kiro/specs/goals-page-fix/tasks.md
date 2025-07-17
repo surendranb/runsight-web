@@ -18,14 +18,14 @@
 
 ## Phase 2: Enhance Goal Types and Templates
 
-- [-] 3. Implement goal templates system
+- [x] 3. Implement goal templates system
   - Create GOAL_TEMPLATES constant with pre-defined goal options
   - Add template categories: distance goals, pace goals, frequency goals
   - Include popular goals like "2500KM in 2025", "5K under 30 minutes", "20 half marathons"
   - Update goal creation modal to show template options
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.5_
 
-- [ ] 4. Update Goal data model and types
+- [-] 4. Update Goal data model and types
   - Extend Goal interface to support diverse goal types
   - Add raceDistance and raceType fields for pace and frequency goals
   - Update goal creation form to handle different goal types

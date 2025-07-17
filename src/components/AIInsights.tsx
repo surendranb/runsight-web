@@ -18,12 +18,26 @@ export default function AIInsights({ runs, goals, className = '' }: AIInsightsPr
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'insights' | 'goals' | 'progress'>('insights');
   const [needsSetup, setNeedsSetup] = useState(false);
+  const [lastAnalysisTime, setLastAnalysisTime] = useState<number>(0);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
+  // Cache duration: 10 minutes (600,000 ms)
+  const CACHE_DURATION = 10 * 60 * 1000;
 
   useEffect(() => {
-    if (runs.length > 0) {
+    // Only load AI insights if:
+    // 1. We have runs data
+    // 2. We haven't loaded once OR cache has expired
+    // 3. We're not currently loading
+    const now = Date.now();
+    const shouldLoad = runs.length > 0 && 
+                      (!hasLoadedOnce || (now - lastAnalysisTime > CACHE_DURATION)) && 
+                      !isLoading;
+    
+    if (shouldLoad) {
       loadAIInsights();
     }
-  }, [runs, goals]);
+  }, [runs.length, goals.length]); // Only depend on length, not the full arrays
 
   const loadAIInsights = async () => {
     setIsLoading(true);
@@ -57,6 +71,10 @@ export default function AIInsights({ runs, goals, className = '' }: AIInsightsPr
         console.warn('Some AI requests failed:', failures);
         setError('Some AI features may not be available. Please try again later.');
       }
+
+      // Update cache tracking
+      setLastAnalysisTime(Date.now());
+      setHasLoadedOnce(true);
 
     } catch (err: any) {
       console.error('Failed to load AI insights:', err);
@@ -120,13 +138,23 @@ export default function AIInsights({ runs, goals, className = '' }: AIInsightsPr
             <Brain className="w-5 h-5 text-blue-600" />
             <h3 className="text-lg font-semibold">AI Coach</h3>
           </div>
-          <button
-            onClick={loadAIInsights}
-            disabled={isLoading}
-            className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isLoading ? 'Loading...' : 'Refresh'}
-          </button>
+          <div className="flex items-center gap-2">
+            {hasLoadedOnce && (
+              <span className="text-xs text-gray-500">
+                Last updated: {Math.round((Date.now() - lastAnalysisTime) / 60000)}m ago
+              </span>
+            )}
+            <button
+              onClick={loadAIInsights}
+              disabled={isLoading || (hasLoadedOnce && (Date.now() - lastAnalysisTime < CACHE_DURATION))}
+              className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isLoading ? 'Loading...' : 
+               hasLoadedOnce && (Date.now() - lastAnalysisTime < CACHE_DURATION) ? 
+               `Refresh (${Math.ceil((CACHE_DURATION - (Date.now() - lastAnalysisTime)) / 60000)}m)` : 
+               'Refresh'}
+            </button>
+          </div>
         </div>
 
         {/* Tab Navigation */}
