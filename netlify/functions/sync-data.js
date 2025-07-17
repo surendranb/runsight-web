@@ -186,12 +186,19 @@ exports.handler = async (event, context) => {
 
     for (const activity of runningActivities) {
       try {
-        // Check if activity already exists
-        const { data: existingRun } = await supabase
+        // Check if activity already exists (don't use .single() as it throws on no match)
+        const { data: existingRuns, error: checkError } = await supabase
           .from('runs')
           .select('id')
-          .eq('strava_id', activity.id)
-          .single();
+          .eq('strava_id', activity.id);
+
+        if (checkError) {
+          console.error('[sync-data] Error checking for existing run:', checkError);
+          skippedCount++;
+          continue;
+        }
+
+        const existingRun = existingRuns && existingRuns.length > 0 ? existingRuns[0] : null;
 
         const runData = {
           strava_id: activity.id,
@@ -217,6 +224,7 @@ exports.handler = async (event, context) => {
 
         if (existingRun) {
           // Update existing run
+          console.log(`[sync-data] Updating existing run: ${activity.name} (${activity.id})`);
           const { error: updateError } = await supabase
             .from('runs')
             .update(runData)
@@ -230,6 +238,7 @@ exports.handler = async (event, context) => {
           }
         } else {
           // Insert new run
+          console.log(`[sync-data] Inserting new run: ${activity.name} (${activity.id})`);
           const { error: insertError } = await supabase
             .from('runs')
             .insert(runData);
