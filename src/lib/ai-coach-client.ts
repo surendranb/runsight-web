@@ -50,11 +50,17 @@ class AICoachClient {
         body: JSON.stringify({ action, data }),
       });
 
+      const responseData = await response.json();
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // Check for specific error types
+        if (responseData.error === 'CONFIG_ERROR') {
+          throw new Error('CONFIG_ERROR: ' + responseData.message);
+        }
+        throw new Error(`HTTP ${response.status}: ${responseData.message || response.statusText}`);
       }
 
-      return await response.json();
+      return responseData;
     } catch (error) {
       console.error('[AICoachClient] Request failed:', error);
       throw error;

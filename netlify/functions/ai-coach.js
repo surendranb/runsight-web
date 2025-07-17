@@ -30,12 +30,14 @@ exports.handler = async (event, context) => {
     // Get Gemini API key from environment
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (!geminiApiKey) {
+      console.error('[ai-coach] GEMINI_API_KEY environment variable not set');
       return {
-        statusCode: 500,
+        statusCode: 400,
         headers,
         body: JSON.stringify({
           error: 'CONFIG_ERROR',
-          message: 'Gemini API key not configured'
+          message: 'AI Coach requires setup. Please configure your Gemini API key in the Netlify environment variables.',
+          details: 'GEMINI_API_KEY environment variable not configured'
         })
       };
     }
