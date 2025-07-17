@@ -32,6 +32,18 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({ user, runs, isLoading, err
   }, [goals, runs]);
 
   const handleCreateGoal = (goalData: CreateGoalRequest) => {
+    // For annual goals, set creation date to start of year to include all runs
+    let createdAt = new Date().toISOString();
+    
+    if (goalData.category === 'annual' || goalData.targetDate === '2025-12-31') {
+      // For 2025 annual goals, start from January 1st, 2025
+      createdAt = '2025-01-01T00:00:00.000Z';
+    } else if (goalData.category === 'monthly') {
+      // For monthly goals, start from beginning of current month
+      const now = new Date();
+      createdAt = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    }
+
     const newGoal: Goal = {
       id: Date.now().toString(),
       userId: user.id,
@@ -42,7 +54,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({ user, runs, isLoading, err
       currentValue: 0,
       unit: goalData.unit,
       targetDate: goalData.targetDate,
-      createdAt: new Date().toISOString(),
+      createdAt: createdAt,
       updatedAt: new Date().toISOString(),
       status: 'active',
       priority: goalData.priority || 'medium',
