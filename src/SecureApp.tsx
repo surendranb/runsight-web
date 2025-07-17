@@ -201,7 +201,7 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
           let readableBefore = new Date(before * 1000).toLocaleDateString();
           if (period === "allTime") readableAfter = "beginning of time";
 
-          setSyncProgressMessage(`Syncing from ${readableAfter} to ${readableBefore}...`);
+          setSyncProgressMessage(`Fetching activities from ${readableAfter} to ${readableBefore}...`);
 
           // Use the simplified sync function
           const response = await apiClient.startSync(user.id, {
@@ -214,19 +214,28 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
           });
 
           if (response.success && response.status === 'completed') {
-              setSyncProgressMessage('Sync completed successfully!');
-              
               const results = response.results;
-              if (results) {
-                  alert(`Sync complete! Processed ${results.total_processed} activities:\n` +
-                        `• Saved: ${results.activities_saved}\n` +
-                        `• Updated: ${results.activities_updated}\n` +
-                        `• Skipped: ${results.activities_skipped}\n` +
-                        `• Weather enriched: ${results.weather_enriched}\n` +
-                        `• Duration: ${results.duration_seconds}s`);
+              
+              if (results.activities_failed > 0) {
+                  // Partial success - some activities failed
+                  setSyncProgressMessage(`Sync completed with ${results.activities_failed} failures`);
+                  alert(`Sync partially completed:\n` +
+                        `✅ Successfully saved: ${results.activities_saved} activities\n` +
+                        `❌ Failed: ${results.activities_failed} activities\n` +
+                        `📊 Total processed: ${results.total_processed}\n\n` +
+                        `Check the function logs for error details.`);
+              } else {
+                  // Complete success
+                  setSyncProgressMessage('Sync completed successfully!');
+                  alert(`🎉 Sync complete! Successfully processed ${results.total_processed} activities:\n` +
+                        `✅ Saved: ${results.activities_saved}\n` +
+                        `🔄 Updated: ${results.activities_updated}\n` +
+                        `⏭️ Skipped: ${results.activities_skipped}\n` +
+                        `🌤️ Weather enriched: ${results.weather_enriched}\n` +
+                        `⏱️ Duration: ${results.duration_seconds}s`);
               }
               
-              // Refresh data
+              // Refresh data regardless of partial failures
               await fetchData();
           } else {
               throw new Error(response.error?.message || response.message || 'Sync failed');
@@ -243,15 +252,17 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
               errorMessage = 'Strava authentication expired. Please re-authenticate.';
           } else if (errorMessage.includes('CONFIG_ERROR')) {
               errorMessage = 'Server configuration issue. Please try again later.';
+          } else if (errorMessage.includes('Database error')) {
+              errorMessage = 'Database error occurred. The sync was aborted to prevent data corruption. Please try again or contact support if the issue persists.';
           }
           
           setDataError(errorMessage);
-          setSyncProgressMessage(`Sync failed: ${errorMessage}`);
-          alert(`Sync failed: ${errorMessage}`);
+          setSyncProgressMessage(`❌ Sync failed: ${errorMessage}`);
+          alert(`❌ Sync failed: ${errorMessage}`);
       } finally {
           setIsSyncing(false);
           // Clear progress message after a delay
-          setTimeout(() => setSyncProgressMessage(''), 3000);
+          setTimeout(() => setSyncProgressMessage(''), 5000);
       }
   };
 

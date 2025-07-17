@@ -203,32 +203,76 @@ exports.handler = async (event, context) => {
       updated_at: new Date().toISOString()
     }));
 
-    // Batch upsert all activities at once
-    console.log(`[sync-data] Batch upserting ${runDataArray.length} runs...`);
-    console.log(`[sync-data] Sample run data:`, JSON.stringify(runDataArray[0], null, 2));
-    
-    const { data: upsertedData, error: upsertError } = await supabase
-      .from('runs')
-      .upsert(runDataArray, { 
-        onConflict: 'strava_id',
-        ignoreDuplicates: false
-      })
-      .select('strava_id');
-
+    // Process activities with progress tracking and better error handling
     let processedCount = 0;
     let failedCount = 0;
+    let errors = [];
+    const startTime = Date.now();
 
-    console.log(`[sync-data] Upsert result:`, {
-      upsertedData: upsertedData ? upsertedData.length : 'null',
-      upsertError: upsertError ? upsertError.message : 'none'
-    });
+    console.log(`[sync-data] Starting to process ${runDataArray.length} runs with progress tracking...`);
 
-    if (upsertError) {
-      console.error('[sync-data] Batch upsert error:', JSON.stringify(upsertError, null, 2));
-      failedCount = runDataArray.length;
-    } else {
-      processedCount = upsertedData ? upsertedData.length : runDataArray.length;
-      console.log(`[sync-data] Successfully upserted ${processedCount} runs`);
+    // Process in smaller batches to provide better progress feedback and error isolation
+    const batchSize = 10;
+    for (let i = 0; i < runDataArray.length; i += batchSize) {
+      const batch = runDataArray.slice(i, i + batchSize);
+      const batchNumber = Math.floor(i / batchSize) + 1;
+      const totalBatches = Math.ceil(runDataArray.length / batchSize);
+      
+      console.log(`[sync-data] Processing batch ${batchNumber}/${totalBatches} (${batch.length} activities)...`);
+      
+      try {
+        const { data: batchResult, error: batchError } = await supabase
+          .from('runs')
+          .upsert(batch, { 
+            onConflict: 'strava_id',
+            ignoreDuplicates: false
+          })
+          .select('strava_id, name');
+
+        if (batchError) {
+          console.error(`[sync-data] Batch ${batchNumber} failed:`, batchError);
+          failedCount += batch.length;
+          errors.push({
+            batch: batchNumber,
+            error: batchError.message,
+            activities: batch.map(r => ({ id: r.strava_id, name: r.name }))
+          });
+          
+          // If we get a critical error, abort the sync
+          if (batchError.code === '22P02' || batchError.code === '23505' || batchError.code === '42703') {
+            console.error(`[sync-data] Critical error detected, aborting sync:`, batchError);
+            throw new Error(`Database error: ${batchError.message}. Sync aborted to prevent data corruption.`);
+          }
+        } else {
+          const batchProcessed = batchResult ? batchResult.length : batch.length;
+          processedCount += batchProcessed;
+          console.log(`[sync-data] Batch ${batchNumber} completed: ${batchProcessed}/${batch.length} activities saved`);
+          
+          if (batchResult && batchResult.length > 0) {
+            console.log(`[sync-data] Sample saved activities:`, batchResult.slice(0, 2).map(r => `${r.name} (${r.strava_id})`));
+          }
+        }
+      } catch (batchError) {
+        console.error(`[sync-data] Batch ${batchNumber} exception:`, batchError);
+        failedCount += batch.length;
+        errors.push({
+          batch: batchNumber,
+          error: batchError.message,
+          activities: batch.map(r => ({ id: r.strava_id, name: r.name }))
+        });
+      }
+      
+      // Add small delay between batches to be gentle on the database
+      if (i + batchSize < runDataArray.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    const duration = Math.round((Date.now() - startTime) / 1000);
+    console.log(`[sync-data] Processing completed in ${duration}s: ${processedCount} saved, ${failedCount} failed`);
+    
+    if (errors.length > 0) {
+      console.log(`[sync-data] Errors encountered:`, errors);
     }
 
     const results = {

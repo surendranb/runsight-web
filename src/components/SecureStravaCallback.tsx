@@ -63,7 +63,14 @@ const SecureStravaCallback: React.FC = () => {
         });
 
         // Step 2: Sync data using new robust sync system
+        setState({
+          step: 'syncing',
+          message: 'Fetching your recent activities...',
+          progress: 40
+        });
+
         const syncResult = await apiClient.startSync(authenticatedUser.id, {
+          userId: authenticatedUser.id,
           timeRange: {
             after: Math.floor((Date.now() - 14 * 24 * 60 * 60 * 1000) / 1000) // Last 14 days
           },
@@ -85,12 +92,21 @@ const SecureStravaCallback: React.FC = () => {
         const results = syncResult.results;
         const totalProcessed = results?.total_processed || 0;
         const saved = results?.activities_saved || 0;
+        const failed = results?.activities_failed || 0;
 
-        setState({
-          step: 'complete',
-          message: `Successfully imported ${saved} runs from ${totalProcessed} activities!`,
-          progress: 100
-        });
+        if (failed > 0) {
+          setState({
+            step: 'complete',
+            message: `Imported ${saved} runs from ${totalProcessed} activities (${failed} failed)`,
+            progress: 100
+          });
+        } else {
+          setState({
+            step: 'complete',
+            message: `Successfully imported ${saved} runs from ${totalProcessed} activities!`,
+            progress: 100
+          });
+        }
 
         // Redirect to dashboard after success
         setTimeout(() => {

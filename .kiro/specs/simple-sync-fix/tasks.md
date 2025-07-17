@@ -56,7 +56,7 @@
   - Clean up any unused frontend code related to complex auth
   - _Requirements: 4.3, 5.2_
 
-- [ ] 9. Test complete simplified flow
+- [x] 9. Test complete simplified flow
   - Test fresh authentication with Strava OAuth
   - Test immediate sync after authentication
   - Test data display in dashboard
