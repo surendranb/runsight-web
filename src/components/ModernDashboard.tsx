@@ -5,6 +5,7 @@ import { PaceTrendChart } from './dashboard/PaceTrendChart';
 import { ActivityTimeline } from './dashboard/ActivityTimeline';
 import { InsightCard } from './dashboard/InsightCard';
 import { GoalProgress } from './dashboard/GoalProgress';
+import AIInsights from './AIInsights';
 import { Activity, MapPin, Clock, Zap, Calendar, Settings, RefreshCw } from 'lucide-react';
 
 interface ModernDashboardProps {
@@ -456,6 +457,13 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
                 </div>
               </div>
             )}
+
+            {/* AI Insights */}
+            <AIInsights 
+              runs={filteredRuns} 
+              goals={[]} // TODO: Connect to actual goals when available
+              className="mb-8"
+            />
 
             {/* Goal Progress System */}
             <GoalProgress 

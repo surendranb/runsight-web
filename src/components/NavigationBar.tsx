@@ -58,7 +58,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
   const navItems = [
     { label: "Dashboard", viewName: "dashboard", icon: Activity, isDisabled: false },
     { label: "Insights", viewName: "insights", icon: BarChart3, isDisabled: false },
-    { label: "Goals", viewName: "goals", icon: Target, isDisabled: true },
+    { label: "Goals", viewName: "goals", icon: Target, isDisabled: false },
     { label: "Settings", viewName: "settings", icon: SettingsIcon, isDisabled: true },
   ];
 

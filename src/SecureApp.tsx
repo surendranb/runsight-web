@@ -7,6 +7,7 @@ import { NavigationBar, SyncPeriod } from './components/NavigationBar';
 import { SimpleDashboard } from './components/SimpleDashboard';
 import { ModernDashboard } from './components/ModernDashboard';
 import { InsightsPage } from './components/InsightsPage';
+import { GoalsPage } from './components/GoalsPage';
 import { DebugConsole } from './components/DebugConsole';
 import { User, EnrichedRun, RunStats } from './types';
 import { apiClient } from './lib/secure-api-client';
