@@ -24,20 +24,8 @@ export default function AIInsights({ runs, goals, className = '' }: AIInsightsPr
   // Cache duration: 10 minutes (600,000 ms)
   const CACHE_DURATION = 10 * 60 * 1000;
 
-  useEffect(() => {
-    // Only load AI insights if:
-    // 1. We have runs data
-    // 2. We haven't loaded once OR cache has expired
-    // 3. We're not currently loading
-    const now = Date.now();
-    const shouldLoad = runs.length > 0 && 
-                      (!hasLoadedOnce || (now - lastAnalysisTime > CACHE_DURATION)) && 
-                      !isLoading;
-    
-    if (shouldLoad) {
-      loadAIInsights();
-    }
-  }, [runs.length, goals.length]); // Only depend on length, not the full arrays
+  // Remove automatic loading - AI insights only load on manual refresh
+  // useEffect removed to prevent automatic API calls
 
   const loadAIInsights = async () => {
     setIsLoading(true);

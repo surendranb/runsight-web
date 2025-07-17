@@ -1,8 +1,8 @@
-// Goal system types and interfaces
+// Simplified Goal system types
 export interface Goal {
   id: string;
   userId: string;
-  type: 'distance' | 'race' | 'consistency' | 'pace';
+  type: 'distance' | 'time' | 'frequency' | 'pace';
   title: string;
   description: string;
   targetValue: number;

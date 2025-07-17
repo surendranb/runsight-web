@@ -13,28 +13,10 @@ interface GoalsPageProps {
   error: string | null;
 }
 
-// Mock goals for now - will be replaced with real data
-const mockGoals: Goal[] = [
-  {
-    id: '1',
-    userId: 'user1',
-    type: 'distance',
-    title: '1000km in 2025',
-    description: 'Run 1000 kilometers throughout the year',
-    targetValue: 1000000, // in meters
-    currentValue: 0,
-    unit: 'meters',
-    targetDate: '2025-12-31',
-    createdAt: '2025-01-01',
-    updatedAt: '2025-01-01',
-    status: 'active',
-    priority: 'high',
-    category: 'annual'
-  }
-];
+// No mock goals - start with empty array
 
 export const GoalsPage: React.FC<GoalsPageProps> = ({ user, runs, isLoading, error }) => {
-  const [goals, setGoals] = useState<Goal[]>(mockGoals);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [goalProgress, setGoalProgress] = useState<Map<string, GoalProgressType>>(new Map());
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
@@ -370,7 +352,7 @@ const CreateGoalModal: React.FC<{
   });
 
   const popularTemplates = getPopularTemplates();
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'distance' | 'pace' | 'frequency' | 'consistency'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'distance' | 'pace' | 'frequency' | 'time'>('all');
 
   const getFilteredTemplates = () => {
     if (selectedCategory === 'all') return popularTemplates;
@@ -414,7 +396,7 @@ const CreateGoalModal: React.FC<{
           <div className="space-y-4">
             {/* Template Categories */}
             <div className="flex flex-wrap gap-2 mb-4">
-              {(['all', 'distance', 'pace', 'frequency', 'consistency'] as const).map((category) => (
+              {(['all', 'distance', 'pace', 'frequency', 'time'] as const).map((category) => (
                 <button
                   key={category}
                   onClick={() => setSelectedCategory(category)}
@@ -491,14 +473,15 @@ const CreateGoalModal: React.FC<{
                 ...prev, 
                 type: e.target.value as any,
                 unit: e.target.value === 'distance' ? 'meters' : 
-                      e.target.value === 'consistency' ? 'runs/week' : 'seconds'
+                      e.target.value === 'frequency' ? 'runs' : 
+                      e.target.value === 'time' ? 'seconds' : 'seconds'
               }))}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="distance">Distance Goal</option>
-              <option value="consistency">Consistency Goal</option>
+              <option value="time">Time Goal</option>
+              <option value="frequency">Frequency Goal</option>
               <option value="pace">Pace Goal</option>
-              <option value="race">Race Goal</option>
             </select>
           </div>
 

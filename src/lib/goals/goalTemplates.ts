@@ -3,7 +3,7 @@ import { CreateGoalRequest } from './goalTypes';
 
 export interface GoalTemplate {
   id: string;
-  category: 'distance' | 'pace' | 'frequency' | 'consistency';
+  category: 'distance' | 'pace' | 'frequency' | 'time';
   title: string;
   description: string;
   targetValue: number;
@@ -16,7 +16,7 @@ export interface GoalTemplate {
   // Additional fields for specific goal types
   raceDistance?: number; // For pace goals
   raceType?: string; // For frequency goals
-  runsPerWeek?: number; // For consistency goals
+  runsPerWeek?: number; // For time goals
 }
 
 // Distance Goal Templates
@@ -247,59 +247,55 @@ export const FREQUENCY_TEMPLATES: GoalTemplate[] = [
   }
 ];
 
-// Consistency Goal Templates
-export const CONSISTENCY_TEMPLATES: GoalTemplate[] = [
+// Time Goal Templates (running time-based goals)
+export const TIME_TEMPLATES: GoalTemplate[] = [
   {
-    id: 'consistency-3-runs-week',
-    category: 'consistency',
-    title: '3 runs per week',
-    description: 'Maintain a consistent schedule of 3 runs every week',
-    targetValue: 3,
-    unit: 'runs/week',
+    id: 'time-100-hours-annual',
+    category: 'time',
+    title: '100 hours of running in 2025',
+    description: 'Spend 100 hours running throughout the year',
+    targetValue: 360000, // seconds (100 hours)
+    unit: 'seconds',
+    timeframe: 'annual',
+    priority: 'medium',
+    difficulty: 'intermediate',
+    estimatedTimeCommitment: '2-3 hours/week'
+  },
+  {
+    id: 'time-200-hours-annual',
+    category: 'time',
+    title: '200 hours of running in 2025',
+    description: 'Dedicate 200 hours to running this year - for serious runners',
+    targetValue: 720000, // seconds (200 hours)
+    unit: 'seconds',
+    timeframe: 'annual',
+    priority: 'high',
+    difficulty: 'advanced',
+    estimatedTimeCommitment: '4-5 hours/week'
+  },
+  {
+    id: 'time-50-hours-annual',
+    category: 'time',
+    title: '50 hours of running in 2025',
+    description: 'A great starting goal - 50 hours of running throughout the year',
+    targetValue: 180000, // seconds (50 hours)
+    unit: 'seconds',
     timeframe: 'annual',
     priority: 'medium',
     difficulty: 'beginner',
-    estimatedTimeCommitment: '3-4 hours/week',
-    runsPerWeek: 3
+    estimatedTimeCommitment: '1-2 hours/week'
   },
   {
-    id: 'consistency-5-runs-week',
-    category: 'consistency',
-    title: '5 runs per week',
-    description: 'Challenge yourself with 5 runs every week throughout the year',
-    targetValue: 5,
-    unit: 'runs/week',
-    timeframe: 'annual',
-    priority: 'high',
+    id: 'time-10-hours-monthly',
+    category: 'time',
+    title: '10 hours this month',
+    description: 'Run for 10 hours in a single month',
+    targetValue: 36000, // seconds (10 hours)
+    unit: 'seconds',
+    timeframe: 'monthly',
+    priority: 'medium',
     difficulty: 'intermediate',
-    estimatedTimeCommitment: '5-7 hours/week',
-    runsPerWeek: 5
-  },
-  {
-    id: 'consistency-daily-running',
-    category: 'consistency',
-    title: 'Run every day',
-    description: 'Ultimate consistency challenge - run every single day',
-    targetValue: 7,
-    unit: 'runs/week',
-    timeframe: 'annual',
-    priority: 'high',
-    difficulty: 'advanced',
-    estimatedTimeCommitment: '7-10 hours/week',
-    runsPerWeek: 7
-  },
-  {
-    id: 'consistency-100-day-streak',
-    category: 'consistency',
-    title: '100-day running streak',
-    description: 'Run for 100 consecutive days without missing a day',
-    targetValue: 100,
-    unit: 'days',
-    timeframe: 'race_specific',
-    priority: 'high',
-    difficulty: 'advanced',
-    estimatedTimeCommitment: '4-6 hours/week',
-    runsPerWeek: 7
+    estimatedTimeCommitment: '2-3 hours/week'
   }
 ];
 
@@ -308,7 +304,7 @@ export const ALL_TEMPLATES: GoalTemplate[] = [
   ...DISTANCE_TEMPLATES,
   ...PACE_TEMPLATES,
   ...FREQUENCY_TEMPLATES,
-  ...CONSISTENCY_TEMPLATES
+  ...TIME_TEMPLATES
 ];
 
 // Helper functions
@@ -325,11 +321,11 @@ export const getPopularTemplates = (): GoalTemplate[] => {
   return [
     ALL_TEMPLATES.find(t => t.id === 'distance-1000km-annual')!,
     ALL_TEMPLATES.find(t => t.id === 'pace-5k-30min')!,
-    ALL_TEMPLATES.find(t => t.id === 'consistency-3-runs-week')!,
+    ALL_TEMPLATES.find(t => t.id === 'time-100-hours-annual')!,
     ALL_TEMPLATES.find(t => t.id === 'distance-2500km-annual')!,
     ALL_TEMPLATES.find(t => t.id === 'frequency-12-races')!,
     ALL_TEMPLATES.find(t => t.id === 'pace-10k-60min')!
-  ];
+  ].filter(Boolean); // Remove any undefined templates
 };
 
 export const templateToGoalRequest = (template: GoalTemplate, targetDate: string): CreateGoalRequest => {

@@ -32,7 +32,7 @@
   - Implement proper validation for each goal type
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 5. Enhance goal creation modal with templates
+- [-] 5. Enhance goal creation modal with templates
   - Add template selection step in goal creation flow
   - Implement custom goal creation option
   - Add goal type-specific form fields (race distance, target time, etc.)
