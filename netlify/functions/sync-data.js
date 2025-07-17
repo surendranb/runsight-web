@@ -194,8 +194,9 @@ exports.handler = async (event, context) => {
       end_longitude: activity.end_latlng ? activity.end_latlng[1] : null,
       average_speed_ms: activity.average_speed,
       max_speed_ms: activity.max_speed,
-      average_heartrate_bpm: activity.average_heartrate,
-      max_heartrate_bpm: activity.max_heartrate,
+      // Convert heart rate values to integers (round decimal values)
+      average_heartrate_bpm: activity.average_heartrate ? Math.round(activity.average_heartrate) : null,
+      max_heartrate_bpm: activity.max_heartrate ? Math.round(activity.max_heartrate) : null,
       total_elevation_gain_meters: activity.total_elevation_gain,
       activity_type: activity.type || activity.sport_type || 'Run',
       strava_data: activity,
