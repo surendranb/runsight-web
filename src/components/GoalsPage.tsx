@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Target, Plus, Calendar, TrendingUp, Award, Edit, Trash2, CheckCircle } from 'lucide-react';
+import { Target, Plus, Calendar, TrendingUp, Award, Edit, Trash2, CheckCircle, Star, Clock, Zap } from 'lucide-react';
 import { User, EnrichedRun } from '../types';
 import { Goal, GoalProgress as GoalProgressType, CreateGoalRequest } from '../lib/goals/goalTypes';
 import { calculateGoalProgress, getGoalStatusColor } from '../lib/goals/goalUtils';
+import { GoalTemplate, getPopularTemplates, getTemplatesByCategory, templateToGoalRequest } from '../lib/goals/goalTemplates';
 import AIInsights from './AIInsights';
 
 interface GoalsPageProps {
@@ -355,6 +356,8 @@ const CreateGoalModal: React.FC<{
   onClose: () => void;
   onSubmit: (goal: CreateGoalRequest) => void;
 }> = ({ onClose, onSubmit }) => {
+  const [step, setStep] = useState<'templates' | 'custom'>('templates');
+  const [selectedTemplate, setSelectedTemplate] = useState<GoalTemplate | null>(null);
   const [formData, setFormData] = useState<CreateGoalRequest>({
     type: 'distance',
     title: '',
@@ -366,6 +369,26 @@ const CreateGoalModal: React.FC<{
     category: 'annual'
   });
 
+  const popularTemplates = getPopularTemplates();
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'distance' | 'pace' | 'frequency' | 'consistency'>('all');
+
+  const getFilteredTemplates = () => {
+    if (selectedCategory === 'all') return popularTemplates;
+    return getTemplatesByCategory(selectedCategory);
+  };
+
+  const handleTemplateSelect = (template: GoalTemplate) => {
+    setSelectedTemplate(template);
+    // Auto-fill form with template data
+    const targetDate = template.timeframe === 'annual' ? '2025-12-31' : 
+                      template.timeframe === 'monthly' ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] :
+                      new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    const goalRequest = templateToGoalRequest(template, targetDate);
+    setFormData(goalRequest);
+    setStep('custom');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.title && formData.targetValue > 0 && formData.targetDate) {
@@ -373,12 +396,93 @@ const CreateGoalModal: React.FC<{
     }
   };
 
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'beginner': return 'bg-green-100 text-green-800';
+      case 'intermediate': return 'bg-yellow-100 text-yellow-800';
+      case 'advanced': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Create New Goal</h2>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {step === 'templates' ? (
+          <div className="space-y-4">
+            {/* Template Categories */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {(['all', 'distance', 'pace', 'frequency', 'consistency'] as const).map((category) => (
+                <button
+                  key={category}
+                  onClick={() => setSelectedCategory(category)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    selectedCategory === category
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {category === 'all' ? 'Popular' : category.charAt(0).toUpperCase() + category.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            {/* Template Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+              {getFilteredTemplates().map((template) => (
+                <div
+                  key={template.id}
+                  onClick={() => handleTemplateSelect(template)}
+                  className="border rounded-lg p-4 cursor-pointer hover:border-blue-500 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-medium text-gray-900 text-sm">{template.title}</h3>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${getDifficultyColor(template.difficulty)}`}>
+                      {template.difficulty}
+                    </span>
+                  </div>
+                  <p className="text-gray-600 text-xs mb-3 line-clamp-2">{template.description}</p>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span className="flex items-center">
+                      <Clock className="w-3 h-3 mr-1" />
+                      {template.estimatedTimeCommitment}
+                    </span>
+                    <span className="flex items-center">
+                      <Star className="w-3 h-3 mr-1" />
+                      {template.priority}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Custom Goal Option */}
+            <div className="border-t pt-4">
+              <button
+                onClick={() => setStep('custom')}
+                className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+              >
+                <div className="flex items-center justify-center">
+                  <Plus className="w-5 h-5 text-gray-400 mr-2" />
+                  <span className="text-gray-600 font-medium">Create Custom Goal</span>
+                </div>
+              </button>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Goal Type</label>
             <select
@@ -475,6 +579,7 @@ const CreateGoalModal: React.FC<{
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

@@ -2,14 +2,14 @@
 
 ## Phase 1: Fix Goals Page Routing Issue
 
-- [-] 1. Debug and fix SecureApp.tsx routing logic
+- [x] 1. Debug and fix SecureApp.tsx routing logic
   - Identify why Goals page shows "Coming Soon!" instead of GoalsPage component
   - Fix the conditional rendering logic in SecureApp.tsx
   - Ensure proper component imports and exports
   - Test navigation between Dashboard, Insights, and Goals sections
   - _Requirements: 1.1, 1.2, 1.3, 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 2. Verify GoalsPage component integration
+- [x] 2. Verify GoalsPage component integration
   - Ensure GoalsPage component is properly imported in SecureApp.tsx
   - Verify props are correctly passed to GoalsPage component
   - Test that Goals page renders with existing mock data
@@ -18,7 +18,7 @@
 
 ## Phase 2: Enhance Goal Types and Templates
 
-- [ ] 3. Implement goal templates system
+- [-] 3. Implement goal templates system
   - Create GOAL_TEMPLATES constant with pre-defined goal options
   - Add template categories: distance goals, pace goals, frequency goals
   - Include popular goals like "2500KM in 2025", "5K under 30 minutes", "20 half marathons"
