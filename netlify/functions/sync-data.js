@@ -142,18 +142,18 @@ exports.handler = async (event, context) => {
       console.log('[sync-data] Tokens refreshed successfully');
     }
 
-    // Fetch activities from Strava with pagination
+    // Fetch activities from Strava with proper pagination (no arbitrary limits)
     const timeRange = requestData.timeRange || {};
     let allActivities = [];
     let page = 1;
-    const perPage = 50; // Strava's max per page
+    const perPage = 200; // Use max per page to reduce API calls
     
     console.log(`[sync-data] Fetching activities from Strava with date range:`, {
       after: timeRange.after ? new Date(timeRange.after * 1000).toISOString() : 'none',
       before: timeRange.before ? new Date(timeRange.before * 1000).toISOString() : 'none'
     });
 
-    // Fetch all pages of activities
+    // Fetch all pages until we get all activities in the date range
     while (true) {
       let stravaUrl = `https://www.strava.com/api/v3/athlete/activities?per_page=${perPage}&page=${page}`;
       
@@ -164,7 +164,7 @@ exports.handler = async (event, context) => {
         stravaUrl += `&before=${timeRange.before}`;
       }
 
-      console.log(`[sync-data] Fetching page ${page}: ${stravaUrl}`);
+      console.log(`[sync-data] Fetching page ${page} (${allActivities.length} activities so far)...`);
       const stravaResponse = await fetch(stravaUrl, {
         headers: {
           'Authorization': `Bearer ${accessToken}`
@@ -186,8 +186,9 @@ exports.handler = async (event, context) => {
       const pageActivities = await stravaResponse.json();
       console.log(`[sync-data] Page ${page}: received ${pageActivities.length} activities`);
       
+      // No more activities available
       if (pageActivities.length === 0) {
-        console.log(`[sync-data] No more activities on page ${page}, stopping pagination`);
+        console.log(`[sync-data] No more activities available, stopping pagination`);
         break;
       }
       
@@ -195,20 +196,36 @@ exports.handler = async (event, context) => {
       
       // If we got less than perPage activities, we've reached the end
       if (pageActivities.length < perPage) {
-        console.log(`[sync-data] Received ${pageActivities.length} < ${perPage} activities, stopping pagination`);
+        console.log(`[sync-data] Received ${pageActivities.length} < ${perPage} activities, reached end of data`);
         break;
+      }
+      
+      // Check if we're outside our date range (activities are returned in reverse chronological order)
+      if (timeRange.after && pageActivities.length > 0) {
+        const oldestActivityInPage = pageActivities[pageActivities.length - 1];
+        const oldestActivityTime = new Date(oldestActivityInPage.start_date).getTime() / 1000;
+        
+        if (oldestActivityTime < timeRange.after) {
+          console.log(`[sync-data] Reached activities older than requested range, stopping pagination`);
+          // Filter out activities outside our date range
+          allActivities = allActivities.filter(activity => {
+            const activityTime = new Date(activity.start_date).getTime() / 1000;
+            return activityTime >= timeRange.after;
+          });
+          break;
+        }
       }
       
       page++;
       
-      // Safety limit to prevent infinite loops
-      if (page > 20) {
-        console.log(`[sync-data] Reached page limit (20), stopping pagination`);
+      // Reasonable safety limit for very large datasets (10,000 activities)
+      if (page > 50) {
+        console.log(`[sync-data] Reached safety limit of 50 pages (${allActivities.length} activities), stopping`);
         break;
       }
       
-      // Small delay between requests to be respectful to Strava API
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Small delay between requests to respect Strava API rate limits
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
 
     const runningActivities = allActivities.filter(activity => 
