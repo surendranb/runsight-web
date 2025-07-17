@@ -142,42 +142,80 @@ exports.handler = async (event, context) => {
       console.log('[sync-data] Tokens refreshed successfully');
     }
 
-    // Fetch activities from Strava
+    // Fetch activities from Strava with pagination
     const timeRange = requestData.timeRange || {};
-    let stravaUrl = 'https://www.strava.com/api/v3/athlete/activities?per_page=50';
+    let allActivities = [];
+    let page = 1;
+    const perPage = 50; // Strava's max per page
     
-    if (timeRange.after) {
-      stravaUrl += `&after=${timeRange.after}`;
-    }
-    if (timeRange.before) {
-      stravaUrl += `&before=${timeRange.before}`;
-    }
-
-    console.log(`[sync-data] Fetching activities from Strava: ${stravaUrl}`);
-    const stravaResponse = await fetch(stravaUrl, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      }
+    console.log(`[sync-data] Fetching activities from Strava with date range:`, {
+      after: timeRange.after ? new Date(timeRange.after * 1000).toISOString() : 'none',
+      before: timeRange.before ? new Date(timeRange.before * 1000).toISOString() : 'none'
     });
 
-    if (!stravaResponse.ok) {
-      console.error('[sync-data] Strava API error:', stravaResponse.status);
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          error: 'STRAVA_API_ERROR',
-          message: stravaResponse.status === 401 ? 'Strava token expired' : 'Failed to fetch activities from Strava'
-        })
-      };
+    // Fetch all pages of activities
+    while (true) {
+      let stravaUrl = `https://www.strava.com/api/v3/athlete/activities?per_page=${perPage}&page=${page}`;
+      
+      if (timeRange.after) {
+        stravaUrl += `&after=${timeRange.after}`;
+      }
+      if (timeRange.before) {
+        stravaUrl += `&before=${timeRange.before}`;
+      }
+
+      console.log(`[sync-data] Fetching page ${page}: ${stravaUrl}`);
+      const stravaResponse = await fetch(stravaUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      if (!stravaResponse.ok) {
+        console.error('[sync-data] Strava API error:', stravaResponse.status);
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({
+            error: 'STRAVA_API_ERROR',
+            message: stravaResponse.status === 401 ? 'Strava token expired' : 'Failed to fetch activities from Strava'
+          })
+        };
+      }
+
+      const pageActivities = await stravaResponse.json();
+      console.log(`[sync-data] Page ${page}: received ${pageActivities.length} activities`);
+      
+      if (pageActivities.length === 0) {
+        console.log(`[sync-data] No more activities on page ${page}, stopping pagination`);
+        break;
+      }
+      
+      allActivities.push(...pageActivities);
+      
+      // If we got less than perPage activities, we've reached the end
+      if (pageActivities.length < perPage) {
+        console.log(`[sync-data] Received ${pageActivities.length} < ${perPage} activities, stopping pagination`);
+        break;
+      }
+      
+      page++;
+      
+      // Safety limit to prevent infinite loops
+      if (page > 20) {
+        console.log(`[sync-data] Reached page limit (20), stopping pagination`);
+        break;
+      }
+      
+      // Small delay between requests to be respectful to Strava API
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    const activities = await stravaResponse.json();
-    const runningActivities = activities.filter(activity => 
+    const runningActivities = allActivities.filter(activity => 
       activity.type === 'Run' || activity.sport_type === 'Run'
     );
 
-    console.log(`[sync-data] Found ${runningActivities.length} running activities`);
+    console.log(`[sync-data] Total activities fetched: ${allActivities.length}, running activities: ${runningActivities.length}`);
 
     // Prepare all run data for batch upsert
     const runDataArray = runningActivities.map(activity => ({
