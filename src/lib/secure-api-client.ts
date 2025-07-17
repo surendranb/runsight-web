@@ -1,33 +1,43 @@
-// New Secure API Client - Uses the robust sync orchestrator
+// Simple API Client - Uses simplified single-user functions
 
 export interface User {
-  id: string;
+  id: string | number; // Can be Strava user ID (number) or string
   strava_id: number;
   name: string;
+  email?: string;
 }
 
 export interface Run {
-  id: string;
-  user_id: string;
+  id: string | number;
   strava_id: number;
   name: string;
   distance: number;
+  distance_meters: number;
   moving_time: number;
+  moving_time_seconds: number;
   elapsed_time: number;
+  elapsed_time_seconds: number;
   start_date: string;
   start_date_local: string;
-  start_latlng: string | null;
-  end_latlng: string | null;
+  start_latitude: number | null;
+  start_longitude: number | null;
+  end_latitude: number | null;
+  end_longitude: number | null;
   average_speed: number;
+  average_speed_ms: number;
   max_speed: number;
+  max_speed_ms: number;
   average_heartrate: number | null;
+  average_heartrate_bpm: number | null;
   max_heartrate: number | null;
+  max_heartrate_bpm: number | null;
   total_elevation_gain: number;
+  total_elevation_gain_meters: number;
+  activity_type: string;
   weather_data: any;
   strava_data: any;
-  city?: string | null;
-  state?: string | null;
-  country?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface RunStats {
@@ -39,28 +49,23 @@ export interface RunStats {
 }
 
 export interface SyncRequest {
+  userId: string | number;
   timeRange?: {
     after?: number;
     before?: number;
   };
   options?: {
     batchSize?: number;
-    maxRetries?: number;
     skipWeatherEnrichment?: boolean;
   };
 }
 
 export interface SyncResponse {
   success: boolean;
-  syncId: string;
+  message: string;
+  timestamp: string;
   status: string;
-  progress: {
-    total_activities: number;
-    processed_activities: number;
-    current_phase: string;
-    percentage_complete: number;
-  };
-  results?: {
+  results: {
     total_processed: number;
     activities_saved: number;
     activities_updated: number;
@@ -117,14 +122,20 @@ class SecureApiClient {
     };
   }
 
-  // NEW: Start a sync using the working sync-orchestrator function
-  async startSync(userId: string, syncRequest: SyncRequest = {}): Promise<SyncResponse> {
+  // NEW: Start a sync using the simplified sync-data function
+  async startSync(userId: string | number, syncRequest: SyncRequest = {}): Promise<SyncResponse> {
     console.log(`🔄 Starting sync for user ${userId}`, syncRequest);
     
-    const response = await fetch(`${this.baseUrl}/sync-orchestrator?userId=${userId}&action=sync`, {
+    const requestBody = {
+      userId: userId,
+      timeRange: syncRequest.timeRange,
+      options: syncRequest.options
+    };
+    
+    const response = await fetch(`${this.baseUrl}/sync-data`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(syncRequest),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -134,116 +145,22 @@ class SecureApiClient {
 
     const data = await response.json();
     
-    // Return the response as-is since sync-orchestrator returns the right format
+    // Return the response in the expected format
     return {
       success: data.success,
-      syncId: data.syncId || `sync_${Date.now()}`,
-      status: data.status || (data.success ? 'completed' : 'failed'),
-      progress: data.progress || {
-        total_activities: 0,
-        processed_activities: 0,
-        current_phase: 'completed',
-        percentage_complete: 100
-      },
-      results: data.results || {
-        total_processed: 0,
-        activities_saved: 0,
-        activities_updated: 0,
-        activities_skipped: 0,
-        activities_failed: 0,
-        weather_enriched: 0,
-        geocoded: 0,
-        duration_seconds: 1
-      }
+      message: data.message,
+      timestamp: data.timestamp,
+      status: data.status,
+      results: data.results,
+      error: data.error
     };
   }
 
-  // NEW: Get sync status
-  async getSyncStatus(userId: string, syncId: string): Promise<SyncResponse> {
-    console.log(`📊 Getting sync status for ${syncId}`);
-    
-    const response = await fetch(`${this.baseUrl}/sync-orchestrator?userId=${userId}&syncId=${syncId}&action=status`, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to get sync status');
-    }
-
-    return await response.json();
-  }
-
-  // NEW: Cancel sync
-  async cancelSync(userId: string, syncId: string): Promise<void> {
-    console.log(`❌ Cancelling sync ${syncId}`);
-    
-    const response = await fetch(`${this.baseUrl}/sync-orchestrator?userId=${userId}&action=cancel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ syncId }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to cancel sync');
-    }
-  }
-
-  // NEW: Resume failed sync
-  async resumeSync(userId: string, syncId: string): Promise<SyncResponse> {
-    console.log(`🔄 Resuming sync ${syncId}`);
-    
-    const response = await fetch(`${this.baseUrl}/sync-orchestrator?userId=${userId}&action=resume`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ syncId }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to resume sync');
-    }
-
-    return await response.json();
-  }
-
-  // NEW: Get sync history
-  async getSyncHistory(userId: string): Promise<any[]> {
-    console.log(`📜 Getting sync history for user ${userId}`);
-    
-    const response = await fetch(`${this.baseUrl}/sync-orchestrator?userId=${userId}&action=history`, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to get sync history');
-    }
-
-    const data = await response.json();
-    return data.history || [];
-  }
-
-  // NEW: Clean up stuck sync sessions
-  async cleanupStuckSessions(userId: string): Promise<void> {
-    console.log(`🧹 Cleaning up stuck sessions for user ${userId}`);
-    
-    const response = await fetch(`${this.baseUrl}/sync-orchestrator?userId=${userId}&action=cleanup`, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to cleanup stuck sessions');
-    }
-  }
-
-  // Get user runs (updated to use new data store)
-  async getUserRuns(userId: string): Promise<{ runs: Run[]; stats: RunStats; count?: number }> {
+  // Get user runs using simplified get-runs function
+  async getUserRuns(userId: string | number): Promise<{ runs: Run[]; stats: RunStats; count?: number }> {
     console.log(`📖 Fetching runs and stats for user ${userId}...`);
     
-    const response = await fetch(`${this.baseUrl}/get-user-runs?userId=${userId}`, {
+    const response = await fetch(`${this.baseUrl}/get-runs?userId=${userId}`, {
       method: 'GET',
     });
 
@@ -260,31 +177,11 @@ class SecureApiClient {
     };
   }
 
-  // DEPRECATED: Old chunked sync method (for backward compatibility)
-  async processStravaActivityChunk(userId: string, paginationParams: any): Promise<any> {
-    console.warn('⚠️ processStravaActivityChunk is deprecated. Use startSync() instead.');
-    
-    // Convert old pagination params to new sync request format
-    const syncRequest: SyncRequest = {
-      timeRange: {
-        after: paginationParams.after,
-        before: paginationParams.before
-      },
-      options: {
-        batchSize: paginationParams.per_page || 50
-      }
-    };
-
-    const response = await this.startSync(userId, syncRequest);
-    
-    // Convert new response format to old format for compatibility
-    return {
-      processedActivityCount: response.results?.total_processed || 0,
-      savedCount: response.results?.activities_saved || 0,
-      skippedCount: response.results?.activities_skipped || 0,
-      isComplete: response.status === 'completed',
-      processedCount: response.results?.total_processed || 0
-    };
+  // Simplified cleanup method (no complex session management needed)
+  async cleanupStuckSessions(userId: string | number): Promise<void> {
+    console.log(`🧹 Note: No cleanup needed with simplified sync approach for user ${userId}`);
+    // No-op for simplified approach - no complex session management
+    return Promise.resolve();
   }
 }
 

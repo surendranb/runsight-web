@@ -1,9 +1,9 @@
-// netlify/functions/auth-strava.js
+// netlify/functions/auth-strava.js - Simplified for single user
 const { createClient } = require('@supabase/supabase-js');
 
 exports.handler = async (event, context) => {
   const headers = {
-    'Access-Control-Allow-Origin': '*', // Adjust for production
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Content-Type': 'application/json',
@@ -19,11 +19,11 @@ exports.handler = async (event, context) => {
     VITE_STRAVA_CLIENT_SECRET: STRAVA_CLIENT_SECRET,
     VITE_STRAVA_REDIRECT_URI: STRAVA_REDIRECT_URI_ENV,
     VITE_SUPABASE_URL: SUPABASE_URL,
-    SUPABASE_SERVICE_KEY, // Directly use SUPABASE_SERVICE_KEY for admin operations
+    SUPABASE_SERVICE_KEY,
     VITE_SUPABASE_ANON_KEY: SUPABASE_ANON_KEY
   } = process.env;
 
-  const STRAVA_REDIRECT_URI = STRAVA_REDIRECT_URI_ENV || 'https://resonant-pony-ea7953.netlify.app/auth/callback'; // Fallback if not set, adjust as needed
+  const STRAVA_REDIRECT_URI = STRAVA_REDIRECT_URI_ENV || 'https://resonant-pony-ea7953.netlify.app/auth/callback';
 
   // Check for missing environment variables
   const missingVars = [];
@@ -39,14 +39,14 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Server configuration error', message: `Missing environment variables: ${missingVars.join(', ')}` }),
+      body: JSON.stringify({ 
+        error: 'CONFIG_ERROR', 
+        message: `Missing environment variables: ${missingVars.join(', ')}` 
+      }),
     };
   }
 
-  // Public Supabase client for RPC call initially
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  // Admin Supabase client for auth operations
-  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
   try {
     if (event.httpMethod === 'GET') {
@@ -55,8 +55,8 @@ exports.handler = async (event, context) => {
         `client_id=${STRAVA_CLIENT_ID}&` +
         `response_type=code&` +
         `redirect_uri=${encodeURIComponent(STRAVA_REDIRECT_URI)}&` +
-        `approval_prompt=force&` + // 'force' to always show auth screen, 'auto' to skip if already authorized
-        `scope=read,activity:read_all`; // Request necessary scopes
+        `approval_prompt=force&` +
+        `scope=read,activity:read_all`;
 
       return {
         statusCode: 200,
@@ -69,10 +69,18 @@ exports.handler = async (event, context) => {
       // Step 2: Handle OAuth callback and exchange code for tokens
       const { code } = JSON.parse(event.body);
       if (!code) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Authorization code is required' }) };
+        return { 
+          statusCode: 400, 
+          headers, 
+          body: JSON.stringify({ 
+            error: 'MISSING_CODE', 
+            message: 'Authorization code is required' 
+          }) 
+        };
       }
 
       // Exchange code for access token
+      console.log('[auth-strava] Exchanging code for tokens...');
       const tokenResponse = await fetch('https://www.strava.com/oauth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -85,112 +93,130 @@ exports.handler = async (event, context) => {
       });
 
       if (!tokenResponse.ok) {
-        const errorBody = await tokenResponse.json().catch(() => ({ message: 'Failed to exchange code for token, and error response was not JSON.' }));
+        const errorBody = await tokenResponse.json().catch(() => ({ message: 'Token exchange failed' }));
         console.error('[auth-strava] Strava token exchange failed:', errorBody);
-        return { statusCode: tokenResponse.status, headers, body: JSON.stringify({ error: 'Failed to exchange code for token', details: errorBody.message || errorBody }) };
+        return { 
+          statusCode: tokenResponse.status, 
+          headers, 
+          body: JSON.stringify({ 
+            error: 'TOKEN_EXCHANGE_FAILED', 
+            message: 'Failed to exchange code for token',
+            details: errorBody.message || errorBody 
+          }) 
+        };
       }
 
       const tokenData = await tokenResponse.json();
-      const stravaAthleteId = tokenData.athlete.id;
+      const stravaUserId = tokenData.athlete.id;
+      const userName = `${tokenData.athlete.firstname || ''} ${tokenData.athlete.lastname || ''}`.trim();
 
-      // Call Supabase RPC to get or generate user UUID
-      const { data: generatedUuid, error: rpcError } = await supabase.rpc('generate_strava_user_uuid', { strava_id: stravaAthleteId });
+      console.log(`[auth-strava] Token exchange successful for Strava user ${stravaUserId}`);
 
-      if (rpcError) {
-        console.error('[auth-strava] Supabase RPC error (generate_strava_user_uuid):', rpcError);
-        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to get user UUID from Supabase RPC', details: rpcError.message }) };
-      }
-      if (!generatedUuid) {
-        console.error('[auth-strava] Supabase RPC error: generatedUuid is null or undefined');
-        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to get user UUID from Supabase RPC: No data returned.' }) };
-      }
+      // Store tokens in simple user_tokens table
+      const { data: existingUser, error: checkError } = await supabase
+        .from('user_tokens')
+        .select('*')
+        .eq('strava_user_id', stravaUserId)
+        .single();
 
-      // Prepare user metadata
-      const userMetadata = {
-        strava_access_token: tokenData.access_token,
-        strava_refresh_token: tokenData.refresh_token,
-        strava_expires_at: tokenData.expires_at,
-        strava_id: stravaAthleteId,
-        name: `${tokenData.athlete.firstname || ''} ${tokenData.athlete.lastname || ''}`.trim(),
-        // Add other athlete details if needed, e.g., profile picture
-        // strava_profile_picture: tokenData.athlete.profile,
-      };
+      let userData;
+      if (existingUser) {
+        // Update existing user tokens
+        console.log(`[auth-strava] Updating tokens for existing user ${stravaUserId}`);
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('user_tokens')
+          .update({
+            strava_access_token: tokenData.access_token,
+            strava_refresh_token: tokenData.refresh_token,
+            strava_expires_at: tokenData.expires_at,
+            user_name: userName,
+            updated_at: new Date().toISOString()
+          })
+          .eq('strava_user_id', stravaUserId)
+          .select()
+          .single();
 
-      const userEmailForAuth = `user_${generatedUuid}@runsight.app`; // Using a deterministic email
-
-      // Check if user exists, then create or update
-      let { data: existingAuthUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(generatedUuid);
-      let authUserResponse; // To store the user object from create or update operation
-
-      if (getUserError && getUserError.message && getUserError.message.toLowerCase().includes('user not found')) {
-        // User does not exist, create new user
-        console.log(`[auth-strava] User with UUID ${generatedUuid} not found. Creating new user.`);
-        const { data: newAuthUserData, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
-          id: generatedUuid,
-          email: userEmailForAuth,
-          email_confirm: true, // Auto-confirm email as it's system-generated
-          user_metadata: userMetadata,
-        });
-
-        if (createUserError) {
-          console.error('[auth-strava] Supabase createUser error:', createUserError);
-          return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to create Supabase auth user', details: createUserError.message }) };
+        if (updateError) {
+          console.error('[auth-strava] Error updating user tokens:', updateError);
+          return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({
+              error: 'DB_UPDATE_ERROR',
+              message: 'Failed to update user tokens',
+              details: updateError.message
+            })
+          };
         }
-        authUserResponse = newAuthUserData.user;
-        console.log('[auth-strava] New user created successfully:', authUserResponse.id);
-      } else if (getUserError) {
-        // Another error occurred trying to get the user
-        console.error('[auth-strava] Supabase getUserById error:', getUserError);
-        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to get Supabase auth user', details: getUserError.message }) };
+        userData = updatedUser;
       } else {
-        // User exists, update metadata
-        console.log(`[auth-strava] User with UUID ${generatedUuid} found. Updating metadata.`);
-        const { data: updatedAuthUserData, error: updateUserError } = await supabaseAdmin.auth.admin.updateUserById(
-          generatedUuid,
-          { user_metadata: userMetadata } // Only update metadata
-        );
-        if (updateUserError) {
-          console.error('[auth-strava] Supabase updateUserById error:', updateUserError);
-          return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to update Supabase auth user', details: updateUserError.message }) };
+        // Create new user
+        console.log(`[auth-strava] Creating new user for Strava user ${stravaUserId}`);
+        const { data: newUser, error: insertError } = await supabase
+          .from('user_tokens')
+          .insert({
+            strava_user_id: stravaUserId,
+            strava_access_token: tokenData.access_token,
+            strava_refresh_token: tokenData.refresh_token,
+            strava_expires_at: tokenData.expires_at,
+            user_name: userName,
+            user_email: tokenData.athlete.email || null
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('[auth-strava] Error creating user:', insertError);
+          return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({
+              error: 'DB_INSERT_ERROR',
+              message: 'Failed to create user record',
+              details: insertError.message
+            })
+          };
         }
-        authUserResponse = updatedAuthUserData.user;
-        console.log('[auth-strava] Existing user metadata updated successfully:', authUserResponse.id);
+        userData = newUser;
       }
 
-      if (!authUserResponse) {
-        console.error('[auth-strava] Auth user record is unexpectedly null after create/update.');
-        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to obtain a valid auth user record.' }) };
-      }
+      console.log(`[auth-strava] Authentication successful for user ${userData.user_name}`);
 
-      // Respond with user info (no session token from server-side for this auth type)
+      // Return simple user data
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           success: true,
-          user: { // This is the user object the client expects
-            id: authUserResponse.id, // This is the Supabase UUID
-            strava_id: stravaAthleteId,
-            name: authUserResponse.user_metadata.name,
-            email: authUserResponse.email
-          },
-          // sessionUrl is not applicable here as we are not creating a session directly,
-          // the client will handle session creation with Supabase-js using the auth user.
-          // The client might need to trigger a signInWithPasswordless or similar if using Supabase client auth.
-          // For this server-side token exchange, we are primarily provisioning the user.
-          // The frontend `useSecureAuth` hook seems to handle what it needs post-callback.
+          user: {
+            id: userData.strava_user_id, // Use Strava user ID as the primary identifier
+            strava_id: userData.strava_user_id,
+            name: userData.user_name,
+            email: userData.user_email
+          }
         }),
       };
     }
 
-    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
+    return { 
+      statusCode: 405, 
+      headers, 
+      body: JSON.stringify({ 
+        error: 'METHOD_NOT_ALLOWED', 
+        message: 'Method not allowed' 
+      }) 
+    };
 
   } catch (error) {
     console.error('[auth-strava] Critical error in handler:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Authentication failed due to an unexpected server error', message: error.message }),
+      body: JSON.stringify({ 
+        error: 'INTERNAL_ERROR', 
+        message: 'Authentication failed due to an unexpected server error', 
+        details: error.message 
+      }),
     };
   }
 };

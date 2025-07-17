@@ -8,13 +8,10 @@ import { SimpleDashboard } from './components/SimpleDashboard';
 import { InsightsPage } from './components/InsightsPage';
 import { DebugConsole } from './components/DebugConsole';
 import { User, EnrichedRun, RunStats } from './types';
-import { apiClient, StravaPaginationParams } from './lib/secure-api-client'; // Import StravaPaginationParams
+import { apiClient } from './lib/secure-api-client';
 
 // View type consistent with NavigationBar and App.tsx's previous definition
 type View = 'dashboard' | 'insights' | 'welcome' | 'callback' | 'loading' | 'goals' | 'settings';
-
-// Define NextPageParams using the imported StravaPaginationParams
-type NextPageParams = StravaPaginationParams | null;
 
 const SecureApp: React.FC = () => {
   const {
@@ -41,7 +38,6 @@ const SecureApp: React.FC = () => {
   // Sync specific states
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [syncProgressMessage, setSyncProgressMessage] = useState<string>('');
-  const [nextPageToSync, setNextPageToSync] = useState<NextPageParams>(null);
 
   // Debug console state
   const [debugConsoleOpen, setDebugConsoleOpen] = useState<boolean>(false);
@@ -117,7 +113,6 @@ const SecureApp: React.FC = () => {
     setCurrentView('welcome');
     setRuns([]);
     setStats(null);
-    setNextPageToSync(null); // Reset sync state
     setSyncProgressMessage('');
   };
 
@@ -208,8 +203,9 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
 
           setSyncProgressMessage(`Syncing from ${readableAfter} to ${readableBefore}...`);
 
-          // Use the new sync orchestrator
+          // Use the simplified sync function
           const response = await apiClient.startSync(user.id, {
+              userId: user.id,
               timeRange: { after, before },
               options: {
                   batchSize: 50,
@@ -233,28 +229,20 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
               // Refresh data
               await fetchData();
           } else {
-              throw new Error(response.error?.message || 'Sync failed');
+              throw new Error(response.error?.message || response.message || 'Sync failed');
           }
 
       } catch (error: any) {
           console.error('Sync failed:', error);
           let errorMessage = error.message || 'Sync failed with unknown error';
           
-          // Handle specific error cases
-          if (errorMessage.includes('sync session(s) already in progress')) {
-              errorMessage = 'Another sync is already running. Please wait for it to complete or try refreshing the page.';
-              
-              // Offer to clean up stuck sessions
-              if (confirm('Would you like to cancel any stuck sync sessions and try again?')) {
-                  try {
-                      await apiClient.cleanupStuckSessions(user.id);
-                      setSyncProgressMessage('Cleaned up stuck sessions. Please try syncing again.');
-                      setTimeout(() => setSyncProgressMessage(''), 3000);
-                      return;
-                  } catch (cleanupError) {
-                      console.error('Failed to cleanup sessions:', cleanupError);
-                  }
-              }
+          // Handle specific error cases for simplified approach
+          if (errorMessage.includes('AUTH_REQUIRED')) {
+              errorMessage = 'Please re-authenticate with Strava to sync your data.';
+          } else if (errorMessage.includes('TOKEN_MISSING')) {
+              errorMessage = 'Strava authentication expired. Please re-authenticate.';
+          } else if (errorMessage.includes('CONFIG_ERROR')) {
+              errorMessage = 'Server configuration issue. Please try again later.';
           }
           
           setDataError(errorMessage);
