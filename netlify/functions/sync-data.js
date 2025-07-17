@@ -204,6 +204,8 @@ exports.handler = async (event, context) => {
 
     // Batch upsert all activities at once
     console.log(`[sync-data] Batch upserting ${runDataArray.length} runs...`);
+    console.log(`[sync-data] Sample run data:`, JSON.stringify(runDataArray[0], null, 2));
+    
     const { data: upsertedData, error: upsertError } = await supabase
       .from('runs')
       .upsert(runDataArray, { 
@@ -215,8 +217,13 @@ exports.handler = async (event, context) => {
     let processedCount = 0;
     let failedCount = 0;
 
+    console.log(`[sync-data] Upsert result:`, {
+      upsertedData: upsertedData ? upsertedData.length : 'null',
+      upsertError: upsertError ? upsertError.message : 'none'
+    });
+
     if (upsertError) {
-      console.error('[sync-data] Batch upsert error:', upsertError);
+      console.error('[sync-data] Batch upsert error:', JSON.stringify(upsertError, null, 2));
       failedCount = runDataArray.length;
     } else {
       processedCount = upsertedData ? upsertedData.length : runDataArray.length;
