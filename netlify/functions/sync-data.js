@@ -60,6 +60,7 @@ exports.handler = async (event, context) => {
     // Environment variables
     const supabaseUrl = process.env.VITE_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+    const openWeatherApiKey = process.env.OPENWEATHER_API_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
       return {
@@ -234,6 +235,90 @@ exports.handler = async (event, context) => {
 
     console.log(`[sync-data] Total activities fetched: ${allActivities.length}, running activities: ${runningActivities.length}`);
 
+    // Location geocoding cache to avoid duplicate API calls
+    const locationCache = new Map();
+
+    // Location geocoding function
+    const enrichWithLocation = async (activity) => {
+      if (!openWeatherApiKey || !activity.start_latlng || activity.start_latlng.length !== 2) {
+        return null;
+      }
+
+      const [lat, lon] = activity.start_latlng;
+      const cacheKey = `${lat.toFixed(3)},${lon.toFixed(3)}`; // Round to ~100m precision for caching
+      
+      if (locationCache.has(cacheKey)) {
+        return locationCache.get(cacheKey);
+      }
+
+      try {
+        const geocodeUrl = `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${openWeatherApiKey}`;
+        
+        const geocodeResponse = await fetch(geocodeUrl);
+        if (!geocodeResponse.ok) {
+          console.warn(`[sync-data] Geocoding API failed for activity ${activity.id}: ${geocodeResponse.status}`);
+          return null;
+        }
+
+        const geocodeData = await geocodeResponse.json();
+        if (geocodeData && geocodeData.length > 0) {
+          const location = geocodeData[0];
+          const locationData = {
+            city: location.name,
+            state: location.state,
+            country: location.country
+          };
+          
+          locationCache.set(cacheKey, locationData);
+          return locationData;
+        }
+      } catch (error) {
+        console.warn(`[sync-data] Location geocoding failed for activity ${activity.id}:`, error.message);
+      }
+      
+      return null;
+    };
+
+    // Weather enrichment function
+    const enrichWithWeather = async (activity) => {
+      if (!openWeatherApiKey || !activity.start_latlng || activity.start_latlng.length !== 2) {
+        return null;
+      }
+
+      const [lat, lon] = activity.start_latlng;
+      const timestamp = Math.floor(new Date(activity.start_date).getTime() / 1000);
+      
+      try {
+        const weatherUrl = `https://api.openweathermap.org/data/3.0/onecall/timemachine?lat=${lat}&lon=${lon}&dt=${timestamp}&appid=${openWeatherApiKey}&units=metric`;
+        
+        const weatherResponse = await fetch(weatherUrl);
+        if (!weatherResponse.ok) {
+          console.warn(`[sync-data] Weather API failed for activity ${activity.id}: ${weatherResponse.status}`);
+          return null;
+        }
+
+        const weatherData = await weatherResponse.json();
+        if (weatherData.data && weatherData.data.length > 0) {
+          const weather = weatherData.data[0];
+          return {
+            temperature: weather.temp,
+            feels_like: weather.feels_like,
+            humidity: weather.humidity,
+            pressure: weather.pressure,
+            wind_speed: weather.wind_speed,
+            wind_deg: weather.wind_deg,
+            weather: weather.weather[0],
+            visibility: weather.visibility,
+            uv_index: weather.uvi
+          };
+        }
+      } catch (error) {
+        console.warn(`[sync-data] Weather enrichment failed for activity ${activity.id}:`, error.message);
+      }
+      
+      return null;
+    };
+
     // Prepare all run data for batch upsert
     const runDataArray = runningActivities.map(activity => ({
       strava_id: activity.id,
@@ -266,14 +351,47 @@ exports.handler = async (event, context) => {
 
     console.log(`[sync-data] Starting to process ${runDataArray.length} runs with progress tracking...`);
 
-    // Process in smaller batches to provide better progress feedback and error isolation
-    const batchSize = 10;
+    // Process in smaller batches with weather enrichment
+    const batchSize = 5; // Smaller batches due to weather API calls
+    let weatherEnrichedCount = 0;
+    let totalGeocodedCount = 0;
+    
     for (let i = 0; i < runDataArray.length; i += batchSize) {
       const batch = runDataArray.slice(i, i + batchSize);
       const batchNumber = Math.floor(i / batchSize) + 1;
       const totalBatches = Math.ceil(runDataArray.length / batchSize);
       
       console.log(`[sync-data] Processing batch ${batchNumber}/${totalBatches} (${batch.length} activities)...`);
+      
+      // Enrich batch with weather and location data if API key is available
+      let batchGeocodedCount = 0;
+      if (openWeatherApiKey && !requestData.options?.skipWeatherEnrichment) {
+        console.log(`[sync-data] Enriching batch ${batchNumber} with weather and location data...`);
+        
+        for (let j = 0; j < batch.length; j++) {
+          const activity = runningActivities[i + j];
+          if (activity && activity.start_latlng) {
+            // Get location data first (uses caching)
+            const locationData = await enrichWithLocation(activity);
+            if (locationData) {
+              batch[j].city = locationData.city;
+              batch[j].state = locationData.state;
+              batch[j].country = locationData.country;
+              batchGeocodedCount++;
+            }
+            
+            // Get weather data
+            const weatherData = await enrichWithWeather(activity);
+            if (weatherData) {
+              batch[j].weather_data = weatherData;
+              weatherEnrichedCount++;
+            }
+            
+            // Rate limiting for weather API (max 1000 calls/day)
+            await new Promise(resolve => setTimeout(resolve, 150));
+          }
+        }
+      }
       
       try {
         const { data: batchResult, error: batchError } = await supabase
@@ -302,6 +420,7 @@ exports.handler = async (event, context) => {
           const batchProcessed = batchResult ? batchResult.length : batch.length;
           processedCount += batchProcessed;
           console.log(`[sync-data] Batch ${batchNumber} completed: ${batchProcessed}/${batch.length} activities saved`);
+          totalGeocodedCount += batchGeocodedCount;
           
           if (batchResult && batchResult.length > 0) {
             console.log(`[sync-data] Sample saved activities:`, batchResult.slice(0, 2).map(r => `${r.name} (${r.strava_id})`));
@@ -341,8 +460,8 @@ exports.handler = async (event, context) => {
         activities_updated: 0, // We don't distinguish between insert/update with upsert
         activities_skipped: 0, // No skipping with upsert
         activities_failed: failedCount,
-        weather_enriched: 0,
-        geocoded: 0,
+        weather_enriched: weatherEnrichedCount,
+        geocoded: totalGeocodedCount,
         duration_seconds: 1
       }
     };

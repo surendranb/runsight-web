@@ -1,5 +1,6 @@
 // src/components/NavigationBar.tsx
-import React, { useState } from 'react'; // Added useState
+import React, { useState } from 'react';
+import { Menu, X, Activity, BarChart3, Target, Settings as SettingsIcon, RefreshCw } from 'lucide-react';
 
 type View = 'dashboard' | 'insights' | 'goals' | 'settings' | string;
 
@@ -45,7 +46,8 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
     onSyncData,
     isSyncing
 }) => {
-  const [selectedSyncPeriod, setSelectedSyncPeriod] = useState<SyncPeriod>("30days"); // Default to "30days"
+  const [selectedSyncPeriod, setSelectedSyncPeriod] = useState<SyncPeriod>("30days");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleSyncClick = () => {
     if (onSyncData) {
@@ -53,60 +55,203 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
     }
   };
 
+  const navItems = [
+    { label: "Dashboard", viewName: "dashboard", icon: Activity, isDisabled: false },
+    { label: "Insights", viewName: "insights", icon: BarChart3, isDisabled: false },
+    { label: "Goals", viewName: "goals", icon: Target, isDisabled: true },
+    { label: "Settings", viewName: "settings", icon: SettingsIcon, isDisabled: true },
+  ];
+
   return (
-    <nav className="bg-white shadow-md border-b border-gray-200">
+    <nav className="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Left side: App Name & Main Navigation */}
+          {/* Left side: App Name & Desktop Navigation */}
           <div className="flex items-center">
-            <span className="text-xl font-bold text-blue-600 mr-6">RunSight</span>
-            <div className="hidden md:flex items-baseline space-x-4"> {/* Links hidden on small screens, shown on md+ */}
-                <NavItem label="Dashboard" viewName="dashboard" isActive={currentView === 'dashboard'} onClick={onNavigate} />
-                <NavItem label="Insights" viewName="insights" isActive={currentView === 'insights'} onClick={onNavigate} />
-                <NavItem label="Goal Tracking" viewName="goals" isActive={currentView === 'goals'} onClick={onNavigate} isDisabled={true} />
-                <NavItem label="Settings" viewName="settings" isActive={currentView === 'settings'} onClick={onNavigate} isDisabled={true} />
+            <div className="flex items-center space-x-2">
+              <Activity className="w-8 h-8 text-blue-600" />
+              <span className="text-xl font-bold text-blue-600">RunSight</span>
+            </div>
+            
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center ml-8 space-x-1">
+              {navItems.map((item) => {
+                const IconComponent = item.icon;
+                const isActive = currentView === item.viewName;
+                return (
+                  <button
+                    key={item.viewName}
+                    onClick={() => !item.isDisabled && onNavigate(item.viewName)}
+                    disabled={item.isDisabled}
+                    className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      item.isDisabled
+                        ? 'text-gray-400 cursor-not-allowed'
+                        : isActive
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
+                    }`}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <IconComponent className="w-4 h-4 mr-2" />
+                    {item.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Right side: Sync, User Info, Logout */}
+          {/* Right side: Sync Controls & User Menu */}
           <div className="flex items-center space-x-3">
-            {onSyncData && ( // Only show sync options if onSyncData is provided
-              <div className="flex items-center space-x-2">
+            {/* Sync Controls - Hidden on mobile */}
+            {onSyncData && (
+              <div className="hidden sm:flex items-center space-x-2">
                 <select
                   value={selectedSyncPeriod}
                   onChange={(e) => setSelectedSyncPeriod(e.target.value as SyncPeriod)}
                   disabled={isSyncing}
-                  className="text-xs border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 disabled:bg-gray-100"
-                  style={{paddingRight: '2rem', paddingLeft: '0.5rem', paddingTop: '0.4rem', paddingBottom: '0.4rem', height: '2.125rem' }} // Adjusted padding for aesthetics
+                  className="text-xs border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-gray-100 transition-all duration-200"
+                  style={{paddingRight: '2rem', paddingLeft: '0.75rem', paddingTop: '0.5rem', paddingBottom: '0.5rem', height: '2.25rem'}}
                 >
                   {SYNC_OPTIONS.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
                 <button
-                    onClick={handleSyncClick}
-                    disabled={isSyncing}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors h-[2.125rem] ${ // Matched height
-                        isSyncing
-                        ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
-                        : 'bg-green-500 hover:bg-green-600 text-white'
-                    }`}
+                  onClick={handleSyncClick}
+                  disabled={isSyncing}
+                  className={`flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 h-9 ${
+                    isSyncing
+                      ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                      : 'bg-green-500 hover:bg-green-600 text-white shadow-md hover:shadow-lg'
+                  }`}
                 >
-                    {isSyncing ? '🔄 Syncing...' : 'Start Sync'}
+                  <RefreshCw className={`w-3 h-3 mr-1 ${isSyncing ? 'animate-spin' : ''}`} />
+                  {isSyncing ? 'Syncing...' : 'Sync'}
                 </button>
               </div>
             )}
-            {userName && <span className="hidden md:inline text-sm text-gray-700">Hi, {userName.split(' ')[0]}</span>}
+
+            {/* User Info - Hidden on small screens */}
+            {userName && (
+              <span className="hidden lg:inline text-sm text-gray-700 font-medium">
+                Hi, {userName.split(' ')[0]}
+              </span>
+            )}
+
+            {/* Logout Button - Hidden on mobile */}
             {onLogout && (
               <button
                 onClick={onLogout}
-                className="px-3 py-2 rounded-md text-sm font-medium text-red-500 hover:bg-red-100 transition-colors"
+                className="hidden sm:flex items-center px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-200"
               >
                 Logout
               </button>
             )}
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors duration-200"
+              aria-label="Toggle mobile menu"
+            >
+              {isMobileMenuOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden border-t border-gray-200 bg-white">
+            <div className="px-2 pt-2 pb-3 space-y-1">
+              {navItems.map((item) => {
+                const IconComponent = item.icon;
+                const isActive = currentView === item.viewName;
+                return (
+                  <button
+                    key={item.viewName}
+                    onClick={() => {
+                      if (!item.isDisabled) {
+                        onNavigate(item.viewName);
+                        setIsMobileMenuOpen(false);
+                      }
+                    }}
+                    disabled={item.isDisabled}
+                    className={`flex items-center w-full px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      item.isDisabled
+                        ? 'text-gray-400 cursor-not-allowed'
+                        : isActive
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
+                    }`}
+                  >
+                    <IconComponent className="w-4 h-4 mr-3" />
+                    {item.label}
+                  </button>
+                );
+              })}
+              
+              {/* Mobile Sync Controls */}
+              {onSyncData && (
+                <div className="pt-3 border-t border-gray-200">
+                  <div className="px-3 py-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-2">
+                      Sync Period
+                    </label>
+                    <select
+                      value={selectedSyncPeriod}
+                      onChange={(e) => setSelectedSyncPeriod(e.target.value as SyncPeriod)}
+                      disabled={isSyncing}
+                      className="w-full text-sm border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-gray-100"
+                    >
+                      {SYNC_OPTIONS.map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => {
+                        handleSyncClick();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      disabled={isSyncing}
+                      className={`w-full mt-2 flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        isSyncing
+                          ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                          : 'bg-green-500 hover:bg-green-600 text-white'
+                      }`}
+                    >
+                      <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                      {isSyncing ? 'Syncing...' : 'Start Sync'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Mobile User Info & Logout */}
+              <div className="pt-3 border-t border-gray-200">
+                {userName && (
+                  <div className="px-3 py-2 text-sm text-gray-700">
+                    Logged in as <span className="font-medium">{userName}</span>
+                  </div>
+                )}
+                {onLogout && (
+                  <button
+                    onClick={() => {
+                      onLogout();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-200"
+                  >
+                    Logout
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </nav>
   );
