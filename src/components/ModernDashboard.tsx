@@ -457,30 +457,14 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
               </div>
             )}
 
-            {/* Sample Goal Progress */}
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Goals</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <GoalProgress
-                  title="2025 Distance Goal"
-                  target={1000}
-                  current={metrics.totalDistance / 1000}
-                  unit="km"
-                  deadline="2025-12-31"
-                />
-                <GoalProgress
-                  title="Monthly Runs"
-                  target={20}
-                  current={filteredRuns.filter(run => {
-                    const runDate = new Date(run.start_date_local);
-                    const now = new Date();
-                    return runDate.getMonth() === now.getMonth() && runDate.getFullYear() === now.getFullYear();
-                  }).length}
-                  unit="runs"
-                  deadline={new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]}
-                />
-              </div>
-            </div>
+            {/* Goal Progress System */}
+            <GoalProgress 
+              runs={filteredRuns}
+              onCreateGoal={() => {
+                // TODO: Implement goal creation modal
+                console.log('Create goal clicked');
+              }}
+            />
           </div>
         )}
       </div>

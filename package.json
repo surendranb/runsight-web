@@ -12,6 +12,7 @@
     "check-env": "node scripts/check-env.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
     "@supabase/supabase-js": "^2.39.0",
     "lucide-react": "^0.344.0",
     "node-fetch": "^2.7.0",
