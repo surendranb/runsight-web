@@ -2,9 +2,9 @@ import { EnrichedRun } from '../../types';
 
 export interface LocationPerformance {
   location: string;
-  city?: string;
-  state?: string;
-  country?: string;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
   runCount: number;
   averagePace: number; // seconds per km
   bestPace: number;
@@ -52,7 +52,7 @@ export const analyzeLocationPerformance = (runs: EnrichedRun[]): LocationAnalysi
   }
 
   // Filter runs with location data
-  const runsWithLocation = runs.filter(run => run.city && run.city.trim() !== '');
+  const runsWithLocation = runs.filter(run => run.city && run.city !== null && run.city.trim() !== '');
   
   if (runsWithLocation.length === 0) {
     return {

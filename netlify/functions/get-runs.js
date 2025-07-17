@@ -109,6 +109,9 @@ exports.handler = async (event, context) => {
       activity_type: run.activity_type,
       strava_data: run.strava_data,
       weather_data: run.weather_data,
+      city: run.city,
+      state: run.state,
+      country: run.country,
       created_at: run.created_at,
       updated_at: run.updated_at
     }));
