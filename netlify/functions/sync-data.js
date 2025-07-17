@@ -179,53 +179,48 @@ exports.handler = async (event, context) => {
 
     console.log(`[sync-data] Found ${runningActivities.length} running activities`);
 
-    // Store activities in runs table using UPSERT
+    // Prepare all run data for batch upsert
+    const runDataArray = runningActivities.map(activity => ({
+      strava_id: activity.id,
+      name: activity.name,
+      distance_meters: activity.distance,
+      moving_time_seconds: activity.moving_time,
+      elapsed_time_seconds: activity.elapsed_time,
+      start_date: activity.start_date,
+      start_date_local: activity.start_date_local,
+      start_latitude: activity.start_latlng ? activity.start_latlng[0] : null,
+      start_longitude: activity.start_latlng ? activity.start_latlng[1] : null,
+      end_latitude: activity.end_latlng ? activity.end_latlng[0] : null,
+      end_longitude: activity.end_latlng ? activity.end_latlng[1] : null,
+      average_speed_ms: activity.average_speed,
+      max_speed_ms: activity.max_speed,
+      average_heartrate_bpm: activity.average_heartrate,
+      max_heartrate_bpm: activity.max_heartrate,
+      total_elevation_gain_meters: activity.total_elevation_gain,
+      activity_type: activity.type || activity.sport_type || 'Run',
+      strava_data: activity,
+      updated_at: new Date().toISOString()
+    }));
+
+    // Batch upsert all activities at once
+    console.log(`[sync-data] Batch upserting ${runDataArray.length} runs...`);
+    const { data: upsertedData, error: upsertError } = await supabase
+      .from('runs')
+      .upsert(runDataArray, { 
+        onConflict: 'strava_id',
+        ignoreDuplicates: false
+      })
+      .select('strava_id');
+
     let processedCount = 0;
     let failedCount = 0;
 
-    for (const activity of runningActivities) {
-      try {
-        const runData = {
-          strava_id: activity.id,
-          name: activity.name,
-          distance_meters: activity.distance,
-          moving_time_seconds: activity.moving_time,
-          elapsed_time_seconds: activity.elapsed_time,
-          start_date: activity.start_date,
-          start_date_local: activity.start_date_local,
-          start_latitude: activity.start_latlng ? activity.start_latlng[0] : null,
-          start_longitude: activity.start_latlng ? activity.start_latlng[1] : null,
-          end_latitude: activity.end_latlng ? activity.end_latlng[0] : null,
-          end_longitude: activity.end_latlng ? activity.end_latlng[1] : null,
-          average_speed_ms: activity.average_speed,
-          max_speed_ms: activity.max_speed,
-          average_heartrate_bpm: activity.average_heartrate,
-          max_heartrate_bpm: activity.max_heartrate,
-          total_elevation_gain_meters: activity.total_elevation_gain,
-          activity_type: activity.type || activity.sport_type || 'Run',
-          strava_data: activity,
-          updated_at: new Date().toISOString()
-        };
-
-        // Use UPSERT - let the database handle duplicates
-        console.log(`[sync-data] Upserting run: ${activity.name} (${activity.id})`);
-        const { error: upsertError } = await supabase
-          .from('runs')
-          .upsert(runData, { 
-            onConflict: 'strava_id',
-            ignoreDuplicates: false // Update existing records
-          });
-
-        if (upsertError) {
-          console.error('[sync-data] Error upserting run:', upsertError);
-          failedCount++;
-        } else {
-          processedCount++;
-        }
-      } catch (activityError) {
-        console.error('[sync-data] Error processing activity:', activityError);
-        failedCount++;
-      }
+    if (upsertError) {
+      console.error('[sync-data] Batch upsert error:', upsertError);
+      failedCount = runDataArray.length;
+    } else {
+      processedCount = upsertedData ? upsertedData.length : runDataArray.length;
+      console.log(`[sync-data] Successfully upserted ${processedCount} runs`);
     }
 
     const results = {
