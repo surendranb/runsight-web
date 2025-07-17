@@ -93,7 +93,7 @@ const SecureApp: React.FC = () => {
   }, [user]); // user is the dependency
 
   useEffect(() => {
-    if (user && user.id && (currentView === 'dashboard' || currentView === 'insights')) {
+    if (user && user.id && (currentView === 'dashboard' || currentView === 'insights' || currentView === 'goals')) {
       // Pass true if authLoading is also true to avoid double loading indicators
       fetchData(authLoading);
     }
