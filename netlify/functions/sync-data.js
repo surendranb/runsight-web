@@ -279,27 +279,50 @@ exports.handler = async (event, context) => {
       return null;
     };
 
-    // Weather enrichment function
+    // Weather enrichment function with fallback for free tier
     const enrichWithWeather = async (activity) => {
       if (!openWeatherApiKey || !activity.start_latlng || activity.start_latlng.length !== 2) {
+        console.log(`[sync-data] Skipping weather for activity ${activity.id}: ${!openWeatherApiKey ? 'No API key' : 'No GPS coordinates'}`);
         return null;
       }
 
       const [lat, lon] = activity.start_latlng;
       const timestamp = Math.floor(new Date(activity.start_date).getTime() / 1000);
+      const activityDate = new Date(activity.start_date);
+      const now = new Date();
+      const daysDiff = (now - activityDate) / (1000 * 60 * 60 * 24);
+      
+      console.log(`[sync-data] Attempting weather enrichment for activity ${activity.id} (${daysDiff.toFixed(1)} days ago)`);
       
       try {
-        const weatherUrl = `https://api.openweathermap.org/data/3.0/onecall/timemachine?lat=${lat}&lon=${lon}&dt=${timestamp}&appid=${openWeatherApiKey}&units=metric`;
+        // Try historical API first (requires paid plan)
+        let weatherUrl = `https://api.openweathermap.org/data/3.0/onecall/timemachine?lat=${lat}&lon=${lon}&dt=${timestamp}&appid=${openWeatherApiKey}&units=metric`;
         
-        const weatherResponse = await fetch(weatherUrl);
+        let weatherResponse = await fetch(weatherUrl);
+        
+        // If historical API fails with 402 (payment required) or 401, try current weather for recent runs
+        if (!weatherResponse.ok && (weatherResponse.status === 402 || weatherResponse.status === 401) && daysDiff <= 5) {
+          console.log(`[sync-data] Historical weather API failed (${weatherResponse.status}), trying current weather for recent activity ${activity.id}`);
+          weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${openWeatherApiKey}&units=metric`;
+          weatherResponse = await fetch(weatherUrl);
+        }
+        
         if (!weatherResponse.ok) {
-          console.warn(`[sync-data] Weather API failed for activity ${activity.id}: ${weatherResponse.status}`);
+          const errorText = await weatherResponse.text();
+          console.warn(`[sync-data] Weather API failed for activity ${activity.id}: ${weatherResponse.status} - ${errorText}`);
+          
+          if (weatherResponse.status === 402) {
+            console.warn(`[sync-data] OpenWeather 3.0 timemachine API requires paid subscription. Consider upgrading or using current weather for recent runs only.`);
+          }
           return null;
         }
 
         const weatherData = await weatherResponse.json();
+        
+        // Handle historical weather response (3.0 API)
         if (weatherData.data && weatherData.data.length > 0) {
           const weather = weatherData.data[0];
+          console.log(`[sync-data] Successfully enriched activity ${activity.id} with historical weather`);
           return {
             temperature: weather.temp,
             feels_like: weather.feels_like,
@@ -309,9 +332,28 @@ exports.handler = async (event, context) => {
             wind_deg: weather.wind_deg,
             weather: weather.weather[0],
             visibility: weather.visibility,
-            uv_index: weather.uvi
+            uv_index: weather.uvi,
+            source: 'historical'
           };
         }
+        
+        // Handle current weather response (2.5 API)
+        if (weatherData.main && weatherData.weather) {
+          console.log(`[sync-data] Successfully enriched activity ${activity.id} with current weather (fallback)`);
+          return {
+            temperature: weatherData.main.temp,
+            feels_like: weatherData.main.feels_like,
+            humidity: weatherData.main.humidity,
+            pressure: weatherData.main.pressure,
+            wind_speed: weatherData.wind?.speed || 0,
+            wind_deg: weatherData.wind?.deg || 0,
+            weather: weatherData.weather[0],
+            visibility: weatherData.visibility,
+            uv_index: null, // Not available in current weather API
+            source: 'current'
+          };
+        }
+        
       } catch (error) {
         console.warn(`[sync-data] Weather enrichment failed for activity ${activity.id}:`, error.message);
       }
