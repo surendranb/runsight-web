@@ -5,6 +5,7 @@ import SecureStravaCallback from './components/SecureStravaCallback';
 // Duplicate imports for React, useSecureAuth, SecureStravaCallback removed
 import { NavigationBar, SyncPeriod } from './components/NavigationBar';
 import { SimpleDashboard } from './components/SimpleDashboard';
+import { ModernDashboard } from './components/ModernDashboard';
 import { InsightsPage } from './components/InsightsPage';
 import { DebugConsole } from './components/DebugConsole';
 import { User, EnrichedRun, RunStats } from './types';
@@ -41,6 +42,9 @@ const SecureApp: React.FC = () => {
 
   // Debug console state
   const [debugConsoleOpen, setDebugConsoleOpen] = useState<boolean>(false);
+  
+  // Dashboard toggle state
+  const [useModernDashboard, setUseModernDashboard] = useState<boolean>(true);
 
   // Effect to handle view changes based on auth state (remains mostly the same)
   useEffect(() => {
@@ -300,15 +304,60 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
         )}
 
         {currentView === 'dashboard' && (
-          <SimpleDashboard
-            user={user}
-            onLogout={handleLogout}
-            runs={runs}
-            // splits prop was removed previously
-            isLoading={dataLoading}
-            error={dataError}
-            // stats={stats} // Optionally pass stats
-          />
+          <>
+            {/* Dashboard Toggle */}
+            <div className="bg-white border-b border-gray-200 px-4 py-2">
+              <div className="max-w-7xl mx-auto flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm text-gray-600">Dashboard View:</span>
+                  <div className="flex bg-gray-100 rounded-lg p-1">
+                    <button
+                      onClick={() => setUseModernDashboard(true)}
+                      className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                        useModernDashboard
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Modern
+                    </button>
+                    <button
+                      onClick={() => setUseModernDashboard(false)}
+                      className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                        !useModernDashboard
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Classic
+                    </button>
+                  </div>
+                </div>
+                <span className="text-xs text-gray-500">
+                  {useModernDashboard ? 'New redesigned dashboard' : 'Original dashboard with filters'}
+                </span>
+              </div>
+            </div>
+
+            {useModernDashboard ? (
+              <ModernDashboard
+                user={user}
+                runs={runs}
+                isLoading={dataLoading}
+                error={dataError}
+                onSync={() => handleSyncData('30days')}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <SimpleDashboard
+                user={user}
+                onLogout={handleLogout}
+                runs={runs}
+                isLoading={dataLoading}
+                error={dataError}
+              />
+            )}
+          </>
         )}
         {currentView === 'insights' && (
           <InsightsPage
