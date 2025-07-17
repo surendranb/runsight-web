@@ -179,27 +179,12 @@ exports.handler = async (event, context) => {
 
     console.log(`[sync-data] Found ${runningActivities.length} running activities`);
 
-    // Store activities in runs table
-    let savedCount = 0;
-    let updatedCount = 0;
-    let skippedCount = 0;
+    // Store activities in runs table using UPSERT
+    let processedCount = 0;
+    let failedCount = 0;
 
     for (const activity of runningActivities) {
       try {
-        // Check if activity already exists (don't use .single() as it throws on no match)
-        const { data: existingRuns, error: checkError } = await supabase
-          .from('runs')
-          .select('id')
-          .eq('strava_id', activity.id);
-
-        if (checkError) {
-          console.error('[sync-data] Error checking for existing run:', checkError);
-          skippedCount++;
-          continue;
-        }
-
-        const existingRun = existingRuns && existingRuns.length > 0 ? existingRuns[0] : null;
-
         const runData = {
           strava_id: activity.id,
           name: activity.name,
@@ -222,37 +207,24 @@ exports.handler = async (event, context) => {
           updated_at: new Date().toISOString()
         };
 
-        if (existingRun) {
-          // Update existing run
-          console.log(`[sync-data] Updating existing run: ${activity.name} (${activity.id})`);
-          const { error: updateError } = await supabase
-            .from('runs')
-            .update(runData)
-            .eq('id', existingRun.id);
+        // Use UPSERT - let the database handle duplicates
+        console.log(`[sync-data] Upserting run: ${activity.name} (${activity.id})`);
+        const { error: upsertError } = await supabase
+          .from('runs')
+          .upsert(runData, { 
+            onConflict: 'strava_id',
+            ignoreDuplicates: false // Update existing records
+          });
 
-          if (updateError) {
-            console.error('[sync-data] Error updating run:', updateError);
-            skippedCount++;
-          } else {
-            updatedCount++;
-          }
+        if (upsertError) {
+          console.error('[sync-data] Error upserting run:', upsertError);
+          failedCount++;
         } else {
-          // Insert new run
-          console.log(`[sync-data] Inserting new run: ${activity.name} (${activity.id})`);
-          const { error: insertError } = await supabase
-            .from('runs')
-            .insert(runData);
-
-          if (insertError) {
-            console.error('[sync-data] Error inserting run:', insertError);
-            skippedCount++;
-          } else {
-            savedCount++;
-          }
+          processedCount++;
         }
       } catch (activityError) {
         console.error('[sync-data] Error processing activity:', activityError);
-        skippedCount++;
+        failedCount++;
       }
     }
 
@@ -263,13 +235,13 @@ exports.handler = async (event, context) => {
       status: 'completed',
       results: {
         total_processed: runningActivities.length,
-        activities_saved: savedCount,
-        activities_updated: updatedCount,
-        activities_skipped: skippedCount,
-        activities_failed: 0,
+        activities_saved: processedCount, // All successful upserts
+        activities_updated: 0, // We don't distinguish between insert/update with upsert
+        activities_skipped: 0, // No skipping with upsert
+        activities_failed: failedCount,
         weather_enriched: 0,
         geocoded: 0,
-        duration_seconds: Math.floor((Date.now() - Date.now()) / 1000) || 1
+        duration_seconds: 1
       }
     };
 
