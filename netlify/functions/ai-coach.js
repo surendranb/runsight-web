@@ -141,6 +141,11 @@ Respond in JSON format with structured analysis.
 async function generateInsights(model, data) {
   const { runs, performanceMetrics } = data;
   
+  console.log('[generateInsights] Input data:', {
+    runsCount: runs?.length || 0,
+    performanceMetrics: performanceMetrics
+  });
+  
   const prompt = `
 As a running performance analyst, analyze this runner's data and provide actionable insights:
 
@@ -166,18 +171,59 @@ Return as JSON array of insight objects with: title, description, priority (high
 
   const result = await model.generateContent(prompt);
   const response = await result.response;
+  const responseText = response.text();
+  
+  console.log('[generateInsights] AI Response:', responseText);
   
   try {
-    return JSON.parse(response.text());
+    const parsed = JSON.parse(responseText);
+    console.log('[generateInsights] Parsed successfully:', parsed);
+    return Array.isArray(parsed) ? parsed : [parsed];
   } catch (e) {
-    return [
-      {
+    console.error('[generateInsights] JSON parse error:', e.message);
+    console.log('[generateInsights] Raw response:', responseText);
+    
+    // Return fallback insights based on the data we have
+    const fallbackInsights = [];
+    
+    if (performanceMetrics.consistencyScore > 75) {
+      fallbackInsights.push({
+        title: "Excellent Consistency",
+        description: `Your consistency score of ${performanceMetrics.consistencyScore}% shows great dedication. Keep up the regular training schedule.`,
+        priority: "medium",
+        actionSteps: ["Maintain current running frequency", "Consider gradually increasing distance", "Monitor for signs of overtraining"]
+      });
+    }
+    
+    if (performanceMetrics.effortVariability > 20) {
+      fallbackInsights.push({
+        title: "Pace Consistency Opportunity",
+        description: `Your effort variability of ${performanceMetrics.effortVariability}% suggests room for more consistent pacing.`,
+        priority: "medium",
+        actionSteps: ["Focus on maintaining steady effort during runs", "Use a heart rate monitor or perceived exertion scale", "Practice negative split runs"]
+      });
+    }
+    
+    if (performanceMetrics.distanceTrend === 'increasing') {
+      fallbackInsights.push({
+        title: "Positive Distance Trend",
+        description: "Your distance trend is increasing, which shows good progression in your training.",
+        priority: "low",
+        actionSteps: ["Continue gradual distance increases", "Include rest weeks every 4th week", "Listen to your body for recovery needs"]
+      });
+    }
+    
+    // Always provide at least one insight
+    if (fallbackInsights.length === 0) {
+      fallbackInsights.push({
         title: "Maintain Consistent Training",
         description: "Your current training approach is showing positive results. Continue with regular running schedule.",
         priority: "medium",
         actionSteps: ["Run 3-4 times per week", "Include one long run weekly", "Monitor pace improvements"]
-      }
-    ];
+      });
+    }
+    
+    return fallbackInsights;
   }
 }
 
