@@ -393,8 +393,16 @@ exports.handler = async (event, context) => {
 
     console.log(`[sync-data] Starting to process ${runDataArray.length} runs with progress tracking...`);
 
-    // Process in smaller batches with weather enrichment
-    const batchSize = 5; // Smaller batches due to weather API calls
+    // For large datasets, skip weather enrichment to avoid timeouts
+    const isLargeDataset = runDataArray.length > 50;
+    const skipWeatherForLargeDataset = isLargeDataset && !requestData.options?.forceWeatherEnrichment;
+    
+    if (skipWeatherForLargeDataset) {
+      console.log(`[sync-data] Large dataset detected (${runDataArray.length} runs). Skipping weather enrichment to avoid timeout.`);
+    }
+    
+    // Process in larger batches when skipping weather enrichment
+    const batchSize = skipWeatherForLargeDataset ? 50 : 5; // Larger batches when no API calls needed
     let weatherEnrichedCount = 0;
     let totalGeocodedCount = 0;
     
@@ -405,9 +413,9 @@ exports.handler = async (event, context) => {
       
       console.log(`[sync-data] Processing batch ${batchNumber}/${totalBatches} (${batch.length} activities)...`);
       
-      // Enrich batch with weather and location data if API key is available
+      // Enrich batch with weather and location data if API key is available and not skipping for large datasets
       let batchGeocodedCount = 0;
-      if (openWeatherApiKey && !requestData.options?.skipWeatherEnrichment) {
+      if (openWeatherApiKey && !requestData.options?.skipWeatherEnrichment && !skipWeatherForLargeDataset) {
         console.log(`[sync-data] Enriching batch ${batchNumber} with weather and location data...`);
         
         for (let j = 0; j < batch.length; j++) {
