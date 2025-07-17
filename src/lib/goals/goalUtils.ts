@@ -73,11 +73,18 @@ const calculateDistanceProgress = (goal: DistanceGoal, runs: EnrichedRun[]): num
   const createdDate = new Date(goal.createdAt);
   
   const relevantRuns = runs.filter(run => {
-    const runDate = new Date(run.start_date);
+    const runDate = new Date(run.start_date_local || run.start_date);
     return runDate >= createdDate && runDate <= targetDate;
   });
 
-  return relevantRuns.reduce((total, run) => total + run.distance, 0);
+  console.log(`[calculateDistanceProgress] Goal: ${goal.title}`);
+  console.log(`[calculateDistanceProgress] Date range: ${createdDate.toISOString()} to ${targetDate.toISOString()}`);
+  console.log(`[calculateDistanceProgress] Total runs: ${runs.length}, Relevant runs: ${relevantRuns.length}`);
+  
+  const totalDistance = relevantRuns.reduce((total, run) => total + run.distance, 0);
+  console.log(`[calculateDistanceProgress] Total distance: ${totalDistance}m (${(totalDistance/1000).toFixed(1)}km)`);
+  
+  return totalDistance;
 };
 
 const calculateRaceProgress = (goal: RaceGoal, runs: EnrichedRun[]): number => {
@@ -120,14 +127,14 @@ const calculateConsistencyProgress = (goal: ConsistencyGoal, runs: EnrichedRun[]
   if (weeksElapsed === 0) return 0;
   
   const relevantRuns = runs.filter(run => {
-    const runDate = new Date(run.start_date);
+    const runDate = new Date(run.start_date_local || run.start_date);
     return runDate >= createdDate && runDate <= now;
   });
 
   // Group runs by week
   const runsByWeek = new Map<string, EnrichedRun[]>();
   relevantRuns.forEach(run => {
-    const runDate = new Date(run.start_date);
+    const runDate = new Date(run.start_date_local || run.start_date);
     const weekKey = getWeekKey(runDate);
     if (!runsByWeek.has(weekKey)) {
       runsByWeek.set(weekKey, []);
@@ -371,7 +378,7 @@ const getWeekKey = (date: Date): string => {
 
 const calculateRecentMonthlyDistance = (runs: EnrichedRun[]): number => {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const recentRuns = runs.filter(run => new Date(run.start_date) >= thirtyDaysAgo);
+  const recentRuns = runs.filter(run => new Date(run.start_date_local || run.start_date) >= thirtyDaysAgo);
   return recentRuns.reduce((total, run) => total + run.distance, 0);
 };
 

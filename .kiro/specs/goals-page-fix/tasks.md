@@ -25,7 +25,7 @@
   - Update goal creation modal to show template options
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.5_
 
-- [-] 4. Update Goal data model and types
+- [x] 4. Update Goal data model and types
   - Extend Goal interface to support diverse goal types
   - Add raceDistance and raceType fields for pace and frequency goals
   - Update goal creation form to handle different goal types
