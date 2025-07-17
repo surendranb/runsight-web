@@ -76,14 +76,14 @@
   - Generate consistency-based insights and recommendations
   - _Requirements: 3.2, 6.1_
 
-- [-] 11. Build location intelligence features
+- [x] 11. Build location intelligence features
   - Analyze performance by city, state, elevation
   - Identify best performing locations
   - Create location-based recommendations
   - Add elevation vs effort correlation analysis
   - _Requirements: 4.1, 4.2, 4.3_
 
-- [ ] 12. Implement advanced performance metrics
+- [x] 12. Implement advanced performance metrics
   - Calculate effort scores based on pace, elevation, weather
   - Create performance variability analysis
   - Implement improvement rate calculations
