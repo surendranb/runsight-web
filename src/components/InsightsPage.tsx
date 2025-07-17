@@ -8,6 +8,7 @@ import { ElevationEffortInsight } from './insights/ElevationEffortInsight';
 import { WindPerformanceInsight } from './insights/WindPerformanceInsight';
 import { WorkoutTypePerformanceInsight } from './insights/WorkoutTypePerformanceInsight';
 import { PersonalRecordsInsight } from './insights/PersonalRecordsInsight';
+import { LocationIntelligenceInsight } from './insights/LocationIntelligenceInsight';
 import { MonthlySummaryTable } from './insights/MonthlySummaryTable';
 
 interface InsightsPageProps {
@@ -66,6 +67,7 @@ export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoadin
         <div className="space-y-6">
           <PersonalRecordsInsight runs={runs} />
           <ConsistencyInsight runs={runs} />
+          <LocationIntelligenceInsight runs={runs} />
           <PerformanceWeatherInsight runs={runs} />
           <TimeOfDayInsight runs={runs} />
           <ElevationEffortInsight runs={runs} />
