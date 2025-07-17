@@ -1,5 +1,6 @@
-import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import React, { useState } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { TrendingUp, TrendingDown, Award, Calendar } from 'lucide-react';
 import { EnrichedRun } from '../../types';
 
 interface PaceTrendChartProps {
@@ -27,6 +28,7 @@ export const PaceTrendChart: React.FC<PaceTrendChartProps> = ({
   highlightPersonalRecords = true,
   showWeatherIndicators = true
 }) => {
+  const [selectedPeriod, setSelectedPeriod] = useState<'30d' | '90d' | '1y'>('30d');
   // Transform runs data into chart format
   const chartData: ChartDataPoint[] = React.useMemo(() => {
     const sortedRuns = [...data]
@@ -111,9 +113,51 @@ export const PaceTrendChart: React.FC<PaceTrendChartProps> = ({
     );
   }
 
+  // Calculate trend statistics
+  const trendStats = React.useMemo(() => {
+    if (chartData.length < 2) return null;
+    
+    const firstPace = chartData[0].pace;
+    const lastPace = chartData[chartData.length - 1].pace;
+    const improvement = ((firstPace - lastPace) / firstPace) * 100;
+    const isImproving = improvement > 0;
+    
+    const personalRecords = chartData.filter(d => d.isPR).length;
+    
+    return {
+      improvement: Math.abs(improvement),
+      isImproving,
+      personalRecords,
+      totalRuns: chartData.length
+    };
+  }, [chartData]);
+
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <h3 className="text-lg font-semibold text-gray-800 mb-4">Pace Trend - {period}</h3>
+    <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-800">Pace Trend - {period}</h3>
+        {trendStats && (
+          <div className="flex items-center space-x-2 text-sm">
+            {trendStats.isImproving ? (
+              <div className="flex items-center text-green-600">
+                <TrendingDown className="w-4 h-4 mr-1" />
+                <span className="font-medium">{trendStats.improvement.toFixed(1)}% faster</span>
+              </div>
+            ) : (
+              <div className="flex items-center text-red-600">
+                <TrendingUp className="w-4 h-4 mr-1" />
+                <span className="font-medium">{trendStats.improvement.toFixed(1)}% slower</span>
+              </div>
+            )}
+            {trendStats.personalRecords > 0 && (
+              <div className="flex items-center text-yellow-600 ml-3">
+                <Award className="w-4 h-4 mr-1" />
+                <span className="font-medium">{trendStats.personalRecords} PR{trendStats.personalRecords > 1 ? 's' : ''}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>

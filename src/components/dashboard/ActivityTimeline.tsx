@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Clock, Zap, Heart, Cloud, Sun, CloudRain } from 'lucide-react';
+import { MapPin, Clock, Zap, Heart, Cloud, Sun, CloudRain, CloudSnow, Wind, Eye } from 'lucide-react';
 import { EnrichedRun } from '../../types';
 
 interface ActivityTimelineProps {
@@ -60,7 +60,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   };
 
   const getPerformanceColor = (run: EnrichedRun) => {
-    if (!colorCodeByPerformance) return 'border-gray-200';
+    if (!colorCodeByPerformance) return 'border-gray-200 bg-white';
     
     const runPace = run.moving_time / (run.distance / 1000);
     const performanceRatio = runPace / avgPace;
@@ -68,6 +68,17 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
     if (performanceRatio < 0.95) return 'border-green-400 bg-green-50'; // Faster than average
     if (performanceRatio > 1.05) return 'border-red-400 bg-red-50'; // Slower than average
     return 'border-blue-400 bg-blue-50'; // Around average
+  };
+
+  const getPerformanceIndicator = (run: EnrichedRun) => {
+    if (!colorCodeByPerformance) return null;
+    
+    const runPace = run.moving_time / (run.distance / 1000);
+    const performanceRatio = runPace / avgPace;
+    
+    if (performanceRatio < 0.95) return { emoji: '💚', label: 'Great run!' };
+    if (performanceRatio > 1.05) return { emoji: '❤️', label: 'Tough run' };
+    return { emoji: '💛', label: 'Good run' };
   };
 
   const getWeatherIcon = (weatherData: any) => {
@@ -121,12 +132,19 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
           return (
             <div
               key={run.id}
-              className={`p-4 rounded-lg border-2 transition-all hover:shadow-md ${getPerformanceColor(run)}`}
+              className={`p-4 rounded-lg border-2 transition-all hover:shadow-md hover:scale-[1.02] cursor-pointer ${getPerformanceColor(run)}`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2 mb-1">
                     <h4 className="font-medium text-gray-900 truncate">{run.name}</h4>
+                    {getPerformanceIndicator(run) && (
+                      <div className="flex items-center space-x-1">
+                        <span className="text-lg" title={getPerformanceIndicator(run)?.label}>
+                          {getPerformanceIndicator(run)?.emoji}
+                        </span>
+                      </div>
+                    )}
                     {showWeather && weather && (
                       <div className="flex items-center space-x-1">
                         {getWeatherIcon(weather)}

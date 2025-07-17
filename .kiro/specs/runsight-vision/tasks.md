@@ -9,14 +9,14 @@
   - Design responsive grid layout that works on all screen sizes
   - _Requirements: 7.1, 7.2, 7.5_
 
-- [ ] 2. Implement performance trend chart component
+- [x] 2. Implement performance trend chart component
   - Create beautiful line chart showing pace improvement over time
   - Add interactive tooltips with run details
   - Implement time period selection (30d, 90d, 1y)
   - Style chart to match overall design aesthetic
   - _Requirements: 3.1, 7.4_
 
-- [ ] 3. Enhance recent activities list
+- [x] 3. Enhance recent activities list
   - Add weather icons and temperature display for each run
   - Include performance indicators (💚 great, 💛 good, ❤️ tough)
   - Show contextual information (pace, distance, conditions)
