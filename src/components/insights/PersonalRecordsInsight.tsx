@@ -1,0 +1,217 @@
+import React, { useState } from 'react';
+import { Trophy, Calendar, MapPin, Thermometer, Cloud, TrendingUp, Award } from 'lucide-react';
+import { EnrichedRun } from '../../types';
+import { detectPersonalRecords, formatTime, formatPace, PersonalRecord } from '../../lib/insights/personalRecordsUtils';
+
+interface PersonalRecordsInsightProps {
+  runs: EnrichedRun[];
+}
+
+export const PersonalRecordsInsight: React.FC<PersonalRecordsInsightProps> = ({ runs }) => {
+  const [selectedDistance, setSelectedDistance] = useState<string>('all');
+  
+  const prAnalysis = detectPersonalRecords(runs);
+  const { personalRecords, recentPRs, prProgression, prsByConditions } = prAnalysis;
+
+  if (personalRecords.length === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center mb-4">
+          <Trophy className="w-6 h-6 text-yellow-500 mr-2" />
+          <h3 className="text-lg font-semibold text-gray-800">Personal Records</h3>
+        </div>
+        <div className="text-center py-8 text-gray-500">
+          <Trophy className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+          <p>No personal records found yet.</p>
+          <p className="text-sm">Keep running to set your first PRs!</p>
+        </div>
+      </div>
+    );
+  }
+
+  const distances = ['all', ...Array.from(new Set(personalRecords.map(pr => pr.distance)))];
+  const filteredRecords = selectedDistance === 'all' 
+    ? personalRecords 
+    : personalRecords.filter(pr => pr.distance === selectedDistance);
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <Trophy className="w-6 h-6 text-yellow-500 mr-2" />
+          <h3 className="text-lg font-semibold text-gray-800">Personal Records</h3>
+        </div>
+        <div className="flex items-center space-x-2">
+          <select
+            value={selectedDistance}
+            onChange={(e) => setSelectedDistance(e.target.value)}
+            className="text-sm border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {distances.map(distance => (
+              <option key={distance} value={distance}>
+                {distance === 'all' ? 'All Distances' : distance}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Recent PRs Highlight */}
+      {recentPRs.length > 0 && (
+        <div className="mb-6 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
+          <div className="flex items-center mb-2">
+            <Award className="w-5 h-5 text-yellow-600 mr-2" />
+            <h4 className="font-medium text-yellow-800">Recent Personal Records</h4>
+          </div>
+          <div className="space-y-2">
+            {recentPRs.slice(0, 3).map((pr, index) => (
+              <div key={index} className="flex items-center justify-between text-sm">
+                <span className="font-medium text-yellow-700">{pr.distance}</span>
+                <span className="text-yellow-600">{formatTime(pr.time)} on {formatDate(pr.date)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* PR Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="text-left py-3 px-2 font-medium text-gray-700">Distance</th>
+              <th className="text-left py-3 px-2 font-medium text-gray-700">Time</th>
+              <th className="text-left py-3 px-2 font-medium text-gray-700">Pace</th>
+              <th className="text-left py-3 px-2 font-medium text-gray-700">Date</th>
+              <th className="text-left py-3 px-2 font-medium text-gray-700">Conditions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredRecords.map((pr, index) => (
+              <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                <td className="py-3 px-2">
+                  <div className="flex items-center">
+                    <Trophy className="w-4 h-4 text-yellow-500 mr-2" />
+                    <span className="font-medium text-gray-900">{pr.distance}</span>
+                  </div>
+                </td>
+                <td className="py-3 px-2 font-mono text-sm text-gray-900">
+                  {formatTime(pr.time)}
+                </td>
+                <td className="py-3 px-2 font-mono text-sm text-gray-600">
+                  {formatPace(pr.pace)}
+                </td>
+                <td className="py-3 px-2 text-sm text-gray-600">
+                  <div className="flex items-center">
+                    <Calendar className="w-3 h-3 mr-1" />
+                    {formatDate(pr.date)}
+                  </div>
+                </td>
+                <td className="py-3 px-2 text-sm">
+                  <div className="flex items-center space-x-2">
+                    {pr.conditions?.temperature && (
+                      <div className="flex items-center text-gray-600">
+                        <Thermometer className="w-3 h-3 mr-1" />
+                        <span>{Math.round(pr.conditions.temperature)}°C</span>
+                      </div>
+                    )}
+                    {pr.conditions?.weather && (
+                      <div className="flex items-center text-gray-600">
+                        <Cloud className="w-3 h-3 mr-1" />
+                        <span>{pr.conditions.weather}</span>
+                      </div>
+                    )}
+                    {pr.conditions?.location && (
+                      <div className="flex items-center text-gray-600">
+                        <MapPin className="w-3 h-3 mr-1" />
+                        <span className="truncate max-w-20">{pr.conditions.location}</span>
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* PR Conditions Analysis */}
+      {prsByConditions.bestWeatherConditions.length > 0 && (
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <h4 className="font-medium text-gray-800 mb-3 flex items-center">
+            <TrendingUp className="w-4 h-4 mr-2" />
+            PR Conditions Analysis
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            {prsByConditions.bestWeatherConditions.length > 0 && (
+              <div>
+                <span className="font-medium text-gray-700">Best Weather:</span>
+                <div className="mt-1">
+                  {prsByConditions.bestWeatherConditions.map((condition, index) => (
+                    <span key={index} className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs mr-1 mb-1">
+                      {condition}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {prsByConditions.bestLocations.length > 0 && (
+              <div>
+                <span className="font-medium text-gray-700">Best Locations:</span>
+                <div className="mt-1">
+                  {prsByConditions.bestLocations.map((location, index) => (
+                    <span key={index} className="inline-block bg-green-100 text-green-800 px-2 py-1 rounded text-xs mr-1 mb-1">
+                      {location}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {prsByConditions.temperatureRange.min > 0 && (
+              <div>
+                <span className="font-medium text-gray-700">Temperature Range:</span>
+                <div className="mt-1 text-gray-600">
+                  {Math.round(prsByConditions.temperatureRange.min)}°C - {Math.round(prsByConditions.temperatureRange.max)}°C
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Summary Stats */}
+      <div className="mt-6 pt-6 border-t border-gray-200">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+          <div>
+            <div className="text-2xl font-bold text-yellow-600">{personalRecords.length}</div>
+            <div className="text-sm text-gray-600">Total PRs</div>
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-green-600">{recentPRs.length}</div>
+            <div className="text-sm text-gray-600">Recent PRs</div>
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-blue-600">{distances.length - 1}</div>
+            <div className="text-sm text-gray-600">Distances</div>
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-purple-600">
+              {prProgression.reduce((sum, prog) => sum + prog.records.length, 0)}
+            </div>
+            <div className="text-sm text-gray-600">Improvements</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

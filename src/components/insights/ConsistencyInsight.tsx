@@ -12,9 +12,10 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { Calendar, TrendingUp, TrendingDown, Activity, CheckCircle } from 'lucide-react';
 import { EnrichedRun } from '../../types';
-import { groupRunsByWeek, groupRunsByMonth, TimeGroupData } from '../../lib/insights/consistencyUtils';
- import { convertSecondsToHoursMinutes } from '../../lib/insightsUtils';
+import { groupRunsByWeek, groupRunsByMonth, TimeGroupData, analyzeConsistency } from '../../lib/insights/consistencyUtils';
+import { convertSecondsToHoursMinutes } from '../../lib/insightsUtils';
 
 interface ConsistencyInsightProps {
   runs: EnrichedRun[];
@@ -23,6 +24,7 @@ interface ConsistencyInsightProps {
 export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) => {
   const weeklyData = useMemo(() => groupRunsByWeek(runs), [runs]);
   const monthlyData = useMemo(() => groupRunsByMonth(runs), [runs]);
+  const consistencyAnalysis = useMemo(() => analyzeConsistency(runs), [runs]);
 
   // Helper function to format time for YAxis and Tooltip
   const formatTime = (timeInSeconds: number) => {
@@ -94,6 +96,60 @@ export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) 
     <div className="bg-white shadow rounded-lg p-6">
       <h3 className="text-xl font-semibold text-gray-800 mb-4">Consistency & Progress Over Time</h3>
       <p className="text-sm text-gray-600 mb-6">Track your running frequency and volume trends on a weekly and monthly basis to see your progress.</p>
+
+      {/* Consistency Analysis */}
+      <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+        <h4 className="font-semibold text-purple-800 mb-3">Consistency Analysis</h4>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-purple-600">{consistencyAnalysis.consistencyScore.toFixed(0)}</div>
+            <div className="text-sm text-purple-700">Consistency Score</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600">{consistencyAnalysis.frequency.runsPerWeek.toFixed(1)}</div>
+            <div className="text-sm text-blue-700">Runs/Week</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600">{consistencyAnalysis.streaks.longest}</div>
+            <div className="text-sm text-green-700">Longest Streak</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-orange-600">{consistencyAnalysis.frequency.averageGapDays.toFixed(1)}</div>
+            <div className="text-sm text-orange-700">Avg Gap (days)</div>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="font-medium text-gray-700">Trend:</span>
+            <span className={`ml-2 px-2 py-1 rounded text-xs ${
+              consistencyAnalysis.trend === 'improving' ? 'bg-green-100 text-green-800' :
+              consistencyAnalysis.trend === 'declining' ? 'bg-red-100 text-red-800' :
+              'bg-gray-100 text-gray-800'
+            }`}>
+              {consistencyAnalysis.trend.charAt(0).toUpperCase() + consistencyAnalysis.trend.slice(1)}
+            </span>
+          </div>
+          <div>
+            <span className="font-medium text-gray-700">Most Active Day:</span>
+            <span className="ml-2 text-gray-600">{consistencyAnalysis.frequency.mostConsistentDay}</span>
+          </div>
+        </div>
+        
+        {consistencyAnalysis.recommendations.length > 0 && (
+          <div className="mt-4">
+            <span className="font-medium text-gray-700 block mb-2">Recommendations:</span>
+            <ul className="text-sm text-gray-600 space-y-1">
+              {consistencyAnalysis.recommendations.slice(0, 3).map((rec, index) => (
+                <li key={index} className="flex items-start">
+                  <span className="text-purple-500 mr-2">•</span>
+                  <span>{rec}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

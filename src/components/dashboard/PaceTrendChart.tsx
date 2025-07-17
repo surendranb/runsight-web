@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { TrendingUp, TrendingDown, Award, Calendar } from 'lucide-react';
 import { EnrichedRun } from '../../types';
+import { detectPersonalRecords, categorizeDistance } from '../../lib/insights/personalRecordsUtils';
 
 interface PaceTrendChartProps {
   data: EnrichedRun[];

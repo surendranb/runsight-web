@@ -62,14 +62,14 @@
 
 ## Phase 2: Performance Analytics & Insights (Week 5-6)
 
-- [ ] 9. Implement personal records tracking
+- [x] 9. Implement personal records tracking
   - Detect and store PRs for different distances (5K, 10K, half, full marathon)
   - Create PR achievement notifications
   - Display PR progression over time
   - Add PR conditions analysis (weather, location when PR was set)
   - _Requirements: 3.3, 6.3_
 
-- [ ] 10. Create consistency analysis system
+- [x] 10. Create consistency analysis system
   - Calculate running consistency scores
   - Track running frequency patterns
   - Identify consistency trends and improvements
