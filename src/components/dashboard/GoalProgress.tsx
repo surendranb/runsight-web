@@ -26,22 +26,6 @@ const mockGoals: Goal[] = [
     status: 'active',
     priority: 'high',
     category: 'annual'
-  },
-  {
-    id: '2',
-    userId: 'user1',
-    type: 'consistency',
-    title: 'Run 4x per week',
-    description: 'Maintain consistency with 4 runs every week',
-    targetValue: 4,
-    currentValue: 0,
-    unit: 'runs/week',
-    targetDate: '2025-12-31',
-    createdAt: '2025-01-01',
-    updatedAt: '2025-01-01',
-    status: 'active',
-    priority: 'medium',
-    category: 'weekly'
   }
 ];
 

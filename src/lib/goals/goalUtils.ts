@@ -105,6 +105,12 @@ const calculateRaceProgress = (goal: RaceGoal, runs: EnrichedRun[]): number => {
 };
 
 const calculateConsistencyProgress = (goal: ConsistencyGoal, runs: EnrichedRun[]): number => {
+  // Defensive programming: check if consistencyDetails exists
+  if (!goal.consistencyDetails || typeof goal.consistencyDetails.runsPerWeek !== 'number') {
+    console.warn('ConsistencyGoal missing consistencyDetails, returning 0 progress');
+    return 0;
+  }
+
   const targetDate = new Date(goal.targetDate);
   const createdDate = new Date(goal.createdAt);
   const now = new Date();
