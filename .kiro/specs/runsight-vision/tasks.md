@@ -83,7 +83,7 @@
   - Add elevation vs effort correlation analysis
   - _Requirements: 4.1, 4.2, 4.3_
 
-- [x] 12. Implement advanced performance metrics
+- [-] 12. Implement advanced performance metrics
   - Calculate effort scores based on pace, elevation, weather
   - Create performance variability analysis
   - Implement improvement rate calculations
