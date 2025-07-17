@@ -393,33 +393,46 @@ exports.handler = async (event, context) => {
 
     console.log(`[sync-data] Starting to process ${runDataArray.length} runs with progress tracking...`);
 
-    // For large datasets, skip weather enrichment to avoid timeouts
-    const isLargeDataset = runDataArray.length > 50;
-    const skipWeatherForLargeDataset = isLargeDataset && !requestData.options?.forceWeatherEnrichment;
+    // Implement chunked processing for large datasets
+    const isLargeDataset = runDataArray.length > 20;
+    const chunkSize = requestData.chunkSize || 20; // Process 20 runs at a time
+    const chunkIndex = requestData.chunkIndex || 0;
     
-    if (skipWeatherForLargeDataset) {
-      console.log(`[sync-data] Large dataset detected (${runDataArray.length} runs). Skipping weather enrichment to avoid timeout.`);
+    let runsToProcess = runDataArray;
+    let isChunkedSync = false;
+    
+    if (isLargeDataset && !requestData.processAll) {
+      // For large datasets, process in chunks
+      const startIndex = chunkIndex * chunkSize;
+      const endIndex = Math.min(startIndex + chunkSize, runDataArray.length);
+      runsToProcess = runDataArray.slice(startIndex, endIndex);
+      isChunkedSync = true;
+      
+      console.log(`[sync-data] Chunked sync: Processing chunk ${chunkIndex + 1} (runs ${startIndex + 1}-${endIndex} of ${runDataArray.length})`);
+    } else {
+      console.log(`[sync-data] Processing all ${runDataArray.length} runs in single batch`);
     }
     
-    // Process in larger batches when skipping weather enrichment
-    const batchSize = skipWeatherForLargeDataset ? 50 : 5; // Larger batches when no API calls needed
+    const batchSize = 5; // Keep small batches for weather API calls
     let weatherEnrichedCount = 0;
     let totalGeocodedCount = 0;
     
-    for (let i = 0; i < runDataArray.length; i += batchSize) {
-      const batch = runDataArray.slice(i, i + batchSize);
+    for (let i = 0; i < runsToProcess.length; i += batchSize) {
+      const batch = runsToProcess.slice(i, i + batchSize);
       const batchNumber = Math.floor(i / batchSize) + 1;
-      const totalBatches = Math.ceil(runDataArray.length / batchSize);
+      const totalBatches = Math.ceil(runsToProcess.length / batchSize);
       
       console.log(`[sync-data] Processing batch ${batchNumber}/${totalBatches} (${batch.length} activities)...`);
       
-      // Enrich batch with weather and location data if API key is available and not skipping for large datasets
+      // Enrich batch with weather and location data if API key is available
       let batchGeocodedCount = 0;
-      if (openWeatherApiKey && !requestData.options?.skipWeatherEnrichment && !skipWeatherForLargeDataset) {
+      if (openWeatherApiKey && !requestData.options?.skipWeatherEnrichment) {
         console.log(`[sync-data] Enriching batch ${batchNumber} with weather and location data...`);
         
         for (let j = 0; j < batch.length; j++) {
-          const activity = runningActivities[i + j];
+          // Find the corresponding activity from the original array
+          const activityIndex = isChunkedSync ? (chunkIndex * chunkSize) + i + j : i + j;
+          const activity = runningActivities[activityIndex];
           if (activity && activity.start_latlng) {
             // Get location data first (uses caching)
             const locationData = await enrichWithLocation(activity);
@@ -499,20 +512,31 @@ exports.handler = async (event, context) => {
       console.log(`[sync-data] Errors encountered:`, errors);
     }
 
+    // Prepare response with chunking information
     const results = {
       success: true,
-      message: 'Sync completed successfully',
+      message: isChunkedSync ? 
+        `Chunk ${chunkIndex + 1} completed successfully` : 
+        'Sync completed successfully',
       timestamp: new Date().toISOString(),
-      status: 'completed',
+      status: isChunkedSync ? 'chunk_completed' : 'completed',
+      chunking: isChunkedSync ? {
+        currentChunk: chunkIndex,
+        totalChunks: Math.ceil(runDataArray.length / chunkSize),
+        hasMoreChunks: (chunkIndex + 1) * chunkSize < runDataArray.length,
+        nextChunkIndex: chunkIndex + 1,
+        totalActivities: runDataArray.length,
+        processedSoFar: (chunkIndex + 1) * chunkSize
+      } : null,
       results: {
-        total_processed: runningActivities.length,
-        activities_saved: processedCount, // All successful upserts
-        activities_updated: 0, // We don't distinguish between insert/update with upsert
-        activities_skipped: 0, // No skipping with upsert
+        total_processed: isChunkedSync ? runsToProcess.length : runningActivities.length,
+        activities_saved: processedCount,
+        activities_updated: 0,
+        activities_skipped: 0,
         activities_failed: failedCount,
         weather_enriched: weatherEnrichedCount,
         geocoded: totalGeocodedCount,
-        duration_seconds: 1
+        duration_seconds: duration
       }
     };
 

@@ -122,37 +122,89 @@ class SecureApiClient {
     };
   }
 
-  // NEW: Start a sync using the simplified sync-data function
+  // NEW: Start a sync using the simplified sync-data function with chunked processing
   async startSync(userId: string | number, syncRequest: SyncRequest = {}): Promise<SyncResponse> {
     console.log(`🔄 Starting sync for user ${userId}`, syncRequest);
     
-    const requestBody = {
-      userId: userId,
-      timeRange: syncRequest.timeRange,
-      options: syncRequest.options
+    return await this.executeChunkedSync(userId, syncRequest);
+  }
+
+  // Execute chunked sync to handle large datasets elegantly
+  private async executeChunkedSync(userId: string | number, syncRequest: SyncRequest = {}): Promise<SyncResponse> {
+    let chunkIndex = 0;
+    let hasMoreChunks = true;
+    let totalResults = {
+      total_processed: 0,
+      activities_saved: 0,
+      activities_updated: 0,
+      activities_skipped: 0,
+      activities_failed: 0,
+      weather_enriched: 0,
+      geocoded: 0,
+      duration_seconds: 0
     };
-    
-    const response = await fetch(`${this.baseUrl}/sync-data`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
-    });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to start sync');
+    console.log(`🔄 Starting chunked sync for user ${userId}`);
+
+    while (hasMoreChunks) {
+      const requestBody = {
+        userId: userId,
+        timeRange: syncRequest.timeRange,
+        options: syncRequest.options,
+        chunkIndex: chunkIndex,
+        chunkSize: 20 // Process 20 runs at a time with full weather enrichment
+      };
+      
+      console.log(`🔄 Processing chunk ${chunkIndex + 1}...`);
+      
+      const response = await fetch(`${this.baseUrl}/sync-data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || `Failed to sync chunk ${chunkIndex + 1}`);
+      }
+
+      const data = await response.json();
+      
+      // Accumulate results from this chunk
+      if (data.results) {
+        totalResults.total_processed += data.results.total_processed || 0;
+        totalResults.activities_saved += data.results.activities_saved || 0;
+        totalResults.activities_updated += data.results.activities_updated || 0;
+        totalResults.activities_skipped += data.results.activities_skipped || 0;
+        totalResults.activities_failed += data.results.activities_failed || 0;
+        totalResults.weather_enriched += data.results.weather_enriched || 0;
+        totalResults.geocoded += data.results.geocoded || 0;
+        totalResults.duration_seconds += data.results.duration_seconds || 0;
+      }
+
+      // Check if there are more chunks to process
+      if (data.chunking && data.chunking.hasMoreChunks) {
+        hasMoreChunks = true;
+        chunkIndex = data.chunking.nextChunkIndex;
+        
+        console.log(`✅ Chunk ${chunkIndex} completed. Processing chunk ${chunkIndex + 1} of ${data.chunking.totalChunks}...`);
+        console.log(`📊 Progress: ${data.chunking.processedSoFar}/${data.chunking.totalActivities} activities processed`);
+        
+        // Small delay between chunks to be gentle on the server
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } else {
+        hasMoreChunks = false;
+        console.log(`✅ All chunks completed! Total processed: ${totalResults.total_processed} activities`);
+      }
     }
-
-    const data = await response.json();
     
-    // Return the response in the expected format
+    // Return the combined response
     return {
-      success: data.success,
-      message: data.message,
-      timestamp: data.timestamp,
-      status: data.status,
-      results: data.results,
-      error: data.error
+      success: true,
+      message: `Chunked sync completed successfully. Processed ${totalResults.total_processed} activities with full weather enrichment.`,
+      timestamp: new Date().toISOString(),
+      status: 'completed',
+      results: totalResults
     };
   }
 

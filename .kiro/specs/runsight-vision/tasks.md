@@ -92,7 +92,7 @@
 
 ## Phase 3: AI Coaching & Goal System (Week 7-10)
 
-- [-] 13. Create goal setting system
+- [x] 13. Create goal setting system
   - Design goal setting UI for annual distance, race times, consistency
   - Implement goal storage in database
   - Create goal progress calculation engine
