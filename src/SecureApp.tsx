@@ -186,7 +186,7 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
   // NEW: Simplified sync using the robust sync orchestrator
   const handleSyncData = async (period: SyncPeriod) => {
       if (!user || !user.id) {
-          alert("Please log in to sync data.");
+          setSyncProgressMessage("❌ Please log in to sync data.");
           return;
       }
 
@@ -218,21 +218,10 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
               
               if (results.activities_failed > 0) {
                   // Partial success - some activities failed
-                  setSyncProgressMessage(`Sync completed with ${results.activities_failed} failures`);
-                  alert(`Sync partially completed:\n` +
-                        `✅ Successfully saved: ${results.activities_saved} activities\n` +
-                        `❌ Failed: ${results.activities_failed} activities\n` +
-                        `📊 Total processed: ${results.total_processed}\n\n` +
-                        `Check the function logs for error details.`);
+                  setSyncProgressMessage(`⚠️ Sync completed with ${results.activities_failed} failures - Successfully saved ${results.activities_saved} of ${results.total_processed} activities`);
               } else {
                   // Complete success
-                  setSyncProgressMessage('Sync completed successfully!');
-                  alert(`🎉 Sync complete! Successfully processed ${results.total_processed} activities:\n` +
-                        `✅ Saved: ${results.activities_saved}\n` +
-                        `🔄 Updated: ${results.activities_updated}\n` +
-                        `⏭️ Skipped: ${results.activities_skipped}\n` +
-                        `🌤️ Weather enriched: ${results.weather_enriched}\n` +
-                        `⏱️ Duration: ${results.duration_seconds}s`);
+                  setSyncProgressMessage(`🎉 Sync complete! Successfully processed ${results.total_processed} activities (${results.activities_saved} saved)`);
               }
               
               // Refresh data regardless of partial failures
@@ -258,7 +247,6 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
           
           setDataError(errorMessage);
           setSyncProgressMessage(`❌ Sync failed: ${errorMessage}`);
-          alert(`❌ Sync failed: ${errorMessage}`);
       } finally {
           setIsSyncing(false);
           // Clear progress message after a delay
@@ -291,10 +279,23 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
           isSyncing={isSyncing}
         />
 
-        {/* Display Sync Progress Message */}
-        {isSyncing && syncProgressMessage && (
-            <div className="bg-blue-100 border-t-4 border-blue-500 text-blue-700 px-4 py-3 shadow-md text-center" role="alert">
-                <p className="font-bold">{syncProgressMessage}</p>
+        {/* Display Sync Status Messages */}
+        {(isSyncing || syncProgressMessage) && (
+            <div className={`px-4 py-3 shadow-md text-center transition-all duration-300 ${
+                syncProgressMessage.includes('❌') || syncProgressMessage.includes('failed') 
+                    ? 'bg-red-100 border-t-4 border-red-500 text-red-700'
+                    : syncProgressMessage.includes('🎉') || syncProgressMessage.includes('completed successfully')
+                    ? 'bg-green-100 border-t-4 border-green-500 text-green-700'
+                    : syncProgressMessage.includes('partially')
+                    ? 'bg-yellow-100 border-t-4 border-yellow-500 text-yellow-700'
+                    : 'bg-blue-100 border-t-4 border-blue-500 text-blue-700'
+            }`} role="alert">
+                <div className="flex items-center justify-center space-x-2">
+                    {isSyncing && (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                    )}
+                    <p className="font-medium">{syncProgressMessage}</p>
+                </div>
             </div>
         )}
 
