@@ -4,9 +4,7 @@ import { KeyPerformanceCard } from './dashboard/KeyPerformanceCard';
 import { PaceTrendChart } from './dashboard/PaceTrendChart';
 import { ActivityTimeline } from './dashboard/ActivityTimeline';
 import { InsightCard } from './dashboard/InsightCard';
-import { GoalProgress } from './dashboard/GoalProgress';
-import AIInsights from './AIInsights';
-import { Activity, MapPin, Clock, Zap, Calendar, Settings, RefreshCw } from 'lucide-react';
+import { Activity, MapPin, Clock, Settings, RefreshCw } from 'lucide-react';
 
 interface ModernDashboardProps {
   user: User;
@@ -425,21 +423,7 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
               </div>
             )}
 
-            {/* AI Insights */}
-            <AIInsights 
-              runs={filteredRuns} 
-              goals={[]} // TODO: Connect to actual goals when available
-              className="mb-8"
-            />
 
-            {/* Goal Progress System */}
-            <GoalProgress 
-              runs={filteredRuns}
-              onCreateGoal={() => {
-                // TODO: Implement goal creation modal
-                console.log('Create goal clicked');
-              }}
-            />
           </div>
         )}
       </div>
