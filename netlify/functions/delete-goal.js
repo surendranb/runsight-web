@@ -1,23 +1,37 @@
-// netlify/functions/delete-goal.js - Delete a goal from Supabase
+// Delete Goal - Netlify Function
 const { createClient } = require('@supabase/supabase-js');
 
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing Supabase configuration');
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
 exports.handler = async (event, context) => {
+  // Set CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Content-Type': 'application/json',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'DELETE, OPTIONS',
   };
 
+  // Handle preflight requests
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
+    return {
+      statusCode: 200,
+      headers,
+      body: '',
+    };
   }
 
-  if (event.httpMethod !== 'POST') {
+  if (event.httpMethod !== 'DELETE') {
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ error: 'METHOD_NOT_ALLOWED', message: 'Only POST method is allowed' }),
+      body: JSON.stringify({ error: 'Method not allowed' }),
     };
   }
 
@@ -28,45 +42,25 @@ exports.handler = async (event, context) => {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({
-          error: 'MISSING_FIELDS',
-          message: 'Required fields: userId, goalId'
-        }),
+        body: JSON.stringify({ error: 'Missing userId or goalId' }),
       };
     }
 
-    // Initialize Supabase client
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('[delete-goal] Missing Supabase configuration');
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'CONFIG_ERROR', message: 'Database configuration missing' }),
-      };
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Delete the goal (RLS will ensure user can only delete their own goals)
+    // Delete goal from database (with user verification for security)
     const { error } = await supabase
       .from('goals')
       .delete()
       .eq('id', goalId)
-      .eq('user_id', userId);
+      .eq('user_id', userId); // Ensure user can only delete their own goals
 
     if (error) {
-      console.error('[delete-goal] Database error:', error);
+      console.error('Database error deleting goal:', error);
       return {
         statusCode: 500,
         headers,
-        body: JSON.stringify({ error: 'DATABASE_ERROR', message: 'Failed to delete goal' }),
+        body: JSON.stringify({ error: 'Failed to delete goal', details: error.message }),
       };
     }
-
-    console.log(`[delete-goal] Deleted goal ${goalId} for user ${userId}`);
 
     return {
       statusCode: 200,
@@ -78,15 +72,11 @@ exports.handler = async (event, context) => {
     };
 
   } catch (error) {
-    console.error('[delete-goal] Error:', error);
+    console.error('Error deleting goal:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({
-        error: 'INTERNAL_ERROR',
-        message: 'Failed to delete goal',
-        details: error.message
-      }),
+      body: JSON.stringify({ error: 'Internal server error', details: error.message }),
     };
   }
 };

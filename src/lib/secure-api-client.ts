@@ -311,7 +311,7 @@ class SecureApiClient {
     console.log(`🎯 Deleting goal ${goalId} for user ${userId}`);
     
     const response = await fetch(`${this.baseUrl}/delete-goal`, {
-      method: 'POST',
+      method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, goalId })
     });

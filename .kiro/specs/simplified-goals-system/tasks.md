@@ -60,7 +60,7 @@
   - Handle edge cases (leap years, month boundaries, timezones)
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [-] 8. Add progress tracking utilities
+- [x] 8. Add progress tracking utilities
   - Create filterRunsByTimeframe utility function
   - Add calculateOnTrackStatus logic
   - Implement projectedCompletion calculations
@@ -69,14 +69,14 @@
 
 ## Phase 5: Integrate Supabase MCP for Database Operations
 
-- [ ] 9. Set up Supabase MCP integration
+- [x] 9. Set up Supabase MCP integration
   - Configure Supabase MCP connection
   - Test database connectivity and permissions
   - Verify goals table schema compatibility
   - Set up proper error handling for database operations
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
 
-- [ ] 10. Implement goal database operations
+- [x] 10. Implement goal database operations
   - Create createGoal function using Supabase MCP
   - Create getUserGoals function using Supabase MCP
   - Create updateGoal function using Supabase MCP

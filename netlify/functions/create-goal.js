@@ -1,126 +1,133 @@
-// netlify/functions/create-goal.js - Create a new goal in Supabase
+// Create Goal - Netlify Function
 const { createClient } = require('@supabase/supabase-js');
 
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing Supabase configuration');
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
 exports.handler = async (event, context) => {
+  // Set CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Content-Type': 'application/json',
   };
 
+  // Handle preflight requests
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
+    return {
+      statusCode: 200,
+      headers,
+      body: '',
+    };
   }
 
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ error: 'METHOD_NOT_ALLOWED', message: 'Only POST method is allowed' }),
+      body: JSON.stringify({ error: 'Method not allowed' }),
     };
   }
 
   try {
-    const {
-      userId,
-      type,
-      title,
-      description,
-      targetValue,
-      unit,
-      targetDate,
-      priority = 'medium',
-      category = 'annual',
-      createdAt,
-      additionalDetails = {}
-    } = JSON.parse(event.body);
+    const { userId, goalData } = JSON.parse(event.body);
 
-    // Validate required fields
-    if (!userId || !type || !title || !targetValue || !unit || !targetDate) {
+    if (!userId || !goalData) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({
-          error: 'MISSING_FIELDS',
-          message: 'Required fields: userId, type, title, targetValue, unit, targetDate'
-        }),
+        body: JSON.stringify({ error: 'Missing userId or goalData' }),
       };
     }
 
-    // Initialize Supabase client
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+    // Validate goal data
+    const requiredFields = ['type', 'title', 'targetValue', 'unit', 'targetDate'];
+    for (const field of requiredFields) {
+      if (!goalData[field]) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: `Missing required field: ${field}` }),
+        };
+      }
+    }
 
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('[create-goal] Missing Supabase configuration');
+    // Validate goal type
+    if (!['distance', 'pace', 'runs'].includes(goalData.type)) {
       return {
-        statusCode: 500,
+        statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'CONFIG_ERROR', message: 'Database configuration missing' }),
+        body: JSON.stringify({ error: 'Invalid goal type. Must be distance, pace, or runs' }),
       };
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Create the goal
-    const goalData = {
-      user_id: userId,
-      type,
-      title,
-      description: description || '',
-      target_value: targetValue,
-      current_value: 0,
-      unit,
-      target_date: targetDate,
-      priority,
-      category,
-      additional_details: additionalDetails,
-      status: 'active'
-    };
-
-    // If createdAt is provided (for backdating annual goals), use it
-    if (createdAt) {
-      goalData.created_at = createdAt;
-    }
-
+    // Create goal in database
     const { data: goal, error } = await supabase
       .from('goals')
-      .insert([goalData])
+      .insert([{
+        user_id: userId,
+        type: goalData.type,
+        title: goalData.title,
+        description: goalData.description || '',
+        target_value: goalData.targetValue,
+        current_value: 0,
+        unit: goalData.unit,
+        target_date: goalData.targetDate,
+        status: 'active',
+        priority: goalData.priority || 'medium',
+        category: goalData.category || 'annual',
+        additional_details: goalData.additionalDetails || {}
+      }])
       .select()
       .single();
 
     if (error) {
-      console.error('[create-goal] Database error:', error);
+      console.error('Database error creating goal:', error);
       return {
         statusCode: 500,
         headers,
-        body: JSON.stringify({ error: 'DATABASE_ERROR', message: 'Failed to create goal' }),
+        body: JSON.stringify({ error: 'Failed to create goal', details: error.message }),
       };
     }
-
-    console.log(`[create-goal] Created goal "${title}" for user ${userId}`);
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         success: true,
-        goal: goal,
-        message: 'Goal created successfully'
+        goal: {
+          id: goal.id,
+          userId: goal.user_id,
+          type: goal.type,
+          title: goal.title,
+          description: goal.description,
+          targetValue: parseFloat(goal.target_value),
+          currentValue: parseFloat(goal.current_value),
+          unit: goal.unit,
+          targetDate: goal.target_date,
+          createdAt: goal.created_at,
+          updatedAt: goal.updated_at,
+          status: goal.status,
+          priority: goal.priority,
+          category: goal.category,
+          raceDistance: goal.additional_details?.raceDistance,
+          timeframe: goal.additional_details?.timeframe
+        }
       }),
     };
 
   } catch (error) {
-    console.error('[create-goal] Error:', error);
+    console.error('Error creating goal:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({
-        error: 'INTERNAL_ERROR',
-        message: 'Failed to create goal',
-        details: error.message
-      }),
+      body: JSON.stringify({ error: 'Internal server error', details: error.message }),
     };
   }
 };
