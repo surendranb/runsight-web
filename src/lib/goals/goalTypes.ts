@@ -1,8 +1,8 @@
-// Simplified Goal system types
+// Simplified Goal system - Only 3 types: distance, pace, runs
 export interface Goal {
   id: string;
   userId: string;
-  type: 'distance' | 'time' | 'frequency' | 'pace';
+  type: 'distance' | 'pace' | 'runs';
   title: string;
   description: string;
   targetValue: number;
@@ -14,47 +14,33 @@ export interface Goal {
   status: 'active' | 'completed' | 'paused' | 'failed';
   priority: 'high' | 'medium' | 'low';
   category: 'annual' | 'monthly' | 'weekly' | 'race_specific';
+  
+  // Additional details for specific goal types
+  raceDistance?: number; // For pace goals (5000, 10000, 21097, 42195 meters)
+  timeframe?: 'weekly' | 'monthly' | 'yearly'; // For runs goals
 }
 
-export interface RaceGoal extends Goal {
-  type: 'race';
-  raceDetails: {
-    name: string;
-    distance: number; // in meters
-    date: string;
-    location?: string;
-    targetTime: number; // in seconds
-    currentPR?: number; // in seconds
-  };
-}
-
+// Distance Goal: Total distance to run (e.g., 1000km in 2025)
 export interface DistanceGoal extends Goal {
   type: 'distance';
-  distanceDetails: {
-    totalTarget: number; // in meters
-    timeframe: 'weekly' | 'monthly' | 'yearly';
-    currentProgress: number;
-  };
+  unit: 'meters';
+  targetValue: number; // total meters to run
 }
 
-export interface ConsistencyGoal extends Goal {
-  type: 'consistency';
-  consistencyDetails: {
-    runsPerWeek: number;
-    minimumDistance?: number;
-    streakTarget?: number;
-    currentStreak: number;
-  };
-}
-
+// Pace Goal: Target time for specific race distance (e.g., 5K under 25 minutes)
 export interface PaceGoal extends Goal {
   type: 'pace';
-  paceDetails: {
-    targetPace: number; // seconds per km
-    distance: number; // meters
-    currentBestPace?: number;
-    improvementTarget: number; // seconds improvement
-  };
+  unit: 'seconds';
+  targetValue: number; // target time in seconds
+  raceDistance: number; // race distance in meters (5000, 10000, 21097, 42195)
+}
+
+// Runs Goal: Number of runs to complete (e.g., 100 runs this year)
+export interface RunsGoal extends Goal {
+  type: 'runs';
+  unit: 'runs';
+  targetValue: number; // number of runs
+  timeframe: 'weekly' | 'monthly' | 'yearly';
 }
 
 export interface GoalProgress {

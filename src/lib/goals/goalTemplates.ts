@@ -1,9 +1,9 @@
-// Goal Templates - Pre-defined popular running goals
+// Simplified Goal Templates - Only 3 types: distance, pace, runs
 import { CreateGoalRequest } from './goalTypes';
 
 export interface GoalTemplate {
   id: string;
-  category: 'distance' | 'pace' | 'frequency' | 'time';
+  category: 'distance' | 'pace' | 'runs';
   title: string;
   description: string;
   targetValue: number;
@@ -15,8 +15,6 @@ export interface GoalTemplate {
   
   // Additional fields for specific goal types
   raceDistance?: number; // For pace goals
-  raceType?: string; // For frequency goals
-  runsPerWeek?: number; // For time goals
 }
 
 // Distance Goal Templates
@@ -178,124 +176,67 @@ export const PACE_TEMPLATES: GoalTemplate[] = [
   }
 ];
 
-// Frequency Goal Templates
-export const FREQUENCY_TEMPLATES: GoalTemplate[] = [
+// Runs Goal Templates (number of runs)
+export const RUNS_TEMPLATES: GoalTemplate[] = [
   {
-    id: 'frequency-20-half-marathons',
-    category: 'frequency',
-    title: '20 half marathons this year',
-    description: 'Complete 20 half marathon races in a single year',
-    targetValue: 20,
-    unit: 'races',
-    timeframe: 'annual',
-    priority: 'high',
-    difficulty: 'advanced',
-    estimatedTimeCommitment: '8-10 hours/week',
-    raceType: 'half_marathon'
-  },
-  {
-    id: 'frequency-12-races',
-    category: 'frequency',
-    title: '12 races this year',
-    description: 'Participate in 12 races of any distance throughout the year',
-    targetValue: 12,
-    unit: 'races',
+    id: 'runs-100-annual',
+    category: 'runs',
+    title: '100 runs this year',
+    description: 'Complete 100 runs throughout the year - great for consistency',
+    targetValue: 100,
+    unit: 'runs',
     timeframe: 'annual',
     priority: 'medium',
     difficulty: 'intermediate',
-    estimatedTimeCommitment: '4-6 hours/week',
-    raceType: 'any'
+    estimatedTimeCommitment: '3-4 hours/week'
   },
   {
-    id: 'frequency-4-marathons',
-    category: 'frequency',
-    title: '4 marathons this year',
-    description: 'Complete 4 full marathons in a single year',
-    targetValue: 4,
-    unit: 'races',
+    id: 'runs-150-annual',
+    category: 'runs',
+    title: '150 runs this year',
+    description: 'Challenge yourself with 150 runs in a year - for dedicated runners',
+    targetValue: 150,
+    unit: 'runs',
     timeframe: 'annual',
     priority: 'high',
     difficulty: 'advanced',
-    estimatedTimeCommitment: '10-15 hours/week',
-    raceType: 'marathon'
+    estimatedTimeCommitment: '5-6 hours/week'
   },
   {
-    id: 'frequency-6-10k-races',
-    category: 'frequency',
-    title: '6 x 10K races this year',
-    description: 'Participate in 6 different 10K races throughout the year',
-    targetValue: 6,
-    unit: 'races',
-    timeframe: 'annual',
-    priority: 'medium',
-    difficulty: 'intermediate',
-    estimatedTimeCommitment: '3-5 hours/week',
-    raceType: '10k'
-  },
-  {
-    id: 'frequency-monthly-5k',
-    category: 'frequency',
-    title: 'Monthly 5K races',
-    description: 'Participate in at least one 5K race every month',
-    targetValue: 12,
-    unit: 'races',
+    id: 'runs-50-annual',
+    category: 'runs',
+    title: '50 runs this year',
+    description: 'A great starting goal - 50 runs throughout the year',
+    targetValue: 50,
+    unit: 'runs',
     timeframe: 'annual',
     priority: 'medium',
     difficulty: 'beginner',
-    estimatedTimeCommitment: '2-4 hours/week',
-    raceType: '5k'
-  }
-];
-
-// Time Goal Templates (running time-based goals)
-export const TIME_TEMPLATES: GoalTemplate[] = [
-  {
-    id: 'time-100-hours-annual',
-    category: 'time',
-    title: '100 hours of running in 2025',
-    description: 'Spend 100 hours running throughout the year',
-    targetValue: 360000, // seconds (100 hours)
-    unit: 'seconds',
-    timeframe: 'annual',
-    priority: 'medium',
-    difficulty: 'intermediate',
     estimatedTimeCommitment: '2-3 hours/week'
   },
   {
-    id: 'time-200-hours-annual',
-    category: 'time',
-    title: '200 hours of running in 2025',
-    description: 'Dedicate 200 hours to running this year - for serious runners',
-    targetValue: 720000, // seconds (200 hours)
-    unit: 'seconds',
-    timeframe: 'annual',
-    priority: 'high',
-    difficulty: 'advanced',
-    estimatedTimeCommitment: '4-5 hours/week'
-  },
-  {
-    id: 'time-50-hours-annual',
-    category: 'time',
-    title: '50 hours of running in 2025',
-    description: 'A great starting goal - 50 hours of running throughout the year',
-    targetValue: 180000, // seconds (50 hours)
-    unit: 'seconds',
-    timeframe: 'annual',
-    priority: 'medium',
-    difficulty: 'beginner',
-    estimatedTimeCommitment: '1-2 hours/week'
-  },
-  {
-    id: 'time-10-hours-monthly',
-    category: 'time',
-    title: '10 hours this month',
-    description: 'Run for 10 hours in a single month',
-    targetValue: 36000, // seconds (10 hours)
-    unit: 'seconds',
+    id: 'runs-12-monthly',
+    category: 'runs',
+    title: '12 runs this month',
+    description: 'Run 12 times in a single month - 3 runs per week',
+    targetValue: 12,
+    unit: 'runs',
     timeframe: 'monthly',
     priority: 'medium',
     difficulty: 'intermediate',
-    estimatedTimeCommitment: '2-3 hours/week'
+    estimatedTimeCommitment: '3-4 hours/week'
+  },
+  {
+    id: 'runs-20-monthly',
+    category: 'runs',
+    title: '20 runs this month',
+    description: 'Challenge yourself with 20 runs in one month',
+    targetValue: 20,
+    unit: 'runs',
+    timeframe: 'monthly',
+    priority: 'high',
+    difficulty: 'advanced',
+    estimatedTimeCommitment: '6-7 hours/week'
   }
 ];
 
@@ -303,8 +244,7 @@ export const TIME_TEMPLATES: GoalTemplate[] = [
 export const ALL_TEMPLATES: GoalTemplate[] = [
   ...DISTANCE_TEMPLATES,
   ...PACE_TEMPLATES,
-  ...FREQUENCY_TEMPLATES,
-  ...TIME_TEMPLATES
+  ...RUNS_TEMPLATES
 ];
 
 // Helper functions
@@ -321,9 +261,9 @@ export const getPopularTemplates = (): GoalTemplate[] => {
   return [
     ALL_TEMPLATES.find(t => t.id === 'distance-1000km-annual')!,
     ALL_TEMPLATES.find(t => t.id === 'pace-5k-30min')!,
-    ALL_TEMPLATES.find(t => t.id === 'time-100-hours-annual')!,
+    ALL_TEMPLATES.find(t => t.id === 'runs-100-annual')!,
     ALL_TEMPLATES.find(t => t.id === 'distance-2500km-annual')!,
-    ALL_TEMPLATES.find(t => t.id === 'frequency-12-races')!,
+    ALL_TEMPLATES.find(t => t.id === 'runs-150-annual')!,
     ALL_TEMPLATES.find(t => t.id === 'pace-10k-60min')!
   ].filter(Boolean); // Remove any undefined templates
 };
@@ -346,14 +286,6 @@ export const templateToGoalRequest = (template: GoalTemplate, targetDate: string
     baseRequest.additionalDetails = {
       raceDistance: template.raceDistance,
       raceType: `${template.raceDistance}m`
-    };
-  } else if (template.category === 'frequency' && template.raceType) {
-    baseRequest.additionalDetails = {
-      raceType: template.raceType
-    };
-  } else if (template.category === 'consistency' && template.runsPerWeek) {
-    baseRequest.additionalDetails = {
-      runsPerWeek: template.runsPerWeek
     };
   }
 

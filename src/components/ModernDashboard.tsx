@@ -248,40 +248,7 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Goal Progress Bar - Most Prominent */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-xl">🎯</span>
-              </div>
-              <div className="min-w-0">
-                <h3 className="font-semibold text-lg sm:text-xl">2025 Distance Goal</h3>
-                <p className="text-blue-100 text-sm">
-                  {((metrics.totalDistance / 1000 / 1000) * 100).toFixed(1)}% to your goal of 1,000 km
-                </p>
-              </div>
-            </div>
-            <div className="text-left sm:text-right">
-              <div className="text-xl sm:text-2xl font-bold">
-                {formatDistance(metrics.totalDistance)} / 1,000 km
-              </div>
-              <div className="text-blue-100 text-sm">
-                {(1000 - (metrics.totalDistance / 1000)).toFixed(0)} km remaining
-              </div>
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="w-full bg-white bg-opacity-20 rounded-full h-3">
-              <div 
-                className="bg-white rounded-full h-3 transition-all duration-500 ease-out shadow-sm"
-                style={{ width: `${Math.min((metrics.totalDistance / 1000 / 1000) * 100, 100)}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+
 
       {/* Header Section */}
       <div className="bg-white shadow-sm border-b border-gray-200">

@@ -1,13 +1,7 @@
 import { EnrichedRun } from '../../types';
 import { 
   Goal, 
-  GoalProgress, 
-  GoalAnalysis, 
-  Milestone,
-  RaceGoal,
-  DistanceGoal,
-  ConsistencyGoal,
-  PaceGoal
+  GoalProgress
 } from './goalTypes';
 
 export const calculateGoalProgress = (goal: Goal, runs: EnrichedRun[]): GoalProgress => {
@@ -25,19 +19,16 @@ export const calculateGoalProgress = (goal: Goal, runs: EnrichedRun[]): GoalProg
   let insights: string[] = [];
   let recommendations: string[] = [];
 
-  // Simplified goal type calculations
+  // Simplified goal type calculations - only 3 types
   switch (goal.type) {
     case 'distance':
       currentValue = calculateDistanceGoal(goal, runs);
       break;
-    case 'time':
-      currentValue = calculateTimeGoal(goal, runs);
-      break;
-    case 'frequency':
-      currentValue = calculateFrequencyGoal(goal, runs);
-      break;
     case 'pace':
       currentValue = calculatePaceGoal(goal, runs);
+      break;
+    case 'runs':
+      currentValue = calculateRunsGoal(goal, runs);
       break;
     default:
       currentValue = 0;
@@ -81,30 +72,12 @@ const calculateDistanceGoal = (goal: Goal, runs: EnrichedRun[]): number => {
     return runDate >= createdDate && runDate <= targetDate;
   });
 
-  console.log(`[calculateDistanceGoal] Goal: ${goal.title}`);
-  console.log(`[calculateDistanceGoal] Date range: ${createdDate.toISOString()} to ${targetDate.toISOString()}`);
-  console.log(`[calculateDistanceGoal] Total runs: ${runs.length}, Relevant runs: ${relevantRuns.length}`);
-  
   const totalDistance = relevantRuns.reduce((total, run) => total + run.distance, 0);
-  console.log(`[calculateDistanceGoal] Total distance: ${totalDistance}m (${(totalDistance/1000).toFixed(1)}km)`);
   
   return totalDistance;
 };
 
-const calculateTimeGoal = (goal: Goal, runs: EnrichedRun[]): number => {
-  const targetDate = new Date(goal.targetDate);
-  const createdDate = new Date(goal.createdAt);
-  
-  const relevantRuns = runs.filter(run => {
-    const runDate = new Date(run.start_date_local || run.start_date);
-    return runDate >= createdDate && runDate <= targetDate;
-  });
-
-  const totalTime = relevantRuns.reduce((total, run) => total + run.moving_time, 0);
-  return totalTime; // in seconds
-};
-
-const calculateFrequencyGoal = (goal: Goal, runs: EnrichedRun[]): number => {
+const calculateRunsGoal = (goal: Goal, runs: EnrichedRun[]): number => {
   const targetDate = new Date(goal.targetDate);
   const createdDate = new Date(goal.createdAt);
   
@@ -175,14 +148,13 @@ const generateSimpleRecommendations = (
         const remainingDistance = (goal.targetValue - currentValue) / 1000;
         recommendations.push(`🏃‍♂️ Run ${(remainingDistance / daysRemaining).toFixed(1)}km per day to stay on track`);
         break;
-      case 'frequency':
-        recommendations.push(`📅 Focus on maintaining ${goal.targetValue} runs per week`);
+      case 'runs':
+        const remainingRuns = goal.targetValue - currentValue;
+        const runsPerWeek = (remainingRuns / daysRemaining) * 7;
+        recommendations.push(`📅 Aim for ${Math.ceil(runsPerWeek)} runs per week to stay on track`);
         break;
       case 'pace':
         recommendations.push(`⚡ Include speed work and tempo runs to improve pace`);
-        break;
-      case 'time':
-        recommendations.push(`⏱️ Focus on increasing your total running time each week`);
         break;
     }
   } else if (isOnTrack) {
@@ -196,12 +168,7 @@ const generateSimpleRecommendations = (
   return recommendations;
 };
 
-// Helper functions
-const calculateRecentMonthlyDistance = (runs: EnrichedRun[]): number => {
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const recentRuns = runs.filter(run => new Date(run.start_date_local || run.start_date) >= thirtyDaysAgo);
-  return recentRuns.reduce((total, run) => total + run.distance, 0);
-};
+// Helper functions can be added here as needed
 
 export const formatGoalProgress = (progress: GoalProgress): string => {
   return `${progress.progressPercentage.toFixed(1)}% complete`;
