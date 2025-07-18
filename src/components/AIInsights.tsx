@@ -1,22 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Brain, TrendingUp, Target, AlertCircle, CheckCircle, Clock, Zap } from 'lucide-react';
-import { Run, Goal } from '../types';
-import { aiCoachClient, TrainingInsight, GoalAnalysis, ProgressAssessment } from '../lib/ai-coach-client';
+import React, { useState } from 'react';
+import { Brain, AlertCircle, CheckCircle, Clock, Zap } from 'lucide-react';
+import { Run } from '../types';
+import { aiCoachClient, TrainingInsight } from '../lib/ai-coach-client';
 import AICoachSetup from './AICoachSetup';
 
 interface AIInsightsProps {
   runs: Run[];
-  goals: Goal[];
   className?: string;
 }
 
-export default function AIInsights({ runs, goals, className = '' }: AIInsightsProps) {
+export default function AIInsights({ runs, className = '' }: AIInsightsProps) {
   const [insights, setInsights] = useState<TrainingInsight[]>([]);
-  const [goalAnalyses, setGoalAnalyses] = useState<GoalAnalysis[]>([]);
-  const [progressAssessments, setProgressAssessments] = useState<ProgressAssessment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'insights' | 'goals' | 'progress'>('insights');
   const [needsSetup, setNeedsSetup] = useState(false);
   const [lastAnalysisTime, setLastAnalysisTime] = useState<number>(0);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -32,33 +28,9 @@ export default function AIInsights({ runs, goals, className = '' }: AIInsightsPr
     setError(null);
 
     try {
-      // Load insights and goal analysis in parallel
-      const [insightsResult, goalAnalysisResult, progressResult] = await Promise.allSettled([
-        aiCoachClient.generateInsights(runs, goals),
-        goals.length > 0 ? aiCoachClient.analyzeGoals(runs, goals) : Promise.resolve([]),
-        goals.length > 0 ? aiCoachClient.assessProgress(goals, runs) : Promise.resolve([])
-      ]);
-
-      if (insightsResult.status === 'fulfilled') {
-        setInsights(insightsResult.value);
-      }
-
-      if (goalAnalysisResult.status === 'fulfilled') {
-        setGoalAnalyses(goalAnalysisResult.value);
-      }
-
-      if (progressResult.status === 'fulfilled') {
-        setProgressAssessments(progressResult.value);
-      }
-
-      // Check if any requests failed
-      const failures = [insightsResult, goalAnalysisResult, progressResult]
-        .filter(result => result.status === 'rejected');
-      
-      if (failures.length > 0) {
-        console.warn('Some AI requests failed:', failures);
-        setError('Some AI features may not be available. Please try again later.');
-      }
+      // Load only training insights
+      const insights = await aiCoachClient.generateInsights(runs, []);
+      setInsights(insights);
 
       // Update cache tracking
       setLastAnalysisTime(Date.now());
@@ -145,42 +117,9 @@ export default function AIInsights({ runs, goals, className = '' }: AIInsightsPr
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex gap-4 mt-4">
-          <button
-            onClick={() => setActiveTab('insights')}
-            className={`pb-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'insights'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Training Insights
-          </button>
-          {goals.length > 0 && (
-            <>
-              <button
-                onClick={() => setActiveTab('goals')}
-                className={`pb-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'goals'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Goal Analysis
-              </button>
-              <button
-                onClick={() => setActiveTab('progress')}
-                className={`pb-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'progress'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Progress Check
-              </button>
-            </>
-          )}
+        {/* Simple header - no tabs needed */}
+        <div className="mt-4">
+          <h4 className="text-sm font-medium text-gray-700">Training Insights</h4>
         </div>
       </div>
 
@@ -208,9 +147,6 @@ export default function AIInsights({ runs, goals, className = '' }: AIInsightsPr
                 <span className="ml-2 text-gray-600">Analyzing your data...</span>
               </div>
             ) : (
-          <>
-            {/* Training Insights Tab */}
-            {activeTab === 'insights' && (
               <div className="space-y-4">
                 {insights.length === 0 ? (
                   <p className="text-gray-600">No insights available yet. Try refreshing or add more running data.</p>
@@ -249,135 +185,6 @@ export default function AIInsights({ runs, goals, className = '' }: AIInsightsPr
                 )}
               </div>
             )}
-
-            {/* Goal Analysis Tab */}
-            {activeTab === 'goals' && (
-              <div className="space-y-4">
-                {goalAnalyses.length === 0 ? (
-                  <p className="text-gray-600">No goal analysis available. Create some goals to get AI recommendations!</p>
-                ) : (
-                  goalAnalyses.map((analysis, index) => {
-                    const goal = goals[index];
-                    return (
-                      <div key={index} className="border rounded-lg p-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h4 className="font-medium text-gray-900">{goal?.type} Goal</h4>
-                            <p className="text-sm text-gray-600">
-                              Target: {goal?.target} {goal?.type === 'pace' ? 'min/km' : goal?.type === 'distance' ? 'km' : 'runs/week'}
-                            </p>
-                          </div>
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${getFeasibilityColor(analysis.feasibility)}`}>
-                            {analysis.feasibility.replace('_', ' ')}
-                          </span>
-                        </div>
-
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-xs font-medium text-gray-700 mb-1">Success Probability</p>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 bg-gray-200 rounded-full h-2">
-                                <div 
-                                  className="bg-blue-600 h-2 rounded-full" 
-                                  style={{ width: `${analysis.successProbability}%` }}
-                                ></div>
-                              </div>
-                              <span className="text-sm font-medium">{analysis.successProbability}%</span>
-                            </div>
-                          </div>
-
-                          {analysis.recommendations && analysis.recommendations.length > 0 && (
-                            <div>
-                              <p className="text-xs font-medium text-gray-700 mb-1">Recommendations</p>
-                              <ul className="text-xs text-gray-600 space-y-1">
-                                {analysis.recommendations.map((rec, recIndex) => (
-                                  <li key={recIndex} className="flex items-start gap-1">
-                                    <TrendingUp className="w-3 h-3 text-blue-600 mt-0.5 flex-shrink-0" />
-                                    <span>{rec}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                          {analysis.milestones && analysis.milestones.length > 0 && (
-                            <div>
-                              <p className="text-xs font-medium text-gray-700 mb-1">Key Milestones</p>
-                              <ul className="text-xs text-gray-600 space-y-1">
-                                {analysis.milestones.map((milestone, milestoneIndex) => (
-                                  <li key={milestoneIndex} className="flex items-start gap-1">
-                                    <Target className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
-                                    <span>{milestone}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-
-            {/* Progress Assessment Tab */}
-            {activeTab === 'progress' && (
-              <div className="space-y-4">
-                {progressAssessments.length === 0 ? (
-                  <p className="text-gray-600">No progress assessment available yet. Keep training to get progress updates!</p>
-                ) : (
-                  progressAssessments.map((assessment, index) => (
-                    <div key={index} className="border rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <h4 className="font-medium text-gray-900">Progress Assessment</h4>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(assessment.status)}`}>
-                          {assessment.status.replace('_', ' ')}
-                        </span>
-                      </div>
-
-                      <p className="text-gray-600 text-sm mb-4">{assessment.message}</p>
-
-                      {assessment.adjustments && assessment.adjustments.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-xs font-medium text-gray-700 mb-2">Recommended Adjustments</p>
-                          <ul className="text-xs text-gray-600 space-y-1">
-                            {assessment.adjustments.map((adjustment, adjIndex) => (
-                              <li key={adjIndex} className="flex items-start gap-1">
-                                <span className="text-orange-600 mt-1">•</span>
-                                <span>{adjustment}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {assessment.nextSteps && assessment.nextSteps.length > 0 && (
-                        <div>
-                          <p className="text-xs font-medium text-gray-700 mb-2">Next Steps</p>
-                          <ul className="text-xs text-gray-600 space-y-1">
-                            {assessment.nextSteps.map((step, stepIndex) => (
-                              <li key={stepIndex} className="flex items-start gap-1">
-                                <CheckCircle className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
-                                <span>{step}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {assessment.motivationalMessage && (
-                        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                          <p className="text-blue-700 text-sm font-medium">{assessment.motivationalMessage}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-            </>
-          )}
         </>
         )}
       </div>
