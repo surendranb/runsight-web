@@ -35,7 +35,7 @@
 
 ## Phase 3: Build Dropdown-Based Goal Creation
 
-- [ ] 5. Create new CreateGoalModal component
+- [x] 5. Create new CreateGoalModal component
   - Build step-by-step goal creation flow with dropdowns
   - Step 1: Select goal type (distance/pace/runs)
   - Step 2: Select specific options based on type
@@ -43,7 +43,7 @@
   - Step 4: Review and submit
   - _Requirements: 6.1, 6.2, 6.6_
 
-- [ ] 6. Implement goal creation form logic
+- [x] 6. Implement goal creation form logic
   - Handle dynamic form updates based on goal type selection
   - Validate all dropdown selections
   - Auto-generate goal titles and descriptions from selections
