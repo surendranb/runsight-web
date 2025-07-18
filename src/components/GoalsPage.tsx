@@ -4,6 +4,7 @@ import { User, EnrichedRun } from '../types';
 import { Goal, GoalProgress as GoalProgressType, CreateGoalRequest } from '../lib/goals/goalTypes';
 import { calculateGoalProgress, getGoalStatusColor } from '../lib/goals/goalUtils';
 import { GoalTemplate, getPopularTemplates, getTemplatesByCategory, templateToGoalRequest } from '../lib/goals/goalTemplates';
+import { apiClient } from '../lib/secure-api-client';
 import AIInsights from './AIInsights';
 
 interface GoalsPageProps {
@@ -20,6 +21,29 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({ user, runs, isLoading, err
   const [goalProgress, setGoalProgress] = useState<Map<string, GoalProgressType>>(new Map());
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
+  const [goalsLoading, setGoalsLoading] = useState(true);
+  const [goalsError, setGoalsError] = useState<string | null>(null);
+
+  // Load goals from Supabase
+  useEffect(() => {
+    const loadGoals = async () => {
+      if (!user?.id) return;
+      
+      try {
+        setGoalsLoading(true);
+        setGoalsError(null);
+        const userGoals = await apiClient.getUserGoals(user.id);
+        setGoals(userGoals);
+      } catch (err: any) {
+        console.error('Failed to load goals:', err);
+        setGoalsError(err.message || 'Failed to load goals');
+      } finally {
+        setGoalsLoading(false);
+      }
+    };
+
+    loadGoals();
+  }, [user?.id]);
 
   useEffect(() => {
     // Calculate progress for each goal
@@ -31,42 +55,46 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({ user, runs, isLoading, err
     setGoalProgress(progressMap);
   }, [goals, runs]);
 
-  const handleCreateGoal = (goalData: CreateGoalRequest) => {
-    // For annual goals, set creation date to start of year to include all runs
-    let createdAt = new Date().toISOString();
-    
-    if (goalData.category === 'annual' || goalData.targetDate === '2025-12-31') {
-      // For 2025 annual goals, start from January 1st, 2025
-      createdAt = '2025-01-01T00:00:00.000Z';
-    } else if (goalData.category === 'monthly') {
-      // For monthly goals, start from beginning of current month
-      const now = new Date();
-      createdAt = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const handleCreateGoal = async (goalData: CreateGoalRequest) => {
+    try {
+      // For annual goals, set creation date to start of year to include all runs
+      let createdAt = new Date().toISOString();
+      
+      if (goalData.category === 'annual' || goalData.targetDate === '2025-12-31') {
+        // For 2025 annual goals, start from January 1st, 2025
+        createdAt = '2025-01-01T00:00:00.000Z';
+      } else if (goalData.category === 'monthly') {
+        // For monthly goals, start from beginning of current month
+        const now = new Date();
+        createdAt = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      }
+
+      // Create goal in Supabase
+      const result = await apiClient.createGoal(user.id, {
+        ...goalData,
+        createdAt: createdAt
+      });
+
+      // Add the new goal to local state
+      setGoals(prev => [...prev, result.goal]);
+      setShowCreateModal(false);
+      
+      console.log('Goal created successfully:', result.goal.title);
+    } catch (error: any) {
+      console.error('Failed to create goal:', error);
+      setGoalsError(error.message || 'Failed to create goal');
     }
-
-    const newGoal: Goal = {
-      id: Date.now().toString(),
-      userId: user.id,
-      type: goalData.type,
-      title: goalData.title,
-      description: goalData.description || '',
-      targetValue: goalData.targetValue,
-      currentValue: 0,
-      unit: goalData.unit,
-      targetDate: goalData.targetDate,
-      createdAt: createdAt,
-      updatedAt: new Date().toISOString(),
-      status: 'active',
-      priority: goalData.priority || 'medium',
-      category: goalData.category || 'annual'
-    };
-
-    setGoals(prev => [...prev, newGoal]);
-    setShowCreateModal(false);
   };
 
-  const handleDeleteGoal = (goalId: string) => {
-    setGoals(prev => prev.filter(g => g.id !== goalId));
+  const handleDeleteGoal = async (goalId: string) => {
+    try {
+      await apiClient.deleteGoal(user.id, goalId);
+      setGoals(prev => prev.filter(g => g.id !== goalId));
+      console.log('Goal deleted successfully');
+    } catch (error: any) {
+      console.error('Failed to delete goal:', error);
+      setGoalsError(error.message || 'Failed to delete goal');
+    }
   };
 
   const formatValue = (value: number, unit: string): string => {

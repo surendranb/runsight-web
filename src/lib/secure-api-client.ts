@@ -255,6 +255,72 @@ class SecureApiClient {
     // No-op for simplified approach - no complex session management
     return Promise.resolve();
   }
+
+  // Goal operations
+  async getUserGoals(userId: string | number): Promise<any[]> {
+    console.log(`🎯 Fetching goals for user ${userId}...`);
+    
+    const response = await fetch(`${this.baseUrl}/get-goals?userId=${userId}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch goals');
+    }
+
+    const data = await response.json();
+    return data.goals || [];
+  }
+
+  async createGoal(userId: string | number, goalData: any): Promise<any> {
+    console.log(`🎯 Creating goal for user ${userId}:`, goalData.title);
+    
+    const response = await fetch(`${this.baseUrl}/create-goal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, ...goalData })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create goal');
+    }
+
+    return await response.json();
+  }
+
+  async updateGoal(userId: string | number, goalId: string, updates: any): Promise<any> {
+    console.log(`🎯 Updating goal ${goalId} for user ${userId}`);
+    
+    const response = await fetch(`${this.baseUrl}/update-goal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, goalId, ...updates })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update goal');
+    }
+
+    return await response.json();
+  }
+
+  async deleteGoal(userId: string | number, goalId: string): Promise<void> {
+    console.log(`🎯 Deleting goal ${goalId} for user ${userId}`);
+    
+    const response = await fetch(`${this.baseUrl}/delete-goal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, goalId })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to delete goal');
+    }
+  }
 }
 
 // Create and export the API client instance
