@@ -52,7 +52,7 @@
 
 ## Phase 4: Implement Robust Progress Calculation
 
-- [ ] 7. Create GoalCalculator class
+- [x] 7. Create GoalCalculator class
   - Implement calculateDistanceProgress method
   - Implement calculatePaceProgress method with distance tolerance
   - Implement calculateRunsProgress method
@@ -60,7 +60,7 @@
   - Handle edge cases (leap years, month boundaries, timezones)
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 8. Add progress tracking utilities
+- [-] 8. Add progress tracking utilities
   - Create filterRunsByTimeframe utility function
   - Add calculateOnTrackStatus logic
   - Implement projectedCompletion calculations
