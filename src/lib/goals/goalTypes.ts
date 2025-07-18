@@ -146,7 +146,11 @@ export interface CreateGoalRequest {
   targetDate: string;
   priority?: Goal['priority'];
   category?: Goal['category'];
-  additionalDetails?: any;
+  additionalDetails?: {
+    raceDistance?: number;
+    timeframe?: 'weekly' | 'monthly' | 'yearly';
+    difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  };
 }
 
 export interface UpdateGoalRequest {

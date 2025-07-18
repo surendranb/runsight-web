@@ -3,6 +3,7 @@ import {
   Goal, 
   GoalProgress
 } from './goalTypes';
+import { DataQualityFilter } from './dataQualityFilter';
 
 export const calculateGoalProgress = (goal: Goal, runs: EnrichedRun[]): GoalProgress => {
   const now = new Date();
@@ -62,16 +63,13 @@ export const calculateGoalProgress = (goal: Goal, runs: EnrichedRun[]): GoalProg
   };
 };
 
-// Simplified goal calculation functions
+// Simplified goal calculation functions with data quality filtering
 const calculateDistanceGoal = (goal: Goal, runs: EnrichedRun[]): number => {
   const targetDate = new Date(goal.targetDate);
   const createdDate = new Date(goal.createdAt);
   
-  const relevantRuns = runs.filter(run => {
-    const runDate = new Date(run.start_date_local || run.start_date);
-    return runDate >= createdDate && runDate <= targetDate;
-  });
-
+  // Use DataQualityFilter to get clean, relevant runs
+  const relevantRuns = DataQualityFilter.filterRunsByTimeframe(runs, createdDate, targetDate);
   const totalDistance = relevantRuns.reduce((total, run) => total + run.distance, 0);
   
   return totalDistance;
@@ -81,28 +79,25 @@ const calculateRunsGoal = (goal: Goal, runs: EnrichedRun[]): number => {
   const targetDate = new Date(goal.targetDate);
   const createdDate = new Date(goal.createdAt);
   
-  const relevantRuns = runs.filter(run => {
-    const runDate = new Date(run.start_date_local || run.start_date);
-    return runDate >= createdDate && runDate <= targetDate;
-  });
-
-  return relevantRuns.length; // number of runs
+  // Use DataQualityFilter to get clean, relevant runs
+  const relevantRuns = DataQualityFilter.filterRunsByTimeframe(runs, createdDate, targetDate);
+  return relevantRuns.length; // number of valid runs
 };
 
 const calculatePaceGoal = (goal: Goal, runs: EnrichedRun[]): number => {
-  // For pace goals, we need to find the best pace achieved
-  // This is more complex, so for now return 0 if no specific distance is set
-  const relevantRuns = runs.filter(run => run.distance > 0);
+  // For pace goals, we need to find the best time for the target race distance
+  if (!goal.raceDistance) return 0;
+  
+  // Use DataQualityFilter to get runs within distance tolerance (±10%)
+  const relevantRuns = DataQualityFilter.filterRunsForPaceGoal(runs, goal.raceDistance, 0.1);
   
   if (relevantRuns.length === 0) return 0;
   
-  // Get best pace (lowest seconds per km)
-  const bestPace = Math.min(...relevantRuns.map(run => run.moving_time / (run.distance / 1000)));
+  // Find the best (fastest) time for this distance
+  const bestTime = Math.min(...relevantRuns.map(run => run.moving_time));
   
-  // If current best pace is better than target, return 100% (achieved)
-  if (bestPace <= goal.targetValue) return goal.targetValue;
-  
-  return bestPace; // return current best pace in seconds per km
+  // Return the best time achieved (in seconds)
+  return bestTime;
 };
 
 const generateSimpleInsights = (

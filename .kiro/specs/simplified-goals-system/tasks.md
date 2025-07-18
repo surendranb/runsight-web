@@ -18,14 +18,14 @@
 
 ## Phase 2: Create Simplified Goal Types and Dropdown Options
 
-- [ ] 3. Define simplified goal types and interfaces
+- [x] 3. Define simplified goal types and interfaces
   - Create new simplified Goal interface with only 3 types: distance, pace, runs
   - Define DistanceGoal, PaceGoal, and RunsGoal interfaces
   - Create dropdown option constants for each goal type
   - Add proper TypeScript types for all dropdown selections
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 4. Create dropdown configuration system
+- [x] 4. Create dropdown configuration system
   - Define DISTANCE_OPTIONS with preset yearly/monthly targets
   - Define PACE_OPTIONS with race distances and target times
   - Define RUNS_OPTIONS with preset yearly/monthly targets
