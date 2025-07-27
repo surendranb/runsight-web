@@ -14,9 +14,10 @@
 - **Node Version**: 18+
 
 ## External APIs
-- **Strava API**: OAuth authentication and activity data
-- **OpenWeatherMap API**: Historical weather data enrichment
-- **Supabase**: Database operations and authentication
+- **Strava API**: OAuth authentication and activity data with rate limiting
+- **OpenWeatherMap API**: Historical weather data enrichment (requires paid plan for historical data)
+- **Supabase**: Database operations and authentication with Row Level Security
+- **Google Generative AI**: AI coach insights and recommendations (optional)
 
 ## Development Tools
 - **Linting**: ESLint 9+ with TypeScript support
@@ -28,12 +29,12 @@
 
 ### Development
 ```bash
-npm run dev          # Start development server (port 12000)
+npm run dev          # Start development server (port 12000, host 0.0.0.0)
 npm run build        # Production build with env check
 npm run build:skip-check  # Build without environment validation
 npm run preview      # Preview production build
-npm run lint         # Run ESLint
-npm run check-env    # Validate environment variables
+npm run lint         # Run ESLint with TypeScript support
+npm run check-env    # Validate environment variables (secure architecture)
 ```
 
 ### Environment Setup
