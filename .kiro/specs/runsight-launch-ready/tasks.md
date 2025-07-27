@@ -72,13 +72,13 @@ After completing each major task (not subtasks), follow the testing workflow:
   - Add confidence indicators and sample size information for data reliability
   - _Requirements: 6.1, 6.2, 6.7_
 
-- [ ] 4. Optimize Insights Page for Cognitive Load
+- [x] 4. Optimize Insights Page for Cognitive Load
   - Restructure insights page to show maximum 7 insights at once with pagination or filtering
   - Implement insight categorization with clear visual grouping
   - Add insight summary cards with progressive disclosure to detailed analysis
   - _Requirements: 1.1, 1.2, 6.7_
 
-- [ ] 4.1 Create Insight Prioritization and Filtering System
+- [x] 4.1 Create Insight Prioritization and Filtering System
   - Implement algorithm that scores insights by potential performance impact
   - Create filtering system that allows users to focus on specific types of insights
   - Add "Most Important" default view that shows highest-priority insights first

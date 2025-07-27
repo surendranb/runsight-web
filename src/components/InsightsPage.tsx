@@ -12,9 +12,16 @@ import { LocationIntelligenceInsight } from './insights/LocationIntelligenceInsi
 import { AdvancedPerformanceInsight } from './insights/AdvancedPerformanceInsight';
 import { MonthlySummaryTable } from './insights/MonthlySummaryTable';
 import { ActionableInsightCard, ActionableInsight } from './insights/ActionableInsightCard';
-import { getActionableInsights } from '../lib/insights/actionableInsightsEngine';
+import { InsightSummaryCard } from './insights/InsightSummaryCard';
+import { 
+  getActionableInsights, 
+  getPrioritizedInsights, 
+  getMostImportantInsights,
+  getInsightCategories,
+  InsightFilter 
+} from '../lib/insights/actionableInsightsEngine';
 import { ProgressiveHelp, HelpIcon } from './common/ContextualHelp';
-import { Lightbulb, Filter, SortAsc } from 'lucide-react';
+import { Lightbulb, ChevronLeft, ChevronRight, Grid3X3, List, FileText } from 'lucide-react';
 
 interface InsightsPageProps {
   user: User;
@@ -25,37 +32,64 @@ interface InsightsPageProps {
 }
 
 export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoading, error }) => {
+  const [viewMode, setViewMode] = useState<'most-important' | 'all' | 'filtered'>('most-important');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'priority' | 'confidence' | 'category'>('priority');
+  const [selectedPriority, setSelectedPriority] = useState<string>('all');
+  const [onlyActionable, setOnlyActionable] = useState<boolean>(false);
+  const [minConfidence, setMinConfidence] = useState<number>(0.6);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [displayMode, setDisplayMode] = useState<'cards' | 'summary' | 'grouped'>('summary');
   
-  // Generate actionable insights
-  const actionableInsights = useMemo(() => getActionableInsights(runs), [runs]);
+  // Cognitive load optimization: max 7 insights per page
+  const INSIGHTS_PER_PAGE = 7;
   
-  // Filter and sort insights
-  const filteredInsights = useMemo(() => {
-    let filtered = actionableInsights;
-    
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(insight => insight.category === selectedCategory);
+  // Get insight categories for filtering
+  const insightCategories = useMemo(() => getInsightCategories(), []);
+  
+  // Generate all insights based on view mode
+  const allInsights = useMemo(() => {
+    if (viewMode === 'most-important') {
+      return getMostImportantInsights(runs);
     }
     
-    // Sort insights
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'priority':
-          const priorityOrder = { high: 3, medium: 2, low: 1 };
-          return priorityOrder[b.priority] - priorityOrder[a.priority];
-        case 'confidence':
-          return b.confidence - a.confidence;
-        case 'category':
-          return a.category.localeCompare(b.category);
-        default:
-          return 0;
-      }
-    });
+    if (viewMode === 'all') {
+      return getActionableInsights(runs);
+    }
     
-    return filtered;
-  }, [actionableInsights, selectedCategory, sortBy]);
+    // Filtered view
+    const filter: InsightFilter = {
+      categories: selectedCategory !== 'all' ? [selectedCategory] : undefined,
+      priorities: selectedPriority !== 'all' ? [selectedPriority] : undefined,
+      onlyActionable: onlyActionable || undefined,
+      minConfidence: minConfidence
+    };
+    
+    return getPrioritizedInsights(runs, filter);
+  }, [runs, viewMode, selectedCategory, selectedPriority, onlyActionable, minConfidence]);
+
+  // Pagination logic - following 7±2 rule
+  const totalPages = Math.ceil(allInsights.length / INSIGHTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * INSIGHTS_PER_PAGE;
+  const endIndex = startIndex + INSIGHTS_PER_PAGE;
+  const displayedInsights = allInsights.slice(startIndex, endIndex);
+
+  // Group insights by category for grouped view
+  const groupedInsights = useMemo(() => {
+    const groups = displayedInsights.reduce((acc, insight) => {
+      if (!acc[insight.category]) {
+        acc[insight.category] = [];
+      }
+      acc[insight.category].push(insight);
+      return acc;
+    }, {} as Record<string, typeof displayedInsights>);
+    
+    return groups;
+  }, [displayedInsights]);
+
+  // Reset page when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [viewMode, selectedCategory, selectedPriority, onlyActionable, minConfidence]);
   
   const handleInsightAction = (insightId: string, action: string) => {
     console.log(`Insight ${insightId} action: ${action}`);
@@ -97,7 +131,7 @@ export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoadin
       </div>
 
       {/* Actionable Insights Section */}
-      {actionableInsights.length > 0 && (
+      {displayedInsights.length > 0 && (
         <div className="mb-8">
           <div className="bg-white shadow rounded-lg p-6">
             <div className="flex items-center justify-between mb-6">
@@ -105,72 +139,324 @@ export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoadin
                 <Lightbulb className="w-6 h-6 text-yellow-500" />
                 <h3 className="text-xl font-semibold text-gray-800">Actionable Insights</h3>
                 <HelpIcon 
-                  content="These insights are prioritized by importance and actionability to help you make the biggest impact on your running."
+                  content="These insights are prioritized by potential impact, confidence, and actionability to help you make the biggest improvements to your running."
                   size="md"
                 />
               </div>
-              
-              {/* Filters and sorting */}
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2">
-                  <Filter className="w-4 h-4 text-gray-500" />
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            </div>
+
+            {/* View Mode and Display Controls */}
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+              {/* View Mode Selector */}
+              <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('most-important')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'most-important'
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  Most Important
+                </button>
+                <button
+                  onClick={() => setViewMode('all')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'all'
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  All Insights
+                </button>
+                <button
+                  onClick={() => setViewMode('filtered')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'filtered'
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  Custom Filter
+                </button>
+              </div>
+
+              {/* Display Mode Selector */}
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Display:</span>
+                <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setDisplayMode('summary')}
+                    className={`p-2 rounded-md transition-colors ${
+                      displayMode === 'summary'
+                        ? 'bg-white text-blue-700 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-800'
+                    }`}
+                    title="Summary cards with progressive disclosure"
                   >
-                    <option value="all">All Categories</option>
-                    <option value="performance">Performance</option>
-                    <option value="consistency">Consistency</option>
-                    <option value="training">Training</option>
-                    <option value="health">Health</option>
-                    <option value="achievement">Achievement</option>
-                  </select>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <SortAsc className="w-4 h-4 text-gray-500" />
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as 'priority' | 'confidence' | 'category')}
-                    className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    <FileText className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setDisplayMode('cards')}
+                    className={`p-2 rounded-md transition-colors ${
+                      displayMode === 'cards'
+                        ? 'bg-white text-blue-700 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-800'
+                    }`}
+                    title="Full card view"
                   >
-                    <option value="priority">Priority</option>
-                    <option value="confidence">Confidence</option>
-                    <option value="category">Category</option>
-                  </select>
+                    <Grid3X3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setDisplayMode('grouped')}
+                    className={`p-2 rounded-md transition-colors ${
+                      displayMode === 'grouped'
+                        ? 'bg-white text-blue-700 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-800'
+                    }`}
+                    title="Grouped by category"
+                  >
+                    <List className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             </div>
 
-            <ProgressiveHelp
-              title="Understanding Actionable Insights"
-              basicExplanation="Each insight shows a finding from your data, explains what it means, and provides specific recommendations you can act on."
-              detailedExplanation="Insights are prioritized by their potential impact on your running and how confident we are in the data. High-priority insights with high confidence should be your focus."
-              examples={[
-                "Performance insights help you run faster or more efficiently",
-                "Consistency insights help you build better training habits",
-                "Health insights help you avoid injury and recover better"
-              ]}
-              className="mb-6"
-            />
+            {/* Filtering Options (only show when in filtered mode) */}
+            {viewMode === 'filtered' && (
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Category Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Category
+                    </label>
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="w-full text-sm border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">All Categories</option>
+                      {insightCategories.map(category => (
+                        <option key={category.value} value={category.value}>
+                          {category.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-            {/* Insights grid */}
-            <div className="space-y-6">
-              {filteredInsights.map((insight) => (
-                <ActionableInsightCard
-                  key={insight.id}
-                  insight={insight}
-                  onAction={handleInsightAction}
+                  {/* Priority Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Priority
+                    </label>
+                    <select
+                      value={selectedPriority}
+                      onChange={(e) => setSelectedPriority(e.target.value)}
+                      className="w-full text-sm border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">All Priorities</option>
+                      <option value="high">High Priority</option>
+                      <option value="medium">Medium Priority</option>
+                      <option value="low">Low Priority</option>
+                    </select>
+                  </div>
+
+                  {/* Confidence Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Min Confidence: {(minConfidence * 100).toFixed(0)}%
+                    </label>
+                    <input
+                      type="range"
+                      min="0.3"
+                      max="1"
+                      step="0.1"
+                      value={minConfidence}
+                      onChange={(e) => setMinConfidence(parseFloat(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Actionable Filter */}
+                  <div>
+                    <label className="flex items-center space-x-2 text-sm font-medium text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={onlyActionable}
+                        onChange={(e) => setOnlyActionable(e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span>Only Actionable</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* View Mode Descriptions */}
+            <div className="mb-6">
+              {viewMode === 'most-important' && (
+                <ProgressiveHelp
+                  title="Most Important Insights"
+                  basicExplanation="These are your top 4 insights, automatically prioritized by potential impact on your running performance."
+                  detailedExplanation="Our algorithm considers impact potential, data confidence, actionability, and urgency to surface the insights that matter most for your training. Use summary view for quick scanning or expand individual insights for details."
+                  examples={[
+                    "High-impact performance improvements you can make immediately",
+                    "Health insights that could prevent injury",
+                    "Training adjustments with the biggest potential benefit"
+                  ]}
+                  className="mb-4"
                 />
-              ))}
+              )}
+              
+              {viewMode === 'all' && (
+                <ProgressiveHelp
+                  title="All Available Insights"
+                  basicExplanation="Complete list of insights from your running data, automatically prioritized by importance. Maximum 7 insights per page to reduce cognitive load."
+                  detailedExplanation="All insights that meet minimum confidence and sample size requirements, sorted by their potential impact on your running. Use pagination to browse through all insights."
+                  examples={[
+                    "Performance trends and patterns",
+                    "Training consistency analysis",
+                    "Achievement celebrations and milestones"
+                  ]}
+                  className="mb-4"
+                />
+              )}
+              
+              {viewMode === 'filtered' && (
+                <ProgressiveHelp
+                  title="Custom Filtered Insights"
+                  basicExplanation="Filter insights by category, priority, confidence level, and actionability to focus on what matters to you. Results are paginated to show maximum 7 insights at once."
+                  detailedExplanation="Use the filters above to narrow down insights based on your current training focus and preferences. The summary view helps you quickly scan through filtered results."
+                  examples={[
+                    "Focus on only performance insights for race preparation",
+                    "Show only high-confidence insights for reliable guidance",
+                    "Filter for actionable insights you can implement immediately"
+                  ]}
+                  className="mb-4"
+                />
+              )}
             </div>
 
-            {filteredInsights.length === 0 && (
+            {/* Insights Display */}
+            {displayMode === 'summary' ? (
+              /* Summary View - Compact cards with progressive disclosure */
+              <div className="space-y-4">
+                {displayedInsights.map((insight) => (
+                  <InsightSummaryCard
+                    key={insight.id}
+                    insight={insight}
+                    onAction={handleInsightAction}
+                  />
+                ))}
+              </div>
+            ) : displayMode === 'cards' ? (
+              /* Card View - Full detailed cards */
+              <div className="space-y-6">
+                {displayedInsights.map((insight) => (
+                  <ActionableInsightCard
+                    key={insight.id}
+                    insight={insight}
+                    onAction={handleInsightAction}
+                  />
+                ))}
+              </div>
+            ) : (
+              /* Grouped View - Visual categorization */
+              <div className="space-y-8">
+                {Object.entries(groupedInsights).map(([category, categoryInsights]) => {
+                  const categoryInfo = insightCategories.find(c => c.value === category);
+                  return (
+                    <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
+                      {/* Category Header */}
+                      <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="text-lg font-semibold text-gray-800 capitalize">
+                              {categoryInfo?.label || category}
+                            </h4>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {categoryInfo?.description || `Insights related to ${category}`}
+                            </p>
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {categoryInsights.length} insight{categoryInsights.length !== 1 ? 's' : ''}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Category Insights */}
+                      <div className="divide-y divide-gray-200">
+                        {categoryInsights.map((insight) => (
+                          <div key={insight.id} className="p-6">
+                            <ActionableInsightCard
+                              insight={insight}
+                              onAction={handleInsightAction}
+                              className="border-0 shadow-none bg-transparent p-0"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="mt-8 flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  Showing {startIndex + 1}-{Math.min(endIndex, allInsights.length)} of {allInsights.length} insights
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                          page === currentPage
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <button
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {allInsights.length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 <Lightbulb className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p>No insights match your current filters.</p>
-                <p className="text-sm">Try adjusting your category or sort options.</p>
+                <p>No insights match your current criteria.</p>
+                <p className="text-sm">
+                  {viewMode === 'filtered' 
+                    ? 'Try adjusting your filters or switch to "All Insights" view.'
+                    : 'More insights will appear as you add more running data.'
+                  }
+                </p>
               </div>
             )}
           </div>

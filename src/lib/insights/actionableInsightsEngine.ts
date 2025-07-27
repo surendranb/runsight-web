@@ -9,6 +9,23 @@ export interface InsightGenerationConfig {
   includeAchievements: boolean;
 }
 
+export interface InsightPrioritizationScore {
+  impactScore: number; // 0-1: Potential performance improvement
+  confidenceScore: number; // 0-1: Data reliability
+  actionabilityScore: number; // 0-1: How easily user can act on it
+  urgencyScore: number; // 0-1: How time-sensitive the insight is
+  totalScore: number; // Weighted combination
+}
+
+export interface InsightFilter {
+  categories?: string[];
+  priorities?: string[];
+  minConfidence?: number;
+  onlyActionable?: boolean;
+  timeframe?: string[];
+  difficulty?: string[];
+}
+
 const defaultConfig: InsightGenerationConfig = {
   minSampleSize: 3,
   minConfidence: 0.6,
@@ -359,7 +376,6 @@ export class ActionableInsightsEngine {
       .sort((a, b) => b.count - a.count);
 
     const mostFrequentDay = dayStats[0];
-    const leastFrequentDay = dayStats[dayStats.length - 1];
 
     if (!mostFrequentDay || mostFrequentDay.count < runs.length * 0.25) return null;
 
@@ -443,7 +459,6 @@ export class ActionableInsightsEngine {
 
     const avgGap = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
     const shortGaps = gaps.filter(gap => gap < 1).length; // Back-to-back days
-    const longGaps = gaps.filter(gap => gap > 7).length; // More than a week
 
     if (shortGaps < gaps.length * 0.3) return null; // Not enough consecutive days to warrant advice
 
@@ -513,13 +528,6 @@ export class ActionableInsightsEngine {
 
   private analyzePersonalRecords(runs: EnrichedRun[]): ActionableInsight | null {
     if (runs.length < 5) return null;
-
-    // Find recent PRs (last 30 days)
-    const recentPRs = runs.filter(run => {
-      const runDate = new Date(run.start_date_local);
-      const daysSince = (Date.now() - runDate.getTime()) / (1000 * 60 * 60 * 24);
-      return daysSince <= 30;
-    });
 
     // Simple PR detection: fastest pace for any distance
     const fastestRun = runs.reduce((fastest, run) => {
@@ -614,38 +622,171 @@ export class ActionableInsightsEngine {
     return totalDistance > 0 ? totalTime / (totalDistance / 1000) : null;
   }
 
+  /**
+   * Calculate comprehensive prioritization score for an insight
+   */
+  calculatePrioritizationScore(insight: ActionableInsight): InsightPrioritizationScore {
+    // Impact Score: Based on priority and potential performance improvement
+    const impactScore = this.calculateImpactScore(insight);
+    
+    // Confidence Score: Based on data quality and sample size
+    const confidenceScore = this.calculateConfidenceScore(insight);
+    
+    // Actionability Score: How easily user can act on the insight
+    const actionabilityScore = this.calculateActionabilityScore(insight);
+    
+    // Urgency Score: How time-sensitive the insight is
+    const urgencyScore = this.calculateUrgencyScore(insight);
+    
+    // Weighted total score (impact and actionability weighted higher)
+    const totalScore = (
+      impactScore * 0.35 +
+      confidenceScore * 0.25 +
+      actionabilityScore * 0.30 +
+      urgencyScore * 0.10
+    );
+    
+    return {
+      impactScore,
+      confidenceScore,
+      actionabilityScore,
+      urgencyScore,
+      totalScore
+    };
+  }
+
+  private calculateImpactScore(insight: ActionableInsight): number {
+    let score = 0;
+    
+    // Base score from priority
+    switch (insight.priority) {
+      case 'high': score += 0.8; break;
+      case 'medium': score += 0.6; break;
+      case 'low': score += 0.4; break;
+    }
+    
+    // Bonus for performance-related insights
+    if (insight.category === 'performance') score += 0.2;
+    
+    // Bonus for health-related insights (injury prevention)
+    if (insight.category === 'health') score += 0.15;
+    
+    return Math.min(1, score);
+  }
+
+  private calculateConfidenceScore(insight: ActionableInsight): number {
+    let score = insight.confidence;
+    
+    // Adjust based on sample size
+    if (insight.sampleSize >= 20) score += 0.1;
+    else if (insight.sampleSize < 5) score -= 0.2;
+    
+    // Adjust based on data quality
+    switch (insight.dataQuality) {
+      case 'high': score += 0.1; break;
+      case 'low': score -= 0.1; break;
+    }
+    
+    return Math.max(0, Math.min(1, score));
+  }
+
+  private calculateActionabilityScore(insight: ActionableInsight): number {
+    if (!insight.actionable) return 0;
+    
+    let score = 0.8; // Base score for actionable insights
+    
+    // Adjust based on difficulty
+    switch (insight.difficulty) {
+      case 'easy': score += 0.2; break;
+      case 'moderate': score += 0.1; break;
+      case 'challenging': score -= 0.1; break;
+    }
+    
+    // Bonus for immediate or short-term results
+    switch (insight.timeframe) {
+      case 'immediate': score += 0.15; break;
+      case 'short-term': score += 0.1; break;
+      case 'long-term': score -= 0.05; break;
+    }
+    
+    return Math.min(1, score);
+  }
+
+  private calculateUrgencyScore(insight: ActionableInsight): number {
+    let score = 0.5; // Base urgency
+    
+    // High urgency for health-related insights
+    if (insight.category === 'health' && insight.priority === 'high') {
+      score = 1.0;
+    }
+    
+    // Medium urgency for performance declines
+    if (insight.category === 'performance' && insight.data?.trend === 'declining') {
+      score = 0.8;
+    }
+    
+    // Lower urgency for achievements
+    if (insight.category === 'achievement') {
+      score = 0.2;
+    }
+    
+    return score;
+  }
+
+  /**
+   * Filter insights based on criteria
+   */
+  filterInsights(insights: ActionableInsight[], filter: InsightFilter): ActionableInsight[] {
+    return insights.filter(insight => {
+      // Category filter
+      if (filter.categories && filter.categories.length > 0) {
+        if (!filter.categories.includes(insight.category)) return false;
+      }
+      
+      // Priority filter
+      if (filter.priorities && filter.priorities.length > 0) {
+        if (!filter.priorities.includes(insight.priority)) return false;
+      }
+      
+      // Confidence filter
+      if (filter.minConfidence !== undefined) {
+        if (insight.confidence < filter.minConfidence) return false;
+      }
+      
+      // Actionable filter
+      if (filter.onlyActionable && !insight.actionable) return false;
+      
+      // Timeframe filter
+      if (filter.timeframe && filter.timeframe.length > 0) {
+        if (!filter.timeframe.includes(insight.timeframe)) return false;
+      }
+      
+      // Difficulty filter
+      if (filter.difficulty && filter.difficulty.length > 0) {
+        if (!filter.difficulty.includes(insight.difficulty)) return false;
+      }
+      
+      return true;
+    });
+  }
+
   private prioritizeInsights(insights: ActionableInsight[]): ActionableInsight[] {
-    // Filter by minimum confidence
+    // Filter by minimum confidence and sample size
     const filtered = insights.filter(insight => 
       insight.confidence >= this.config.minConfidence &&
       insight.sampleSize >= this.config.minSampleSize
     );
 
-    // Sort by priority, actionability, and confidence
-    const sorted = filtered.sort((a, b) => {
-      // Priority scoring
-      const priorityScore = (priority: string) => {
-        switch (priority) {
-          case 'high': return 3;
-          case 'medium': return 2;
-          case 'low': return 1;
-          default: return 0;
-        }
-      };
+    // Calculate prioritization scores for each insight
+    const insightsWithScores = filtered.map(insight => ({
+      insight,
+      score: this.calculatePrioritizationScore(insight)
+    }));
 
-      // Prioritize actionable insights if configured
-      if (this.config.prioritizeActionable) {
-        if (a.actionable && !b.actionable) return -1;
-        if (!a.actionable && b.actionable) return 1;
-      }
-
-      // Then by priority
-      const priorityDiff = priorityScore(b.priority) - priorityScore(a.priority);
-      if (priorityDiff !== 0) return priorityDiff;
-
-      // Then by confidence
-      return b.confidence - a.confidence;
-    });
+    // Sort by total score (highest first)
+    const sorted = insightsWithScores
+      .sort((a, b) => b.score.totalScore - a.score.totalScore)
+      .map(item => item.insight);
 
     // Return top insights up to max limit
     return sorted.slice(0, this.config.maxInsights);
@@ -658,4 +799,52 @@ export const actionableInsightsEngine = new ActionableInsightsEngine();
 // Helper function to get actionable insights with default config
 export const getActionableInsights = (runs: EnrichedRun[]): ActionableInsight[] => {
   return actionableInsightsEngine.generateInsights(runs);
+};
+
+// Helper function to get prioritized insights with scoring
+export const getPrioritizedInsights = (runs: EnrichedRun[], filter?: InsightFilter): ActionableInsight[] => {
+  const allInsights = actionableInsightsEngine.generateInsights(runs);
+  
+  if (filter) {
+    return actionableInsightsEngine.filterInsights(allInsights, filter);
+  }
+  
+  return allInsights;
+};
+
+// Helper function to get insight categories for filtering
+export const getInsightCategories = (): Array<{value: string, label: string, description: string}> => {
+  return [
+    { 
+      value: 'performance', 
+      label: 'Performance', 
+      description: 'Insights about pace, speed, and running efficiency' 
+    },
+    { 
+      value: 'consistency', 
+      label: 'Consistency', 
+      description: 'Insights about training frequency and patterns' 
+    },
+    { 
+      value: 'health', 
+      label: 'Health', 
+      description: 'Insights about recovery, injury prevention, and wellbeing' 
+    },
+    { 
+      value: 'training', 
+      label: 'Training', 
+      description: 'Insights about workout variety and training structure' 
+    },
+    { 
+      value: 'achievement', 
+      label: 'Achievement', 
+      description: 'Personal records and milestone celebrations' 
+    }
+  ];
+};
+
+// Helper function to get "Most Important" insights (top 4 by score)
+export const getMostImportantInsights = (runs: EnrichedRun[]): ActionableInsight[] => {
+  const engine = new ActionableInsightsEngine({ maxInsights: 4, prioritizeActionable: true });
+  return engine.generateInsights(runs);
 };
