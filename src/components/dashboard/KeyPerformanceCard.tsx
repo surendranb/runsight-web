@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, Minus, HelpCircle, ChevronRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react';
+import { HelpIcon, ContextualExplanation } from '../common/ContextualHelp';
 
 interface KeyPerformanceCardProps {
   metric: string;
@@ -12,6 +13,11 @@ interface KeyPerformanceCardProps {
   trendDirection: 'up' | 'down' | 'stable'; // Clear visual hierarchy for trend
   priority: 'primary' | 'secondary'; // Visual emphasis level
   onViewDetails?: () => void; // Progressive disclosure trigger
+  // Enhanced contextual help properties
+  interpretation?: string; // What this means for the user's training
+  actionableAdvice?: string; // What the user should do about it
+  confidence?: number; // Confidence in the data (0-1)
+  sampleSize?: number; // Number of runs this is based on
 }
 
 export const KeyPerformanceCard: React.FC<KeyPerformanceCardProps> = ({
@@ -24,9 +30,13 @@ export const KeyPerformanceCard: React.FC<KeyPerformanceCardProps> = ({
   contextTooltip,
   trendDirection,
   priority = 'secondary',
-  onViewDetails
+  onViewDetails,
+  interpretation,
+  actionableAdvice,
+  confidence,
+  sampleSize
 }) => {
-  const [showTooltip, setShowTooltip] = useState(false);
+  const [showDetailedHelp, setShowDetailedHelp] = useState(false);
   const trendPercentage = Math.abs(trend * 100);
   
   // Determine trend colors and icons based on direction
@@ -75,31 +85,16 @@ export const KeyPerformanceCard: React.FC<KeyPerformanceCardProps> = ({
 
 
       <div className="text-center">
-        {/* Metric title with context tooltip */}
+        {/* Metric title with contextual help */}
         <div className="flex items-center justify-center space-x-2 mb-3">
           <h3 className={`font-semibold ${priority === 'primary' ? 'text-xl text-gray-800' : 'text-lg text-gray-700'}`}>
             {metric}
           </h3>
-          <div className="relative">
-            <button
-              onMouseEnter={() => setShowTooltip(true)}
-              onMouseLeave={() => setShowTooltip(false)}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-              aria-label={`Information about ${metric}`}
-            >
-              <HelpCircle className="w-4 h-4" />
-            </button>
-            
-            {/* Context tooltip */}
-            {showTooltip && (
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-10">
-                <div className="relative">
-                  {contextTooltip}
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                </div>
-              </div>
-            )}
-          </div>
+          <HelpIcon 
+            content={contextTooltip}
+            size={priority === 'primary' ? 'md' : 'sm'}
+            position="top"
+          />
         </div>
         
         {/* Main value display */}
@@ -134,17 +129,46 @@ export const KeyPerformanceCard: React.FC<KeyPerformanceCardProps> = ({
           <span>{comparisonPeriod}</span>
         </div>
 
-        {/* Progressive disclosure trigger */}
-        {onViewDetails && (
-          <button
-            onClick={onViewDetails}
-            className="inline-flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors group"
-          >
-            <span>View Details</span>
-            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </button>
-        )}
+        {/* Progressive disclosure triggers */}
+        <div className="flex flex-col space-y-2">
+          {(interpretation || actionableAdvice) && (
+            <button
+              onClick={() => setShowDetailedHelp(!showDetailedHelp)}
+              className="inline-flex items-center space-x-1 text-sm text-green-600 hover:text-green-700 font-medium transition-colors group"
+            >
+              <span>{showDetailedHelp ? 'Hide' : 'Show'} Context</span>
+              <ChevronRight className={`w-4 h-4 transition-transform ${showDetailedHelp ? 'rotate-90' : 'group-hover:translate-x-1'}`} />
+            </button>
+          )}
+          
+          {onViewDetails && (
+            <button
+              onClick={onViewDetails}
+              className="inline-flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors group"
+            >
+              <span>View Details</span>
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </button>
+          )}
+        </div>
       </div>
+      
+      {/* Contextual explanation panel */}
+      {showDetailedHelp && (interpretation || actionableAdvice) && (
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <ContextualExplanation
+            metric={metric}
+            value={value}
+            unit={unit}
+            explanation={contextTooltip}
+            interpretation={interpretation}
+            actionableAdvice={actionableAdvice}
+            confidence={confidence}
+            sampleSize={sampleSize}
+            className="bg-transparent border-0 p-0"
+          />
+        </div>
+      )}
     </div>
   );
 };

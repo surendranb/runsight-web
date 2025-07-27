@@ -17,6 +17,7 @@ import { EnrichedRun } from '../../types';
 import { groupRunsByWeek, groupRunsByMonth, TimeGroupData, analyzeConsistency } from '../../lib/insights/consistencyUtils';
 import { convertSecondsToHoursMinutes } from '../../lib/insightsUtils';
 import { chartTheme, chartDefaults, createStandardTooltip, ChartTitle, axisFormatters } from '../../lib/chartTheme';
+import { ProgressiveHelp, HelpIcon, runningTerminology } from '../common/ContextualHelp';
 
 interface ConsistencyInsightProps {
   runs: EnrichedRun[];
@@ -107,7 +108,14 @@ export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) 
   if (runs.length === 0) {
     return (
       <div className="bg-white shadow rounded-lg p-6">
-        <h3 className="text-xl font-semibold text-gray-800 mb-3">Consistency & Progress</h3>
+        <div className="flex items-center space-x-2 mb-3">
+          <h3 className="text-xl font-semibold text-gray-800">Consistency & Progress</h3>
+          <HelpIcon 
+            content={runningTerminology.consistency.basic}
+            size="md"
+            position="top"
+          />
+        </div>
         <p className="text-gray-600">No run data available to show consistency insights.</p>
       </div>
     );
@@ -118,10 +126,28 @@ export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) 
 
   return (
     <div className="bg-white shadow rounded-lg p-6">
-      <ChartTitle 
-        title="Running Consistency Analysis"
-        subtitle="Track your running frequency, volume trends, and consistency patterns over time"
-        dataCount={runs.length}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-2">
+          <ChartTitle 
+            title="Running Consistency Analysis"
+            subtitle="Track your running frequency, volume trends, and consistency patterns over time"
+            dataCount={runs.length}
+          />
+          <HelpIcon 
+            content={runningTerminology.consistency.basic}
+            size="md"
+            position="top"
+          />
+        </div>
+      </div>
+
+      {/* Progressive help for understanding consistency */}
+      <ProgressiveHelp
+        title="Understanding Running Consistency"
+        basicExplanation="Consistency is more important than intensity for long-term running success. Regular training builds fitness gradually and reduces injury risk."
+        detailedExplanation={runningTerminology.consistency.detailed}
+        examples={runningTerminology.consistency.examples}
+        className="mb-6"
       />
 
       {/* Consistency Analysis */}

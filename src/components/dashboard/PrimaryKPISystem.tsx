@@ -2,6 +2,7 @@ import React from 'react';
 import { KeyPerformanceCard } from './KeyPerformanceCard';
 import { EnrichedRun } from '../../types';
 import { Activity, MapPin, Clock, TrendingUp } from 'lucide-react';
+import { runningTerminology } from '../common/ContextualHelp';
 
 interface PrimaryKPISystemProps {
   runs: EnrichedRun[];
@@ -21,6 +22,11 @@ interface KPIMetric {
   contextTooltip: string;
   priority: 'primary' | 'secondary';
   icon: React.ReactNode;
+  // Enhanced contextual information
+  interpretation?: string;
+  actionableAdvice?: string;
+  confidence?: number;
+  sampleSize?: number;
 }
 
 export const PrimaryKPISystem: React.FC<PrimaryKPISystemProps> = ({
@@ -88,7 +94,84 @@ export const PrimaryKPISystem: React.FC<PrimaryKPISystemProps> = ({
       }
     };
 
+    // Generate contextual interpretations and advice
+    const getPaceInterpretation = (pace: number, trend: number, trendDirection: string) => {
+      const paceMinutes = pace / 60;
+      let interpretation = '';
+      let advice = '';
+      
+      if (paceMinutes < 4) {
+        interpretation = 'You\'re running at a competitive pace, indicating excellent fitness level.';
+        advice = 'Focus on maintaining this pace while ensuring adequate recovery between runs.';
+      } else if (paceMinutes < 5.5) {
+        interpretation = 'You\'re running at a strong recreational pace, showing good fitness.';
+        advice = 'Consider incorporating interval training to improve speed, or longer runs to build endurance.';
+      } else if (paceMinutes < 7) {
+        interpretation = 'You\'re running at a moderate pace, perfect for building aerobic base.';
+        advice = 'This is an excellent pace for most training runs. Focus on consistency and gradually increasing distance.';
+      } else {
+        interpretation = 'You\'re running at an easy, conversational pace - ideal for building endurance.';
+        advice = 'This pace is perfect for base building. Consider adding one faster run per week to improve speed.';
+      }
+      
+      if (trendDirection === 'up') {
+        advice += ' Your pace is improving - keep up the great work!';
+      } else if (trendDirection === 'down') {
+        advice += ' Your pace has slowed recently - ensure you\'re getting adequate rest and nutrition.';
+      }
+      
+      return { interpretation, advice };
+    };
+
+    const getDistanceInterpretation = (distance: number, runsCount: number, trend: number) => {
+      const avgDistance = distance / runsCount / 1000;
+      let interpretation = '';
+      let advice = '';
+      
+      if (avgDistance < 3) {
+        interpretation = 'You\'re focusing on shorter runs, which is great for building consistency.';
+        advice = 'Consider gradually increasing one run per week to build endurance capacity.';
+      } else if (avgDistance < 6) {
+        interpretation = 'You\'re running moderate distances, building good aerobic fitness.';
+        advice = 'This is a solid foundation. Consider adding variety with both shorter and longer runs.';
+      } else if (avgDistance < 10) {
+        interpretation = 'You\'re covering good distances, showing strong endurance development.';
+        advice = 'Great endurance base! Consider adding some shorter, faster runs for speed development.';
+      } else {
+        interpretation = 'You\'re running long distances, indicating excellent endurance fitness.';
+        advice = 'Impressive endurance! Ensure you\'re balancing with adequate recovery and shorter runs.';
+      }
+      
+      return { interpretation, advice };
+    };
+
+    const getFrequencyInterpretation = (runsCount: number, periodDays: number) => {
+      const runsPerWeek = (runsCount / periodDays) * 7;
+      let interpretation = '';
+      let advice = '';
+      
+      if (runsPerWeek < 2) {
+        interpretation = 'You\'re running less than twice per week. Consistency is key for improvement.';
+        advice = 'Try to aim for at least 3 runs per week to see meaningful fitness gains.';
+      } else if (runsPerWeek < 4) {
+        interpretation = 'You\'re running 2-3 times per week, which is a good foundation for fitness.';
+        advice = 'Consider adding one more run per week to accelerate your fitness improvements.';
+      } else if (runsPerWeek < 6) {
+        interpretation = 'You\'re running 4-5 times per week, showing excellent consistency.';
+        advice = 'Great frequency! Focus on varying your run types (easy, tempo, long) for balanced training.';
+      } else {
+        interpretation = 'You\'re running very frequently, showing strong commitment to training.';
+        advice = 'Excellent consistency! Ensure you\'re including easy runs and rest days to prevent overtraining.';
+      }
+      
+      return { interpretation, advice };
+    };
+
     // Define the maximum 4 primary KPIs based on importance and actionability
+    const paceContext = getPaceInterpretation(avgPace, 0, getTrendDirection(avgPace, previousMetrics.avgPace, true));
+    const distanceContext = getDistanceInterpretation(totalDistance, totalRuns, 0);
+    const frequencyContext = getFrequencyInterpretation(totalRuns, periodDays);
+
     const metrics: KPIMetric[] = [
       {
         id: 'avg_pace',
@@ -99,7 +182,11 @@ export const PrimaryKPISystem: React.FC<PrimaryKPISystemProps> = ({
         trendDirection: getTrendDirection(avgPace, previousMetrics.avgPace, true),
         comparisonPeriod: `previous ${period.toLowerCase()}`,
         previousValue: formatPace(previousMetrics.avgPace || avgPace),
-        contextTooltip: 'Your average pace shows how fast you typically run. Consistent improvement in pace indicates better fitness and endurance.',
+        contextTooltip: runningTerminology.pace.basic,
+        interpretation: paceContext.interpretation,
+        actionableAdvice: paceContext.advice,
+        confidence: runs.length >= 5 ? 0.85 : 0.65,
+        sampleSize: runs.length,
         priority: 'primary',
         icon: <TrendingUp className="w-6 h-6" />
       },
@@ -113,6 +200,10 @@ export const PrimaryKPISystem: React.FC<PrimaryKPISystemProps> = ({
         comparisonPeriod: `previous ${period.toLowerCase()}`,
         previousValue: formatDistance(previousMetrics.totalDistance || totalDistance),
         contextTooltip: 'Total distance covered shows your training volume. Higher volume generally leads to better endurance and fitness.',
+        interpretation: distanceContext.interpretation,
+        actionableAdvice: distanceContext.advice,
+        confidence: runs.length >= 3 ? 0.9 : 0.7,
+        sampleSize: runs.length,
         priority: 'primary',
         icon: <MapPin className="w-6 h-6" />
       },
@@ -125,7 +216,11 @@ export const PrimaryKPISystem: React.FC<PrimaryKPISystemProps> = ({
         trendDirection: getTrendDirection(totalRuns, previousMetrics.totalRuns),
         comparisonPeriod: `previous ${period.toLowerCase()}`,
         previousValue: (previousMetrics.totalRuns || totalRuns).toString(),
-        contextTooltip: 'Frequency of runs indicates consistency in your training. Regular running is key to building and maintaining fitness.',
+        contextTooltip: runningTerminology.consistency.basic,
+        interpretation: frequencyContext.interpretation,
+        actionableAdvice: frequencyContext.advice,
+        confidence: 0.95, // High confidence in run count
+        sampleSize: runs.length,
         priority: 'primary',
         icon: <Activity className="w-6 h-6" />
       },
@@ -139,6 +234,10 @@ export const PrimaryKPISystem: React.FC<PrimaryKPISystemProps> = ({
         comparisonPeriod: `previous ${period.toLowerCase()}`,
         previousValue: formatTime(previousMetrics.totalTime || totalTime),
         contextTooltip: 'Time spent running reflects your training commitment. More time generally leads to better endurance and cardiovascular health.',
+        interpretation: `You've spent ${formatTime(totalTime)} running this ${period.toLowerCase()}, averaging ${formatTime(totalTime / totalRuns)} per run.`,
+        actionableAdvice: totalTime / totalRuns < 1800 ? 'Consider gradually extending some runs to build endurance.' : 'Good training volume! Balance with adequate recovery time.',
+        confidence: 0.9,
+        sampleSize: runs.length,
         priority: 'primary',
         icon: <Clock className="w-6 h-6" />
       }
@@ -176,6 +275,10 @@ export const PrimaryKPISystem: React.FC<PrimaryKPISystemProps> = ({
             comparisonPeriod={metric.comparisonPeriod}
             previousValue={metric.previousValue}
             contextTooltip={metric.contextTooltip}
+            interpretation={metric.interpretation}
+            actionableAdvice={metric.actionableAdvice}
+            confidence={metric.confidence}
+            sampleSize={metric.sampleSize}
             priority={metric.priority}
             onViewDetails={onViewDetails ? () => onViewDetails(metric.id) : undefined}
           />

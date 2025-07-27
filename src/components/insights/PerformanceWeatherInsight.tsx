@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { EnrichedRun } from '../../types';
 import { getPerformanceByTemperature, getPerformanceByHumidity, PerformanceBucket } from '../../lib/insights/weatherPerformanceUtils';
+import { ProgressiveHelp, HelpIcon, ContextualExplanation } from '../common/ContextualHelp';
 
 interface PerformanceWeatherInsightProps {
   runs: EnrichedRun[];
@@ -64,7 +65,28 @@ export const PerformanceWeatherInsight: React.FC<PerformanceWeatherInsightProps>
 
   return (
     <div className="bg-white shadow rounded-lg p-6">
-      <h3 className="text-xl font-semibold text-gray-800 mb-4">Performance vs. Weather Conditions</h3>
+      <div className="flex items-center space-x-2 mb-4">
+        <h3 className="text-xl font-semibold text-gray-800">Performance vs. Weather Conditions</h3>
+        <HelpIcon 
+          content="Weather conditions significantly impact running performance. Temperature and humidity affect your body's ability to cool itself and maintain pace."
+          size="md"
+          position="top"
+        />
+      </div>
+      
+      <ProgressiveHelp
+        title="How Weather Affects Running Performance"
+        basicExplanation="Temperature and humidity impact your body's cooling system. Hot, humid conditions make running feel harder and typically slow your pace."
+        detailedExplanation="Your body generates heat while running and must cool itself through sweating. High temperatures and humidity reduce cooling efficiency, forcing your body to work harder to maintain the same pace. This is why you might feel slower on hot, humid days - it's not just in your head!"
+        examples={[
+          "Ideal running temperature: 10-15°C (50-59°F)",
+          "Performance drops ~2% for every 5°C above 15°C",
+          "High humidity (>70%) can feel like +5-10°C warmer",
+          "Your body adapts to heat over 10-14 days"
+        ]}
+        className="mb-6"
+      />
+      
       <p className="text-sm text-gray-600 mb-6">See how different temperature and humidity ranges typically affect your average pace and heart rate.</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">

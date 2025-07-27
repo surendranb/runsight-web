@@ -11,6 +11,8 @@ import { standardTimePeriods } from '../lib/chartTheme';
 import { smartDefaults } from '../lib/smartDefaults';
 import { Activity, MapPin, Clock, Settings, RefreshCw, TrendingUp, TrendingDown, ChevronDown, ChevronUp, Lightbulb, TrendingUp as TrendingUpIcon } from 'lucide-react';
 import { filterOutliers, getOutlierStats } from '../lib/outlierDetection';
+import { getHighlightedPatterns, HighlightedPattern } from '../lib/smartHighlighting';
+import { useUserPreferences } from '../lib/userPreferences';
 
 interface ModernDashboardProps {
   user: User;
@@ -31,20 +33,28 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
   onSync,
   onLogout
 }) => {
-  // Initialize with smart defaults
+  // Use persistent user preferences
+  const { preferences, updateSection, recordInteraction, getSmartDefaults } = useUserPreferences();
+  const smartDefaults = getSmartDefaults();
+  
+  // Initialize with user preferences and smart defaults
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>(() => 
-    smartDefaults.getSmartTimePeriod(runs) as TimePeriod
+    (smartDefaults.timePeriod as TimePeriod) || 'last30'
   );
   
-  // Progressive disclosure state with smart defaults
+  // Progressive disclosure state with user preferences
   const [selectedMetricForDetails, setSelectedMetricForDetails] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => 
-    smartDefaults.getPreferences().dashboardLayout.expandedSections
+    smartDefaults.expandedSections || {}
   );
 
-  // Smart chart settings
+  // Chart settings from user preferences
   const [chartSettings, setChartSettings] = useState(() => 
-    smartDefaults.getSmartChartSettings(runs)
+    smartDefaults.chartSettings || {
+      showWeatherIndicators: true,
+      showMovingAverage: true,
+      highlightPersonalRecords: true
+    }
   );
 
   // Update smart defaults when runs data changes
@@ -70,8 +80,8 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
       [section]: newExpanded
     }));
     
-    // Record user preference
-    smartDefaults.recordInteraction('toggleSection', {
+    // Record user preference persistently
+    recordInteraction('sectionToggle', {
       section,
       expanded: newExpanded
     });
@@ -80,7 +90,7 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
   // Handle period change with preference recording
   const handlePeriodChange = (period: TimePeriod) => {
     setSelectedPeriod(period);
-    smartDefaults.recordInteraction('changePeriod', { period });
+    recordInteraction('timePeriodChange', { period });
   };
 
   // Filter runs based on selected period and remove outliers
@@ -196,9 +206,9 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
     };
   }, [filteredRuns, runs, selectedPeriod]);
 
-  // Get significant changes automatically highlighted
+  // Get significant changes automatically highlighted using smart highlighting
   const significantChanges = useMemo(() => 
-    smartDefaults.getSignificantChanges(filteredRuns), 
+    getHighlightedPatterns(filteredRuns), 
     [filteredRuns]
   );
 
@@ -426,40 +436,50 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
           </div>
         ) : (
           <div className="space-y-8">
-            {/* Significant Changes Alert - Smart Highlighting */}
+            {/* Smart Highlighted Patterns */}
             {significantChanges.length > 0 && (
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
                 <div className="flex items-start space-x-3">
                   <Lightbulb className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-blue-900 mb-2">
-                      Significant Changes Detected
+                      Key Insights Detected
                     </h3>
-                    <div className="space-y-3">
-                      {significantChanges.slice(0, 2).map((change, index) => (
-                        <div key={index} className="flex items-start space-x-2">
-                          <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                            change.type === 'improvement' ? 'bg-green-500' :
-                            change.type === 'achievement' ? 'bg-yellow-500' :
-                            'bg-red-500'
+                    <div className="space-y-4">
+                      {significantChanges.slice(0, 3).map((pattern, index) => (
+                        <div key={pattern.id} className="flex items-start space-x-3">
+                          <div className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${
+                            pattern.type === 'improvement' ? 'bg-green-500' :
+                            pattern.type === 'achievement' ? 'bg-yellow-500' :
+                            pattern.type === 'concern' ? 'bg-red-500' :
+                            'bg-blue-500'
                           }`} />
-                          <div>
-                            <p className="text-blue-800 font-medium">{change.description}</p>
-                            <div className="flex items-center mt-1">
+                          <div className="flex-1">
+                            <h4 className="text-blue-800 font-medium mb-1">{pattern.title}</h4>
+                            <p className="text-blue-700 text-sm mb-2">{pattern.description}</p>
+                            {pattern.recommendation && (
+                              <p className="text-blue-600 text-sm bg-blue-100 p-2 rounded border border-blue-200">
+                                💡 {pattern.recommendation}
+                              </p>
+                            )}
+                            <div className="flex items-center mt-2 space-x-3">
                               <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
-                                {(change.confidence * 100).toFixed(0)}% confidence
+                                {(pattern.confidence * 100).toFixed(0)}% confidence
+                              </span>
+                              <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+                                {pattern.actionable ? 'Actionable' : 'Informational'}
                               </span>
                             </div>
                           </div>
                         </div>
                       ))}
                     </div>
-                    {significantChanges.length > 2 && (
+                    {significantChanges.length > 3 && (
                       <button 
-                        onClick={() => {/* TODO: Show all changes */}}
-                        className="text-sm text-blue-600 hover:text-blue-800 mt-2 font-medium"
+                        onClick={() => {/* TODO: Show all patterns */}}
+                        className="text-sm text-blue-600 hover:text-blue-800 mt-3 font-medium"
                       >
-                        View {significantChanges.length - 2} more changes →
+                        View {significantChanges.length - 3} more insights →
                       </button>
                     )}
                   </div>

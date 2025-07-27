@@ -1,5 +1,5 @@
 // src/components/InsightsPage.tsx
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { User, EnrichedRun } from '../types';
 import { ConsistencyInsight } from './insights/ConsistencyInsight';
 import { PerformanceWeatherInsight } from './insights/PerformanceWeatherInsight';
@@ -11,6 +11,10 @@ import { PersonalRecordsInsight } from './insights/PersonalRecordsInsight';
 import { LocationIntelligenceInsight } from './insights/LocationIntelligenceInsight';
 import { AdvancedPerformanceInsight } from './insights/AdvancedPerformanceInsight';
 import { MonthlySummaryTable } from './insights/MonthlySummaryTable';
+import { ActionableInsightCard, ActionableInsight } from './insights/ActionableInsightCard';
+import { getActionableInsights } from '../lib/insights/actionableInsightsEngine';
+import { ProgressiveHelp, HelpIcon } from './common/ContextualHelp';
+import { Lightbulb, Filter, SortAsc } from 'lucide-react';
 
 interface InsightsPageProps {
   user: User;
@@ -21,6 +25,42 @@ interface InsightsPageProps {
 }
 
 export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoading, error }) => {
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'priority' | 'confidence' | 'category'>('priority');
+  
+  // Generate actionable insights
+  const actionableInsights = useMemo(() => getActionableInsights(runs), [runs]);
+  
+  // Filter and sort insights
+  const filteredInsights = useMemo(() => {
+    let filtered = actionableInsights;
+    
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(insight => insight.category === selectedCategory);
+    }
+    
+    // Sort insights
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'priority':
+          const priorityOrder = { high: 3, medium: 2, low: 1 };
+          return priorityOrder[b.priority] - priorityOrder[a.priority];
+        case 'confidence':
+          return b.confidence - a.confidence;
+        case 'category':
+          return a.category.localeCompare(b.category);
+        default:
+          return 0;
+      }
+    });
+    
+    return filtered;
+  }, [actionableInsights, selectedCategory, sortBy]);
+  
+  const handleInsightAction = (insightId: string, action: string) => {
+    console.log(`Insight ${insightId} action: ${action}`);
+    // Here you could track user interactions with insights
+  };
   if (isLoading) {
     return (
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center"> {/* Adjust height for navbar */}
@@ -46,9 +86,96 @@ export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoadin
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="bg-white shadow rounded-lg p-6 mb-6">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-1">Insights Hub</h2>
+        <div className="flex items-center space-x-2 mb-2">
+          <h2 className="text-2xl font-semibold text-gray-800">Insights Hub</h2>
+          <HelpIcon 
+            content="Insights are automatically generated from your running data to help you understand patterns and improve your training."
+            size="md"
+          />
+        </div>
         <p className="text-gray-600">Welcome, {user.name}! Analyzing {runs.length} runs.</p>
       </div>
+
+      {/* Actionable Insights Section */}
+      {actionableInsights.length > 0 && (
+        <div className="mb-8">
+          <div className="bg-white shadow rounded-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-2">
+                <Lightbulb className="w-6 h-6 text-yellow-500" />
+                <h3 className="text-xl font-semibold text-gray-800">Actionable Insights</h3>
+                <HelpIcon 
+                  content="These insights are prioritized by importance and actionability to help you make the biggest impact on your running."
+                  size="md"
+                />
+              </div>
+              
+              {/* Filters and sorting */}
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                  <Filter className="w-4 h-4 text-gray-500" />
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">All Categories</option>
+                    <option value="performance">Performance</option>
+                    <option value="consistency">Consistency</option>
+                    <option value="training">Training</option>
+                    <option value="health">Health</option>
+                    <option value="achievement">Achievement</option>
+                  </select>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <SortAsc className="w-4 h-4 text-gray-500" />
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'priority' | 'confidence' | 'category')}
+                    className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="priority">Priority</option>
+                    <option value="confidence">Confidence</option>
+                    <option value="category">Category</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <ProgressiveHelp
+              title="Understanding Actionable Insights"
+              basicExplanation="Each insight shows a finding from your data, explains what it means, and provides specific recommendations you can act on."
+              detailedExplanation="Insights are prioritized by their potential impact on your running and how confident we are in the data. High-priority insights with high confidence should be your focus."
+              examples={[
+                "Performance insights help you run faster or more efficiently",
+                "Consistency insights help you build better training habits",
+                "Health insights help you avoid injury and recover better"
+              ]}
+              className="mb-6"
+            />
+
+            {/* Insights grid */}
+            <div className="space-y-6">
+              {filteredInsights.map((insight) => (
+                <ActionableInsightCard
+                  key={insight.id}
+                  insight={insight}
+                  onAction={handleInsightAction}
+                />
+              ))}
+            </div>
+
+            {filteredInsights.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <Lightbulb className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p>No insights match your current filters.</p>
+                <p className="text-sm">Try adjusting your category or sort options.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <MonthlySummaryTable runs={runs} />
 
