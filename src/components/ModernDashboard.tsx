@@ -8,7 +8,6 @@ import { InsightCard } from './dashboard/InsightCard';
 import { TimePeriodSelector, TimePeriod, Breadcrumb, SectionIndicator } from './common/TimePeriodSelector';
 import { StandardButton } from './common/StandardButton';
 import { standardTimePeriods } from '../lib/chartTheme';
-import { smartDefaults } from '../lib/smartDefaults';
 import { Activity, MapPin, Clock, Settings, RefreshCw, TrendingUp, TrendingDown, ChevronDown, ChevronUp, Lightbulb, TrendingUp as TrendingUpIcon } from 'lucide-react';
 import { filterOutliers, getOutlierStats } from '../lib/outlierDetection';
 import { getHighlightedPatterns, HighlightedPattern } from '../lib/smartHighlighting';
@@ -35,42 +34,29 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
 }) => {
   // Use persistent user preferences
   const { preferences, updateSection, recordInteraction, getSmartDefaults } = useUserPreferences();
-  const smartDefaults = getSmartDefaults();
+  const smartDefaultsData = getSmartDefaults();
   
   // Initialize with user preferences and smart defaults
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>(() => 
-    (smartDefaults.timePeriod as TimePeriod) || 'last30'
+    (smartDefaultsData.timePeriod as TimePeriod) || 'last30'
   );
   
   // Progressive disclosure state with user preferences
   const [selectedMetricForDetails, setSelectedMetricForDetails] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => 
-    smartDefaults.expandedSections || {}
+    smartDefaultsData.expandedSections || {}
   );
 
   // Chart settings from user preferences
   const [chartSettings, setChartSettings] = useState(() => 
-    smartDefaults.chartSettings || {
+    smartDefaultsData.chartSettings || {
       showWeatherIndicators: true,
       showMovingAverage: true,
       highlightPersonalRecords: true
     }
   );
 
-  // Update smart defaults when runs data changes
-  React.useEffect(() => {
-    if (runs.length > 0) {
-      const smartPeriod = smartDefaults.getSmartTimePeriod(runs) as TimePeriod;
-      const smartChartSettings = smartDefaults.getSmartChartSettings(runs);
-      
-      // Only update if different from current settings
-      if (smartPeriod !== selectedPeriod) {
-        setSelectedPeriod(smartPeriod);
-      }
-      
-      setChartSettings(smartChartSettings);
-    }
-  }, [runs.length]); // Only run when runs count changes, not on every render
+  // User preferences are now handled by the persistent preferences system
 
   // Toggle section expansion with preference recording
   const toggleSection = (section: string) => {
