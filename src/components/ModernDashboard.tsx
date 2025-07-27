@@ -145,7 +145,7 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
     }
 
     return cleanRuns;
-  }, [runs, selectedPeriod, customDateRange]);
+  }, [runs, selectedPeriod]);
 
   // Calculate key metrics
   const metrics = useMemo(() => {
