@@ -40,13 +40,13 @@ After completing each major task (not subtasks), follow the testing workflow:
   - Implement breadcrumb navigation and clear section indicators
   - _Requirements: 2.1, 2.2, 2.3, 8.4_
 
-- [ ] 2.1 Standardize Chart Types and Data Visualization
+- [x] 2.1 Standardize Chart Types and Data Visualization
   - Audit all charts to ensure they use conventional chart types users recognize
   - Implement consistent color schemes and typography across all visualizations
   - Add clear titles and axis labels that are self-explanatory
   - _Requirements: 2.7, 8.1, 8.3_
 
-- [ ] 2.2 Create Smart Defaults System
+- [x] 2.2 Create Smart Defaults System
   - Implement user preference memory for time periods, view settings, and filters
   - Create intelligent default selections based on common runner needs
   - Add system that automatically highlights significant changes in data

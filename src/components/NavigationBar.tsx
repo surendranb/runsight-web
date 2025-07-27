@@ -1,6 +1,7 @@
 // src/components/NavigationBar.tsx
 import React, { useState } from 'react';
 import { Menu, X, Activity, BarChart3, Target, Settings as SettingsIcon, RefreshCw, HelpCircle } from 'lucide-react';
+import { StandardDropdown } from './common/StandardButton';
 
 type View = 'dashboard' | 'insights' | 'goals' | 'settings' | string;
 
@@ -124,22 +125,17 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
 
           {/* Right side: Sync Controls & User Menu */}
           <div className="flex items-center space-x-3">
-            {/* Compact Sync Controls - Gmail Style */}
+            {/* Standardized Sync Controls */}
             {onSyncData && (
               <div className="hidden sm:flex items-center space-x-3 bg-gray-50 rounded-lg p-1">
-                <select
+                <StandardDropdown
+                  options={SYNC_OPTIONS}
                   value={selectedSyncPeriod}
-                  onChange={(e) => setSelectedSyncPeriod(e.target.value as SyncPeriod)}
+                  onChange={(value) => setSelectedSyncPeriod(value as SyncPeriod)}
                   disabled={isSyncing}
-                  className="text-sm border-0 bg-transparent focus:ring-0 focus:outline-none disabled:opacity-50 pr-6 pl-2 py-1"
-                  title="Sync period"
-                >
-                  {SYNC_OPTIONS.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  size="sm"
+                  className="min-w-32"
+                />
                 
                 <button
                   onClick={handleSyncClick}
@@ -223,18 +219,14 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                 <div className="pt-3 border-t border-gray-200">
                   <div className="px-3 py-2">
                     <div className="flex items-center space-x-2 mb-3">
-                      <select
+                      <StandardDropdown
+                        options={SYNC_OPTIONS}
                         value={selectedSyncPeriod}
-                        onChange={(e) => setSelectedSyncPeriod(e.target.value as SyncPeriod)}
+                        onChange={(value) => setSelectedSyncPeriod(value as SyncPeriod)}
                         disabled={isSyncing}
-                        className="flex-1 text-sm border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 disabled:bg-gray-100 py-2 px-3"
-                      >
-                        {SYNC_OPTIONS.map(option => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                        size="md"
+                        className="flex-1"
+                      />
                       <button
                         onClick={() => {
                           handleSyncClick();
@@ -282,7 +274,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
   );
 };
 
-const SYNC_OPTIONS: { label: string; value: SyncPeriod }[] = [
+const SYNC_OPTIONS = [
   { label: "Last 14 Days", value: "14days" },
   { label: "Last 30 Days", value: "30days" },
   { label: "Last 60 Days", value: "60days" },

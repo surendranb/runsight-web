@@ -5,7 +5,11 @@ import { ProgressiveDisclosurePanel } from './dashboard/ProgressiveDisclosurePan
 import { PaceTrendChart } from './dashboard/PaceTrendChart';
 import { ActivityTimeline } from './dashboard/ActivityTimeline';
 import { InsightCard } from './dashboard/InsightCard';
-import { Activity, MapPin, Clock, Settings, RefreshCw, TrendingUp, TrendingDown, ChevronDown, ChevronUp } from 'lucide-react';
+import { TimePeriodSelector, TimePeriod, Breadcrumb, SectionIndicator } from './common/TimePeriodSelector';
+import { StandardButton } from './common/StandardButton';
+import { standardTimePeriods } from '../lib/chartTheme';
+import { smartDefaults } from '../lib/smartDefaults';
+import { Activity, MapPin, Clock, Settings, RefreshCw, TrendingUp, TrendingDown, ChevronDown, ChevronUp, Lightbulb, TrendingUp as TrendingUpIcon } from 'lucide-react';
 import { filterOutliers, getOutlierStats } from '../lib/outlierDetection';
 
 interface ModernDashboardProps {
@@ -17,7 +21,7 @@ interface ModernDashboardProps {
   onLogout: () => void;
 }
 
-type TimePeriod = 'last30' | 'thisYear' | 'allTime' | 'custom';
+// Use standardized TimePeriod from common component
 
 export const ModernDashboard: React.FC<ModernDashboardProps> = ({
   user,
@@ -27,24 +31,56 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
   onSync,
   onLogout
 }) => {
-  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('last30');
-  const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
+  // Initialize with smart defaults
+  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>(() => 
+    smartDefaults.getSmartTimePeriod(runs) as TimePeriod
+  );
   
-  // Progressive disclosure state
+  // Progressive disclosure state with smart defaults
   const [selectedMetricForDetails, setSelectedMetricForDetails] = useState<string | null>(null);
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    trends: true,  // Expanded by default
-    activities: true,  // Expanded by default
-    insights: false,
-    advanced: false
-  });
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => 
+    smartDefaults.getPreferences().dashboardLayout.expandedSections
+  );
 
-  // Toggle section expansion
+  // Smart chart settings
+  const [chartSettings, setChartSettings] = useState(() => 
+    smartDefaults.getSmartChartSettings(runs)
+  );
+
+  // Update smart defaults when runs data changes
+  React.useEffect(() => {
+    if (runs.length > 0) {
+      const smartPeriod = smartDefaults.getSmartTimePeriod(runs) as TimePeriod;
+      const smartChartSettings = smartDefaults.getSmartChartSettings(runs);
+      
+      // Only update if different from current settings
+      if (smartPeriod !== selectedPeriod) {
+        setSelectedPeriod(smartPeriod);
+      }
+      
+      setChartSettings(smartChartSettings);
+    }
+  }, [runs.length]); // Only run when runs count changes, not on every render
+
+  // Toggle section expansion with preference recording
   const toggleSection = (section: string) => {
+    const newExpanded = !expandedSections[section];
     setExpandedSections(prev => ({
       ...prev,
-      [section]: !prev[section]
+      [section]: newExpanded
     }));
+    
+    // Record user preference
+    smartDefaults.recordInteraction('toggleSection', {
+      section,
+      expanded: newExpanded
+    });
+  };
+
+  // Handle period change with preference recording
+  const handlePeriodChange = (period: TimePeriod) => {
+    setSelectedPeriod(period);
+    smartDefaults.recordInteraction('changePeriod', { period });
   };
 
   // Filter runs based on selected period and remove outliers
@@ -54,25 +90,41 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
     let dateFilteredRuns: EnrichedRun[];
 
     switch (selectedPeriod) {
+      case 'last7':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        dateFilteredRuns = runs.filter(run => new Date(run.start_date_local) >= startDate);
+        break;
       case 'last30':
         startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         dateFilteredRuns = runs.filter(run => new Date(run.start_date_local) >= startDate);
+        break;
+      case 'last90':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        dateFilteredRuns = runs.filter(run => new Date(run.start_date_local) >= startDate);
+        break;
+      case 'thisMonth':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        dateFilteredRuns = runs.filter(run => new Date(run.start_date_local) >= startDate);
+        break;
+      case 'lastMonth':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+        dateFilteredRuns = runs.filter(run => {
+          const runDate = new Date(run.start_date_local);
+          return runDate >= startDate && runDate <= endDate;
+        });
         break;
       case 'thisYear':
         startDate = new Date(now.getFullYear(), 0, 1);
         dateFilteredRuns = runs.filter(run => new Date(run.start_date_local) >= startDate);
         break;
-      case 'custom':
-        if (!customDateRange.start) {
-          dateFilteredRuns = runs;
-        } else {
-          startDate = new Date(customDateRange.start);
-          const endDate = customDateRange.end ? new Date(customDateRange.end) : now;
-          dateFilteredRuns = runs.filter(run => {
-            const runDate = new Date(run.start_date_local);
-            return runDate >= startDate && runDate <= endDate;
-          });
-        }
+      case 'lastYear':
+        startDate = new Date(now.getFullYear() - 1, 0, 1);
+        const lastYearEnd = new Date(now.getFullYear() - 1, 11, 31);
+        dateFilteredRuns = runs.filter(run => {
+          const runDate = new Date(run.start_date_local);
+          return runDate >= startDate && runDate <= lastYearEnd;
+        });
         break;
       case 'allTime':
       default:
@@ -113,7 +165,10 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
     const avgPace = totalTime / (totalDistance / 1000);
 
     // Calculate previous period for comparison
-    const periodDays = selectedPeriod === 'last30' ? 30 : selectedPeriod === 'thisYear' ? 365 : 90;
+    const periodDays = selectedPeriod === 'last7' ? 7 : 
+                      selectedPeriod === 'last30' ? 30 : 
+                      selectedPeriod === 'last90' ? 90 :
+                      selectedPeriod === 'thisYear' ? 365 : 90;
     const previousStartDate = new Date(Date.now() - 2 * periodDays * 24 * 60 * 60 * 1000);
     const previousEndDate = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000);
     
@@ -141,7 +196,13 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
     };
   }, [filteredRuns, runs, selectedPeriod]);
 
-  // Generate insights
+  // Get significant changes automatically highlighted
+  const significantChanges = useMemo(() => 
+    smartDefaults.getSignificantChanges(filteredRuns), 
+    [filteredRuns]
+  );
+
+  // Generate insights with smart defaults
   const insights = useMemo(() => {
     if (filteredRuns.length < 5) return [];
 
@@ -243,13 +304,7 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
   const formatDistance = (meters: number) => (meters / 1000).toFixed(0);
 
   const getPeriodLabel = () => {
-    switch (selectedPeriod) {
-      case 'last30': return 'Last 30 Days';
-      case 'thisYear': return 'This Year';
-      case 'allTime': return 'All Time';
-      case 'custom': return 'Custom Range';
-      default: return 'Last 30 Days';
-    }
+    return standardTimePeriods[selectedPeriod] || 'Last 30 Days';
   };
 
   // Cognitive load helper: Get the most important insight based on confidence and impact
@@ -299,12 +354,13 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
           </div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">Error Loading Dashboard</h2>
           <p className="text-red-600 mb-3 text-sm">{error}</p>
-          <button
+          <StandardButton
             onClick={() => window.location.reload()}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg text-sm transition-colors"
+            variant="primary"
+            size="md"
           >
             Retry
-          </button>
+          </StandardButton>
         </div>
       </div>
     );
@@ -312,65 +368,49 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Simplified Header - Information Chunk 1 */}
+      {/* Standardized Header with Clear Information Hierarchy */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-blue-600 font-semibold">
-                  {user.name.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Welcome back, {user.name}</h1>
-                <p className="text-sm text-gray-600">{getPeriodLabel()} • {metrics.totalRuns} runs • {getDataFreshnessIndicator()}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              {onSync && (
-                <button
-                  onClick={onSync}
-                  className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                >
-                  <RefreshCw className="w-4 h-4 mr-1" />
-                  Sync
-                </button>
-              )}
-              
-              {/* Integrated Period Selector */}
-              <select
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value as TimePeriod)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="last30">Last 30 Days</option>
-                <option value="thisYear">This Year</option>
-                <option value="allTime">All Time</option>
-                <option value="custom">Custom Range</option>
-              </select>
-            </div>
-          </div>
+          {/* Breadcrumb Navigation */}
+          <Breadcrumb 
+            items={[
+              { label: 'RunSight', onClick: () => {} },
+              { label: 'Dashboard', isActive: true }
+            ]}
+            className="mb-3"
+          />
           
-          {/* Custom Date Range - Only show when needed */}
-          {selectedPeriod === 'custom' && (
-            <div className="mt-3 flex items-center space-x-2 justify-end">
-              <input
-                type="date"
-                value={customDateRange.start}
-                onChange={(e) => setCustomDateRange(prev => ({ ...prev, start: e.target.value }))}
-                className="px-2 py-1 border border-gray-300 rounded text-sm"
-              />
-              <span className="text-gray-500 text-sm">to</span>
-              <input
-                type="date"
-                value={customDateRange.end}
-                onChange={(e) => setCustomDateRange(prev => ({ ...prev, end: e.target.value }))}
-                className="px-2 py-1 border border-gray-300 rounded text-sm"
-              />
-            </div>
-          )}
+          <SectionIndicator
+            title={`Welcome back, ${user.name}`}
+            subtitle={`${metrics.totalRuns} runs • ${getDataFreshnessIndicator()}`}
+            badge={{
+              text: getPeriodLabel(),
+              color: 'blue'
+            }}
+            actions={
+              <div className="flex items-center space-x-2">
+                {onSync && (
+                  <StandardButton
+                    onClick={onSync}
+                    variant="primary"
+                    size="md"
+                    icon={RefreshCw}
+                    iconPosition="left"
+                  >
+                    Sync Data
+                  </StandardButton>
+                )}
+                
+                <TimePeriodSelector
+                  selectedPeriod={selectedPeriod}
+                  onPeriodChange={handlePeriodChange}
+                  availablePeriods={['last7', 'last30', 'last90', 'thisYear', 'allTime']}
+                  showIcon={true}
+                  size="md"
+                />
+              </div>
+            }
+          />
         </div>
       </div>
 
@@ -386,7 +426,46 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
           </div>
         ) : (
           <div className="space-y-8">
-            {/* Simplified Dashboard: Only KPIs, Pace Trends, and Activity Timeline */}
+            {/* Significant Changes Alert - Smart Highlighting */}
+            {significantChanges.length > 0 && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
+                <div className="flex items-start space-x-3">
+                  <Lightbulb className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                      Significant Changes Detected
+                    </h3>
+                    <div className="space-y-3">
+                      {significantChanges.slice(0, 2).map((change, index) => (
+                        <div key={index} className="flex items-start space-x-2">
+                          <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                            change.type === 'improvement' ? 'bg-green-500' :
+                            change.type === 'achievement' ? 'bg-yellow-500' :
+                            'bg-red-500'
+                          }`} />
+                          <div>
+                            <p className="text-blue-800 font-medium">{change.description}</p>
+                            <div className="flex items-center mt-1">
+                              <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+                                {(change.confidence * 100).toFixed(0)}% confidence
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {significantChanges.length > 2 && (
+                      <button 
+                        onClick={() => {/* TODO: Show all changes */}}
+                        className="text-sm text-blue-600 hover:text-blue-800 mt-2 font-medium"
+                      >
+                        View {significantChanges.length - 2} more changes →
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* KPI System */}
             <PrimaryKPISystem
@@ -397,53 +476,47 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
               }}
             />
 
-            {/* Pace Trend Analysis - Always Expanded */}
+            {/* Pace Trend Analysis - Standardized Section */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="text-left">
-                    <h3 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
-                      <span>Pace Trend Analysis</span>
-                      <span className="text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
-                        {filteredRuns.length} runs analyzed
-                      </span>
-                    </h3>
-                    <p className="text-sm text-gray-600">Interactive chart showing pace improvements, moving averages, and performance patterns</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500">{getDataFreshnessIndicator()}</p>
-                  </div>
-                </div>
+                <SectionIndicator
+                  title="Pace Trend Analysis"
+                  subtitle="Interactive chart showing pace improvements, moving averages, and performance patterns"
+                  badge={{
+                    text: `${filteredRuns.length} runs analyzed`,
+                    color: 'blue'
+                  }}
+                  actions={
+                    <span className="text-xs text-gray-500">{getDataFreshnessIndicator()}</span>
+                  }
+                />
               </div>
               
               <div className="p-6">
                 <PaceTrendChart
                   data={filteredRuns}
                   period={getPeriodLabel()}
-                  showMovingAverage={true}
-                  highlightPersonalRecords={true}
-                  showWeatherIndicators={true}
+                  showMovingAverage={chartSettings.showMovingAverage}
+                  highlightPersonalRecords={chartSettings.highlightPersonalRecords}
+                  showWeatherIndicators={chartSettings.showWeatherIndicators}
                 />
               </div>
             </div>
 
-            {/* Activity Timeline - Always Expanded, Latest First */}
+            {/* Activity Timeline - Standardized Section */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="text-left">
-                    <h3 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
-                      <span>Activity Timeline</span>
-                      <span className="text-sm bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                        Latest {Math.min(filteredRuns.length, 8)} runs
-                      </span>
-                    </h3>
-                    <p className="text-sm text-gray-600">Your most recent runs with weather data, pace, and performance indicators</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500">Most recent first</p>
-                  </div>
-                </div>
+                <SectionIndicator
+                  title="Recent Activity Timeline"
+                  subtitle="Your most recent runs with weather data, pace, and performance indicators"
+                  badge={{
+                    text: `Latest ${Math.min(filteredRuns.length, 8)} runs`,
+                    color: 'green'
+                  }}
+                  actions={
+                    <span className="text-xs text-gray-500">Most recent first</span>
+                  }
+                />
               </div>
               
               <div className="p-6">
@@ -453,7 +526,7 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
                     .slice(0, 8)
                   }
                   limit={8}
-                  showWeather={true}
+                  showWeather={chartSettings.showWeatherIndicators}
                   colorCodeByPerformance={true}
                 />
               </div>

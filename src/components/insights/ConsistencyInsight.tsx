@@ -16,6 +16,7 @@ import { Calendar, TrendingUp, TrendingDown, Activity, CheckCircle } from 'lucid
 import { EnrichedRun } from '../../types';
 import { groupRunsByWeek, groupRunsByMonth, TimeGroupData, analyzeConsistency } from '../../lib/insights/consistencyUtils';
 import { convertSecondsToHoursMinutes } from '../../lib/insightsUtils';
+import { chartTheme, chartDefaults, createStandardTooltip, ChartTitle, axisFormatters } from '../../lib/chartTheme';
 
 interface ConsistencyInsightProps {
   runs: EnrichedRun[];
@@ -35,44 +36,67 @@ export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) 
     return `${minutes}m`;
   };
 
-  // Helper function to render charts or "Not enough data" message
+  // Helper function to render standardized charts
   const renderChart = (
     title: string,
     chartData: TimeGroupData[],
     chartType: "line" | "bar",
     dataKey: keyof TimeGroupData,
     yAxisFormatter?: (value: any) => string,
-    tooltipFormatter?: (value: any, name: string, props: any) => [string, string] | string,
-    yAxisUnit?: string,
+    yAxisLabel?: string,
   ) => {
     if (chartData.length < 2) {
       return (
         <div className="p-4 border rounded-lg shadow bg-gray-50">
-          <h3 className="text-lg font-semibold mb-2 text-gray-700">{title}</h3>
-          <p className="text-sm text-gray-500">Not enough data to display chart.</p>
+          <ChartTitle title={title} />
+          <div className="flex items-center justify-center h-48 text-gray-500">
+            <div className="text-center">
+              <Activity className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+              <p className="text-sm">Not enough data to display chart</p>
+              <p className="text-xs text-gray-400">Need at least 2 data points</p>
+            </div>
+          </div>
         </div>
       );
     }
 
     const ChartComponent = chartType === "line" ? LineChart : BarChart;
     const ChartSeries = chartType === "line" ? Line : Bar;
+    
+    // Create appropriate tooltip formatters
+    const tooltipFormatters: Record<string, (value: any) => string> = {};
+    if (dataKey === 'totalDistance') {
+      tooltipFormatters[dataKey as string] = (value: number) => axisFormatters.distance(value);
+    } else if (dataKey === 'totalMovingTime') {
+      tooltipFormatters[dataKey as string] = (value: number) => axisFormatters.duration(value);
+    } else if (dataKey === 'runCount') {
+      tooltipFormatters[dataKey as string] = (value: number) => `${value} runs`;
+    }
 
     return (
-      <div className="p-4 border rounded-lg shadow bg-gray-50">
-        <h3 className="text-lg font-semibold mb-2 text-gray-700">{title}</h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <ChartComponent data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
-            <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-            <YAxis tickFormatter={yAxisFormatter} unit={yAxisUnit} tick={{ fontSize: 12 }} />
-            <Tooltip formatter={tooltipFormatter} />
-            <Legend />
+      <div className="p-4 border rounded-lg shadow bg-white">
+        <ChartTitle title={title} dataCount={chartData.length} />
+        <ResponsiveContainer width="100%" height={chartDefaults.height}>
+          <ChartComponent data={chartData} margin={chartDefaults.margin}>
+            <CartesianGrid {...chartDefaults.grid} />
+            <XAxis 
+              dataKey="label" 
+              {...chartDefaults.axis}
+              label={{ value: 'Time Period', position: 'insideBottom', offset: -10 }}
+            />
+            <YAxis 
+              tickFormatter={yAxisFormatter}
+              {...chartDefaults.axis}
+              label={{ value: yAxisLabel || '', angle: -90, position: 'insideLeft' }}
+            />
+            <Tooltip content={createStandardTooltip(tooltipFormatters)} />
             <ChartSeries
-              type="monotone"
+              type={chartType === 'line' ? 'monotone' : undefined}
               dataKey={dataKey}
-              stroke="#8884d8"
-              fill={chartType === 'bar' ? "#8884d8" : undefined} // Fill for Bar chart
-              activeDot={chartType === 'line' ? { r: 6 } : undefined}
+              stroke={chartTheme.colors.primary}
+              fill={chartType === 'bar' ? chartTheme.colors.primary : undefined}
+              strokeWidth={chartType === 'line' ? 2 : undefined}
+              activeDot={chartType === 'line' ? { r: 4, fill: chartTheme.colors.primary } : undefined}
             />
           </ChartComponent>
         </ResponsiveContainer>
@@ -94,8 +118,11 @@ export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) 
 
   return (
     <div className="bg-white shadow rounded-lg p-6">
-      <h3 className="text-xl font-semibold text-gray-800 mb-4">Consistency & Progress Over Time</h3>
-      <p className="text-sm text-gray-600 mb-6">Track your running frequency and volume trends on a weekly and monthly basis to see your progress.</p>
+      <ChartTitle 
+        title="Running Consistency Analysis"
+        subtitle="Track your running frequency, volume trends, and consistency patterns over time"
+        dataCount={runs.length}
+      />
 
       {/* Consistency Analysis */}
       <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
@@ -171,66 +198,70 @@ export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) 
          )}
       </div>
 
-      {/* Weekly Charts */}
+      {/* Weekly Trends - Line charts for time series data */}
       <div className="mb-6">
-        <h4 className="text-lg font-medium text-gray-700 mb-3">Weekly Trends</h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h4 className="text-lg font-medium text-gray-700 mb-3 flex items-center">
+          <Calendar className="w-5 h-5 mr-2" />
+          Weekly Trends
+        </h4>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {renderChart(
-            "Distance per Week",
+            "Weekly Distance",
             weeklyData,
             "line",
             "totalDistance",
-            (value) => `${(value / 1000).toFixed(1)} km`,
-            (value) => `${(value as number / 1000).toFixed(1)} km`,
+            (value) => axisFormatters.distance(value),
+            "Distance (km)"
           )}
           {renderChart(
-            "Time per Week",
+            "Weekly Training Time",
             weeklyData,
             "line",
             "totalMovingTime",
             formatTime,
-            (value) => formatTime(value as number),
+            "Time"
           )}
           {renderChart(
-            "Runs per Week",
+            "Weekly Run Frequency",
             weeklyData,
             "bar",
             "runCount",
-            undefined,
-            (value) => `${value} runs`,
-            " runs"
+            (value) => `${value}`,
+            "Number of Runs"
           )}
         </div>
       </div>
 
-      {/* Monthly Charts */}
+      {/* Monthly Trends - Line charts for time series data */}
       <div>
-        <h4 className="text-lg font-medium text-gray-700 mb-3">Monthly Trends</h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h4 className="text-lg font-medium text-gray-700 mb-3 flex items-center">
+          <Calendar className="w-5 h-5 mr-2" />
+          Monthly Trends
+        </h4>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {renderChart(
-            "Distance per Month",
+            "Monthly Distance",
             monthlyData,
             "line",
             "totalDistance",
-            (value) => `${(value / 1000).toFixed(1)} km`,
-            (value) => `${(value as number / 1000).toFixed(1)} km`,
+            (value) => axisFormatters.distance(value),
+            "Distance (km)"
           )}
           {renderChart(
-            "Time per Month",
+            "Monthly Training Time",
             monthlyData,
             "line",
             "totalMovingTime",
             formatTime,
-            (value) => formatTime(value as number),
+            "Time"
           )}
           {renderChart(
-            "Runs per Month",
+            "Monthly Run Frequency",
             monthlyData,
             "bar",
             "runCount",
-            undefined,
-            (value) => `${value} runs`,
-            " runs"
+            (value) => `${value}`,
+            "Number of Runs"
           )}
         </div>
       </div>

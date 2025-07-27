@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { TrendingUp, TrendingDown, Award, Calendar } from 'lucide-react';
 import { EnrichedRun } from '../../types';
 import { detectPersonalRecords, categorizeDistance } from '../../lib/insights/personalRecordsUtils';
+import { chartTheme, chartDefaults, createStandardTooltip, ChartTitle, ChartLegend, axisFormatters } from '../../lib/chartTheme';
 
 interface PaceTrendChartProps {
   data: EnrichedRun[];
@@ -70,38 +71,13 @@ export const PaceTrendChart: React.FC<PaceTrendChartProps> = ({
     });
   }, [data, showMovingAverage, highlightPersonalRecords, showWeatherIndicators]);
 
-  const formatPace = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-  };
+  const formatPace = axisFormatters.pace;
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-          <p className="font-medium text-gray-900">{data.name}</p>
-          <p className="text-sm text-gray-600">{label}</p>
-          <p className="text-sm">
-            <span className="font-medium">Pace:</span> {formatPace(data.pace)}/km
-          </p>
-          <p className="text-sm">
-            <span className="font-medium">Distance:</span> {data.distance.toFixed(2)} km
-          </p>
-          {data.weather && (
-            <p className="text-sm">
-              <span className="font-medium">Weather:</span> {data.weather}
-            </p>
-          )}
-          {data.isPR && (
-            <p className="text-sm font-medium text-green-600">🏆 Personal Record!</p>
-          )}
-        </div>
-      );
-    }
-    return null;
-  };
+  const CustomTooltip = createStandardTooltip({
+    pace: (value: number) => `${axisFormatters.pace(value)}/km`,
+    distance: (value: number) => axisFormatters.distance(value * 1000),
+    movingAverage: (value: number) => `${axisFormatters.pace(value)}/km (5-run avg)`
+  });
 
   if (chartData.length === 0) {
     return (
@@ -135,94 +111,108 @@ export const PaceTrendChart: React.FC<PaceTrendChartProps> = ({
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">Pace Trend - {period}</h3>
-        {trendStats && (
-          <div className="flex items-center space-x-2 text-sm">
-            {trendStats.isImproving ? (
-              <div className="flex items-center text-green-600">
-                <TrendingDown className="w-4 h-4 mr-1" />
-                <span className="font-medium">{trendStats.improvement.toFixed(1)}% faster</span>
-              </div>
-            ) : (
-              <div className="flex items-center text-red-600">
-                <TrendingUp className="w-4 h-4 mr-1" />
-                <span className="font-medium">{trendStats.improvement.toFixed(1)}% slower</span>
-              </div>
-            )}
-            {trendStats.personalRecords > 0 && (
-              <div className="flex items-center text-yellow-600 ml-3">
-                <Award className="w-4 h-4 mr-1" />
-                <span className="font-medium">{trendStats.personalRecords} PR{trendStats.personalRecords > 1 ? 's' : ''}</span>
-              </div>
-            )}
+      <ChartTitle 
+        title={`Pace Trend Analysis - ${period}`}
+        subtitle="Track your pace improvements over time with moving averages and personal records"
+        dataCount={chartData.length}
+      />
+      
+      {/* Performance Summary */}
+      {trendStats && (
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center space-x-4">
+              {trendStats.isImproving ? (
+                <div className="flex items-center text-green-600">
+                  <TrendingDown className="w-4 h-4 mr-1" />
+                  <span className="font-medium">{trendStats.improvement.toFixed(1)}% faster</span>
+                </div>
+              ) : (
+                <div className="flex items-center text-red-600">
+                  <TrendingUp className="w-4 h-4 mr-1" />
+                  <span className="font-medium">{trendStats.improvement.toFixed(1)}% slower</span>
+                </div>
+              )}
+              {trendStats.personalRecords > 0 && (
+                <div className="flex items-center text-yellow-600">
+                  <Award className="w-4 h-4 mr-1" />
+                  <span className="font-medium">{trendStats.personalRecords} PR{trendStats.personalRecords > 1 ? 's' : ''}</span>
+                </div>
+              )}
+            </div>
+            <span className="text-gray-500">Based on {trendStats.totalRuns} runs</span>
           </div>
-        )}
-      </div>
-      <div className="h-64">
+        </div>
+      )}
+
+      <div style={{ height: chartDefaults.height }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+          <LineChart data={chartData} margin={chartDefaults.margin}>
+            <CartesianGrid {...chartDefaults.grid} />
             <XAxis 
               dataKey="date" 
-              tick={{ fontSize: 12 }}
-              stroke="#6b7280"
+              {...chartDefaults.axis}
+              label={{ value: 'Date', position: 'insideBottom', offset: -10 }}
             />
             <YAxis 
               tickFormatter={formatPace}
-              tick={{ fontSize: 12 }}
-              stroke="#6b7280"
+              {...chartDefaults.axis}
               domain={['dataMin - 10', 'dataMax + 10']}
+              label={{ value: 'Pace (min/km)', angle: -90, position: 'insideLeft' }}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={CustomTooltip} />
             <Line
               type="monotone"
               dataKey="pace"
-              stroke="#3b82f6"
+              stroke={chartTheme.colors.primary}
               strokeWidth={2}
               dot={(props: any) => {
                 const { cx, cy, payload } = props;
                 if (payload.isPR) {
-                  return <circle cx={cx} cy={cy} r={4} fill="#10b981" stroke="#ffffff" strokeWidth={2} />;
+                  return <circle cx={cx} cy={cy} r={4} fill={chartTheme.colors.success} stroke="#ffffff" strokeWidth={2} />;
                 }
-                return <circle cx={cx} cy={cy} r={2} fill="#3b82f6" />;
+                return <circle cx={cx} cy={cy} r={2} fill={chartTheme.colors.primary} />;
               }}
-              activeDot={{ r: 4, fill: '#3b82f6' }}
+              activeDot={{ r: 4, fill: chartTheme.colors.primary }}
+              name="Pace"
             />
             {showMovingAverage && (
               <Line
                 type="monotone"
                 dataKey="movingAverage"
-                stroke="#6b7280"
+                stroke={chartTheme.colors.secondary}
                 strokeWidth={1}
                 strokeDasharray="5 5"
                 dot={false}
-                name="5-run average"
+                name="5-run moving average"
               />
             )}
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center">
-            <div className="w-3 h-0.5 bg-blue-500 mr-2"></div>
-            <span>Pace</span>
-          </div>
-          {showMovingAverage && (
-            <div className="flex items-center">
-              <div className="w-3 h-0.5 bg-gray-400 border-dashed mr-2"></div>
-              <span>5-run average</span>
-            </div>
-          )}
-          {highlightPersonalRecords && (
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-              <span>Personal Record</span>
-            </div>
-          )}
-        </div>
-        <span>Lower is better</span>
+      
+      <ChartLegend 
+        items={[
+          { 
+            label: 'Pace', 
+            color: chartTheme.colors.primary,
+            description: 'Your actual pace for each run'
+          },
+          ...(showMovingAverage ? [{
+            label: '5-run moving average',
+            color: chartTheme.colors.secondary,
+            description: 'Smoothed trend line showing average pace over last 5 runs'
+          }] : []),
+          ...(highlightPersonalRecords ? [{
+            label: 'Personal Record',
+            color: chartTheme.colors.success,
+            description: 'Runs where you achieved a new personal best pace'
+          }] : [])
+        ]}
+      />
+      
+      <div className="mt-2 text-right">
+        <span className="text-xs text-gray-500">Lower pace values indicate faster running</span>
       </div>
     </div>
   );
