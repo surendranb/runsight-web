@@ -33,8 +33,8 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
   // Progressive disclosure state
   const [selectedMetricForDetails, setSelectedMetricForDetails] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    trends: false,
-    activities: false,
+    trends: true,  // Expanded by default
+    activities: true,  // Expanded by default
     insights: false,
     advanced: false
   });
@@ -386,9 +386,9 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
           </div>
         ) : (
           <div className="space-y-8">
-            {/* 7±2 Rule Implementation: Maximum 7 primary information chunks */}
+            {/* Simplified Dashboard: Only KPIs, Pace Trends, and Activity Timeline */}
             
-            {/* Information Chunk 1: Primary KPI System (4 cards grouped as one cognitive unit) */}
+            {/* KPI System */}
             <PrimaryKPISystem
               runs={filteredRuns}
               period={getPeriodLabel()}
@@ -397,12 +397,9 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
               }}
             />
 
-            {/* Information Chunk 2: Performance Trend Visualization (Collapsible) */}
+            {/* Pace Trend Analysis - Always Expanded */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <button
-                onClick={() => toggleSection('trends')}
-                className="w-full bg-gray-50 px-6 py-4 border-b border-gray-200 hover:bg-gray-100 transition-colors"
-              >
+              <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <div className="text-left">
                     <h3 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
@@ -413,230 +410,50 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
                     </h3>
                     <p className="text-sm text-gray-600">Interactive chart showing pace improvements, moving averages, and performance patterns</p>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="text-right">
-                      <p className="text-xs text-gray-500">{getDataFreshnessIndicator()}</p>
-                    </div>
-                    {expandedSections.trends ? (
-                      <ChevronUp className="w-5 h-5 text-gray-500" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-gray-500" />
-                    )}
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">{getDataFreshnessIndicator()}</p>
                   </div>
-                </div>
-              </button>
-              
-              {/* Collapsible content with smooth transition */}
-              <div className={`transition-all duration-300 ease-in-out ${expandedSections.trends ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
-                <div className="p-6">
-                  <PaceTrendChart
-                    data={filteredRuns}
-                    period={getPeriodLabel()}
-                    showMovingAverage={true}
-                    highlightPersonalRecords={true}
-                    showWeatherIndicators={true}
-                  />
                 </div>
               </div>
               
-              {/* Preview when collapsed */}
-              {!expandedSections.trends && (
-                <div className="px-6 py-4 bg-blue-50 border-t border-blue-100">
-                  <p className="text-sm text-blue-700 text-center">
-                    📈 Interactive pace chart • Moving averages • Personal records • Weather indicators
-                  </p>
-                </div>
-              )}
+              <div className="p-6">
+                <PaceTrendChart
+                  data={filteredRuns}
+                  period={getPeriodLabel()}
+                  showMovingAverage={true}
+                  highlightPersonalRecords={true}
+                  showWeatherIndicators={true}
+                />
+              </div>
             </div>
 
-            {/* Information Chunk 3: Recent Activity Summary (Collapsible) */}
+            {/* Activity Timeline - Always Expanded, Latest First */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <button
-                onClick={() => toggleSection('activities')}
-                className="w-full bg-gray-50 px-6 py-4 border-b border-gray-200 hover:bg-gray-100 transition-colors"
-              >
+              <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <div className="text-left">
                     <h3 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
                       <span>Activity Timeline</span>
                       <span className="text-sm bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                        Last 8 runs
+                        Latest {Math.min(filteredRuns.length, 8)} runs
                       </span>
                     </h3>
-                    <p className="text-sm text-gray-600">Chronological view of recent runs with weather data, pace, and performance indicators</p>
+                    <p className="text-sm text-gray-600">Your most recent runs with weather data, pace, and performance indicators</p>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="text-right">
-                      <p className="text-xs text-gray-500">Most recent first</p>
-                    </div>
-                    {expandedSections.activities ? (
-                      <ChevronUp className="w-5 h-5 text-gray-500" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-gray-500" />
-                    )}
-                  </div>
-                </div>
-              </button>
-              
-              {/* Collapsible content with smooth transition */}
-              <div className={`transition-all duration-300 ease-in-out ${expandedSections.activities ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
-                <div className="p-6">
-                  <ActivityTimeline
-                    activities={filteredRuns.slice().reverse()}
-                    limit={8}
-                    showWeather={true}
-                    colorCodeByPerformance={true}
-                  />
-                </div>
-              </div>
-              
-              {/* Preview when collapsed */}
-              {!expandedSections.activities && (
-                <div className="px-6 py-4 bg-green-50 border-t border-green-100">
-                  <p className="text-sm text-green-700 text-center">
-                    🏃‍♂️ Activity timeline • Weather conditions • Pace analysis • Performance trends
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Information Chunk 4: Key Performance Insight (Collapsible) */}
-            {getPrimaryInsight() && (
-              <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200 shadow-sm overflow-hidden">
-                <button
-                  onClick={() => toggleSection('insights')}
-                  className="w-full p-6 hover:bg-amber-100 hover:bg-opacity-50 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3 text-left">
-                      <div className="w-3 h-3 bg-amber-400 rounded-full animate-pulse"></div>
-                      <div>
-                        <h3 className="text-xl font-semibold text-gray-900">AI-Powered Performance Insight</h3>
-                        <p className="text-sm text-amber-700">Most important finding: {getPrimaryInsight()!.title}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <span className="text-sm text-amber-700 bg-amber-100 px-3 py-1 rounded-full font-medium">
-                        {getPrimaryInsight()?.confidence ? `${Math.round(getPrimaryInsight()!.confidence * 100)}% confidence` : 'High priority'}
-                      </span>
-                      {expandedSections.insights ? (
-                        <ChevronUp className="w-5 h-5 text-amber-600" />
-                      ) : (
-                        <ChevronDown className="w-5 h-5 text-amber-600" />
-                      )}
-                    </div>
-                  </div>
-                </button>
-                
-                {/* Collapsible insight content */}
-                <div className={`transition-all duration-300 ease-in-out ${expandedSections.insights ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
-                  <div className="px-6 pb-6">
-                    <InsightCard
-                      icon={getPrimaryInsight()!.icon}
-                      title={getPrimaryInsight()!.title}
-                      insight={getPrimaryInsight()!.insight}
-                      actionable={getPrimaryInsight()!.actionable}
-                      confidence={getPrimaryInsight()!.confidence}
-                    />
-                    
-                    {/* Progressive Disclosure for Additional Insights */}
-                    {insights.length > 1 && (
-                      <div className="mt-6 pt-4 border-t border-amber-200">
-                        <button 
-                          onClick={() => toggleSection('advanced')}
-                          className="w-full text-center text-sm text-amber-700 hover:text-amber-800 font-medium transition-colors bg-amber-100 hover:bg-amber-200 py-3 px-4 rounded-lg"
-                        >
-                          View {insights.length - 1} Additional Insights →
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Preview when collapsed */}
-                {!expandedSections.insights && (
-                  <div className="px-6 pb-6">
-                    <p className="text-sm text-amber-700 bg-amber-100 bg-opacity-60 rounded-lg p-3 text-center">
-                      "{getPrimaryInsight()!.insight.substring(0, 80)}..." - Click to view full insight and recommendations
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Information Chunk 5: Advanced Metrics (Collapsible) */}
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border-2 border-purple-200 overflow-hidden">
-              <button
-                onClick={() => toggleSection('advanced')}
-                className="w-full p-6 hover:bg-purple-100 hover:bg-opacity-50 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="text-left">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <div className="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
-                        Advanced Analytics
-                      </div>
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-800">Advanced Analytics Hub</h3>
-                    <p className="text-sm text-purple-700">Deep-dive analysis: weather impact, training consistency, and performance optimization strategies</p>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <span className="text-sm text-purple-700 bg-purple-100 px-3 py-1 rounded-full font-medium">
-                      {insights.length} insights
-                    </span>
-                    {expandedSections.advanced ? (
-                      <ChevronUp className="w-5 h-5 text-purple-600" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-purple-600" />
-                    )}
-                  </div>
-                </div>
-              </button>
-              
-              {/* Collapsible advanced content */}
-              <div className={`transition-all duration-300 ease-in-out ${expandedSections.advanced ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
-                <div className="px-6 pb-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div className="bg-white bg-opacity-60 rounded-lg p-4">
-                      <h4 className="font-semibold text-gray-800 mb-2">Weather Impact Analysis</h4>
-                      <p className="text-sm text-gray-600">
-                        Correlation between weather conditions and your performance across {filteredRuns.length} runs
-                      </p>
-                    </div>
-                    <div className="bg-white bg-opacity-60 rounded-lg p-4">
-                      <h4 className="font-semibold text-gray-800 mb-2">Consistency Tracking</h4>
-                      <p className="text-sm text-gray-600">
-                        Pace variability and training consistency patterns over time
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button className="flex items-center justify-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium shadow-sm">
-                      <span>View All Insights</span>
-                      {insights.length > 0 && (
-                        <span className="ml-2 text-xs bg-purple-500 px-2 py-1 rounded-full">
-                          {insights.length}
-                        </span>
-                      )}
-                    </button>
-                    
-                    <button className="flex items-center justify-center px-6 py-3 border-2 border-purple-300 text-purple-700 rounded-lg hover:bg-white hover:shadow-sm transition-all font-medium">
-                      <span>Export Data</span>
-                      <span className="ml-2 text-purple-500">↗</span>
-                    </button>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Most recent first</p>
                   </div>
                 </div>
               </div>
               
-              {/* Preview when collapsed */}
-              {!expandedSections.advanced && (
-                <div className="px-6 pb-6">
-                  <p className="text-sm text-purple-700 bg-purple-100 bg-opacity-60 rounded-lg p-3 text-center">
-                    🌤️ Weather impact analysis • 📊 Consistency tracking • 🎯 Performance optimization • 📈 Advanced metrics
-                  </p>
-                </div>
-              )}
+              <div className="p-6">
+                <ActivityTimeline
+                  activities={filteredRuns.slice(-8).reverse()}
+                  limit={8}
+                  showWeather={true}
+                  colorCodeByPerformance={true}
+                />
+              </div>
             </div>
           </div>
         )}

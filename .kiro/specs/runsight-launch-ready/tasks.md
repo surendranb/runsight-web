@@ -1,5 +1,13 @@
 # Implementation Plan
 
+## Testing Protocol
+After completing each major task (not subtasks), follow the testing workflow:
+1. Run `npm run build` to verify local build
+2. Run `npx tsc --noEmit` to check TypeScript errors  
+3. Commit and push changes to trigger deployment
+4. Test deployed application and provide feedback
+5. See `.kiro/steering/testing-workflow.md` for detailed steps
+
 ## Phase 1: Cognitive Load Optimization and Information Architecture
 
 - [x] 1. Implement 7±2 Rule Dashboard Restructuring

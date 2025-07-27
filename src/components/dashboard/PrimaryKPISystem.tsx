@@ -163,14 +163,6 @@ export const PrimaryKPISystem: React.FC<PrimaryKPISystemProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Section header with clear information scent */}
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Key Performance Indicators</h2>
-        <p className="text-gray-600">
-          The 4 most important metrics to track your running progress for {period.toLowerCase()}
-        </p>
-      </div>
-
       {/* Primary KPI Cards - Maximum 4 cards in responsive grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {metrics.map((metric) => (
@@ -190,14 +182,7 @@ export const PrimaryKPISystem: React.FC<PrimaryKPISystemProps> = ({
         ))}
       </div>
 
-      {/* Visual grouping indicator */}
-      <div className="text-center">
-        <div className="inline-flex items-center space-x-2 text-sm text-gray-500">
-          <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-          <span>Primary performance metrics</span>
-          <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-        </div>
-      </div>
+
     </div>
   );
 };

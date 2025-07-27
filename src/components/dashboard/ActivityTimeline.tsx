@@ -103,26 +103,22 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
 
   if (displayActivities.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Recent Activities</h3>
-        <div className="text-center py-8 text-gray-500">
-          <MapPin className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-          <p>No recent activities to display</p>
-        </div>
+      <div className="text-center py-8 text-gray-500">
+        <MapPin className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+        <p>No recent activities to display</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">Recent Activities</h3>
-        {activities.length > limit && (
+    <div>
+      {activities.length > limit && (
+        <div className="mb-4 text-center">
           <span className="text-sm text-gray-500">
             Showing {limit} of {activities.length} activities
           </span>
-        )}
-      </div>
+        </div>
+      )}
       
       <div className="space-y-3">
         {displayActivities.map((run, index) => {

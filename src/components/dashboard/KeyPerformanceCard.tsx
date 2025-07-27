@@ -72,14 +72,7 @@ export const KeyPerformanceCard: React.FC<KeyPerformanceCardProps> = ({
 
   return (
     <div className={cardClasses}>
-      {/* Priority indicator for primary cards */}
-      {priority === 'primary' && (
-        <div className="flex justify-center mb-3">
-          <span className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-            Key Metric
-          </span>
-        </div>
-      )}
+
 
       <div className="text-center">
         {/* Metric title with context tooltip */}
