@@ -448,7 +448,10 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
               
               <div className="p-6">
                 <ActivityTimeline
-                  activities={filteredRuns.slice(-8).reverse()}
+                  activities={filteredRuns
+                    .sort((a, b) => new Date(b.start_date_local).getTime() - new Date(a.start_date_local).getTime())
+                    .slice(0, 8)
+                  }
                   limit={8}
                   showWeather={true}
                   colorCodeByPerformance={true}
