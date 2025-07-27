@@ -157,12 +157,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
               </div>
             )}
 
-            {/* User Info - Hidden on small screens */}
-            {userName && (
-              <span className="hidden lg:inline text-sm text-gray-700 font-medium">
-                Hi, {userName.split(' ')[0]}
-              </span>
-            )}
+
 
             {/* Logout Button - Hidden on mobile */}
             {onLogout && (
