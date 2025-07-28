@@ -7,6 +7,7 @@ import { ActivityTimeline } from './dashboard/ActivityTimeline';
 import { InsightCard } from './dashboard/InsightCard';
 import { TimePeriodSelector, TimePeriod, Breadcrumb, SectionIndicator } from './common/TimePeriodSelector';
 import { StandardButton } from './common/StandardButton';
+import { Heading, Section, EmphasisBox, visualHierarchy } from './common/VisualHierarchy';
 import { standardTimePeriods } from '../lib/chartTheme';
 import { Activity, MapPin, Clock, Settings, RefreshCw, TrendingUp, TrendingDown, ChevronDown, ChevronUp, Lightbulb, TrendingUp as TrendingUpIcon } from 'lucide-react';
 import { filterOutliers, getOutlierStats } from '../lib/outlierDetection';
@@ -376,37 +377,41 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
             className="mb-3"
           />
           
-          <SectionIndicator
-            title={`Welcome back, ${user.name}`}
-            subtitle={`${metrics.totalRuns} runs • ${getDataFreshnessIndicator()}`}
-            badge={{
-              text: getPeriodLabel(),
-              color: 'blue'
-            }}
-            actions={
-              <div className="flex items-center space-x-2">
-                {onSync && (
-                  <StandardButton
-                    onClick={onSync}
-                    variant="primary"
-                    size="md"
-                    icon={RefreshCw}
-                    iconPosition="left"
-                  >
-                    Sync Data
-                  </StandardButton>
-                )}
-                
-                <TimePeriodSelector
-                  selectedPeriod={selectedPeriod}
-                  onPeriodChange={handlePeriodChange}
-                  availablePeriods={['last7', 'last30', 'last90', 'thisYear', 'allTime']}
-                  showIcon={true}
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <Heading 
+                level={1} 
+                emphasis="primary"
+                className="mb-2"
+              >
+                Welcome back, {user.name}
+              </Heading>
+              <p className="text-gray-600">
+                {metrics.totalRuns} runs • {getDataFreshnessIndicator()} • {getPeriodLabel()}
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              {onSync && (
+                <StandardButton
+                  onClick={onSync}
+                  variant="primary"
                   size="md"
-                />
-              </div>
-            }
-          />
+                  icon={RefreshCw}
+                  iconPosition="left"
+                >
+                  Sync Data
+                </StandardButton>
+              )}
+              
+              <TimePeriodSelector
+                selectedPeriod={selectedPeriod}
+                onPeriodChange={handlePeriodChange}
+                availablePeriods={['last7', 'last30', 'last90', 'thisYear', 'allTime']}
+                showIcon={true}
+                size="md"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -424,57 +429,58 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
           <div className="space-y-8">
             {/* Smart Highlighted Patterns */}
             {significantChanges.length > 0 && (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
-                <div className="flex items-start space-x-3">
-                  <Lightbulb className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-blue-900 mb-2">
-                      Key Insights Detected
-                    </h3>
-                    <div className="space-y-4">
-                      {significantChanges.slice(0, 3).map((pattern, index) => (
-                        <div key={pattern.id} className="flex items-start space-x-3">
-                          <div className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${
-                            pattern.type === 'improvement' ? 'bg-green-500' :
-                            pattern.type === 'achievement' ? 'bg-yellow-500' :
-                            pattern.type === 'concern' ? 'bg-red-500' :
-                            'bg-blue-500'
-                          }`} />
-                          <div className="flex-1">
-                            <h4 className="text-blue-800 font-medium mb-1">{pattern.title}</h4>
-                            <p className="text-blue-700 text-sm mb-2">{pattern.description}</p>
-                            {pattern.recommendation && (
-                              <p className="text-blue-600 text-sm bg-blue-100 p-2 rounded border border-blue-200">
-                                💡 {pattern.recommendation}
-                              </p>
-                            )}
-                            <div className="flex items-center mt-2 space-x-3">
-                              <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
-                                {(pattern.confidence * 100).toFixed(0)}% confidence
-                              </span>
-                              <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
-                                {pattern.actionable ? 'Actionable' : 'Informational'}
-                              </span>
-                            </div>
+              <EmphasisBox
+                variant="insight"
+                title="Key Insights Detected"
+                icon={Lightbulb}
+                priority="high"
+              >
+                <div className={visualHierarchy.spacing.sm}>
+                  {significantChanges.slice(0, 3).map((pattern, index) => (
+                    <div key={pattern.id} className="flex items-start space-x-3">
+                      <div className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${
+                        pattern.type === 'improvement' ? 'bg-green-500' :
+                        pattern.type === 'achievement' ? 'bg-yellow-500' :
+                        pattern.type === 'concern' ? 'bg-red-500' :
+                        'bg-blue-500'
+                      }`} />
+                      <div className="flex-1">
+                        <Heading level={4} emphasis="accent" className="mb-1">
+                          {pattern.title}
+                        </Heading>
+                        <p className="text-sm mb-2 leading-relaxed">{pattern.description}</p>
+                        {pattern.recommendation && (
+                          <div className="bg-blue-100 border border-blue-200 rounded-lg p-3 mb-3">
+                            <p className="text-sm font-medium text-blue-800">
+                              💡 {pattern.recommendation}
+                            </p>
                           </div>
+                        )}
+                        <div className="flex items-center space-x-3">
+                          <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                            {(pattern.confidence * 100).toFixed(0)}% confidence
+                          </span>
+                          <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                            {pattern.actionable ? 'Actionable' : 'Informational'}
+                          </span>
                         </div>
-                      ))}
+                      </div>
                     </div>
-                    {significantChanges.length > 3 && (
-                      <button 
-                        onClick={() => {/* TODO: Show all patterns */}}
-                        className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-4 py-3 mt-3 text-sm text-blue-600 hover:text-blue-800 active:text-blue-900 font-medium rounded-lg hover:bg-blue-50 active:bg-blue-100 transition-all duration-200 select-none md:min-h-[32px] md:min-w-[32px] md:px-3 md:py-2"
-                        style={{ 
-                          WebkitTapHighlightColor: 'transparent',
-                          touchAction: 'manipulation'
-                        }}
-                      >
-                        <span className="whitespace-nowrap">View {significantChanges.length - 3} more insights →</span>
-                      </button>
-                    )}
-                  </div>
+                  ))}
+                  {significantChanges.length > 3 && (
+                    <button 
+                      onClick={() => {/* TODO: Show all patterns */}}
+                      className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-4 py-3 mt-3 text-sm text-blue-600 hover:text-blue-800 active:text-blue-900 font-medium rounded-lg hover:bg-blue-50 active:bg-blue-100 transition-all duration-200 select-none md:min-h-[32px] md:min-w-[32px] md:px-3 md:py-2"
+                      style={{ 
+                        WebkitTapHighlightColor: 'transparent',
+                        touchAction: 'manipulation'
+                      }}
+                    >
+                      <span className="whitespace-nowrap">View {significantChanges.length - 3} more insights →</span>
+                    </button>
+                  )}
                 </div>
-              </div>
+              </EmphasisBox>
             )}
             
             {/* KPI System */}
@@ -486,61 +492,53 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
               }}
             />
 
-            {/* Pace Trend Analysis - Standardized Section */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                <SectionIndicator
-                  title="Pace Trend Analysis"
-                  subtitle="Interactive chart showing pace improvements, moving averages, and performance patterns"
-                  badge={{
-                    text: `${filteredRuns.length} runs analyzed`,
-                    color: 'blue'
-                  }}
-                  actions={
-                    <span className="text-xs text-gray-500">{getDataFreshnessIndicator()}</span>
-                  }
-                />
-              </div>
-              
-              <div className="p-6">
-                <PaceTrendChart
-                  data={filteredRuns}
-                  period={getPeriodLabel()}
-                  showMovingAverage={chartSettings.showMovingAverage}
-                  highlightPersonalRecords={chartSettings.highlightPersonalRecords}
-                  showWeatherIndicators={chartSettings.showWeatherIndicators}
-                />
-              </div>
-            </div>
+            {/* Pace Trend Analysis */}
+            <Section
+              title="Pace Trend Analysis"
+              subtitle="Interactive chart showing pace improvements, moving averages, and performance patterns"
+              level={2}
+              icon={TrendingUpIcon}
+              badge={{
+                text: `${filteredRuns.length} runs analyzed`,
+                color: 'blue'
+              }}
+              actions={
+                <span className="text-xs text-gray-500">{getDataFreshnessIndicator()}</span>
+              }
+            >
+              <PaceTrendChart
+                data={filteredRuns}
+                period={getPeriodLabel()}
+                showMovingAverage={chartSettings.showMovingAverage}
+                highlightPersonalRecords={chartSettings.highlightPersonalRecords}
+                showWeatherIndicators={chartSettings.showWeatherIndicators}
+              />
+            </Section>
 
-            {/* Activity Timeline - Standardized Section */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                <SectionIndicator
-                  title="Recent Activity Timeline"
-                  subtitle="Your most recent runs with weather data, pace, and performance indicators"
-                  badge={{
-                    text: `Latest ${Math.min(filteredRuns.length, 8)} runs`,
-                    color: 'green'
-                  }}
-                  actions={
-                    <span className="text-xs text-gray-500">Most recent first</span>
-                  }
-                />
-              </div>
-              
-              <div className="p-6">
-                <ActivityTimeline
-                  activities={filteredRuns
-                    .sort((a, b) => new Date(b.start_date_local).getTime() - new Date(a.start_date_local).getTime())
-                    .slice(0, 8)
-                  }
-                  limit={8}
-                  showWeather={chartSettings.showWeatherIndicators}
-                  colorCodeByPerformance={true}
-                />
-              </div>
-            </div>
+            {/* Activity Timeline */}
+            <Section
+              title="Recent Activity Timeline"
+              subtitle="Your most recent runs with weather data, pace, and performance indicators"
+              level={2}
+              icon={Clock}
+              badge={{
+                text: `Latest ${Math.min(filteredRuns.length, 8)} runs`,
+                color: 'green'
+              }}
+              actions={
+                <span className="text-xs text-gray-500">Most recent first</span>
+              }
+            >
+              <ActivityTimeline
+                activities={filteredRuns
+                  .sort((a, b) => new Date(b.start_date_local).getTime() - new Date(a.start_date_local).getTime())
+                  .slice(0, 8)
+                }
+                limit={8}
+                showWeather={chartSettings.showWeatherIndicators}
+                colorCodeByPerformance={true}
+              />
+            </Section>
           </div>
         )}
       </div>

@@ -18,6 +18,7 @@ import { groupRunsByWeek, groupRunsByMonth, TimeGroupData, analyzeConsistency } 
 import { convertSecondsToHoursMinutes } from '../../lib/insightsUtils';
 import { chartTheme, chartDefaults, createStandardTooltip, ChartTitle, axisFormatters } from '../../lib/chartTheme';
 import { ProgressiveHelp, HelpIcon, runningTerminology } from '../common/ContextualHelp';
+import { Heading, Section, EmphasisBox, InfoScent, visualHierarchy } from '../common/VisualHierarchy';
 
 interface ConsistencyInsightProps {
   runs: EnrichedRun[];
@@ -107,17 +108,19 @@ export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) 
 
   if (runs.length === 0) {
     return (
-      <div className="bg-white shadow rounded-lg p-6">
-        <div className="flex items-center space-x-2 mb-3">
-          <h3 className="text-xl font-semibold text-gray-800">Consistency & Progress</h3>
+      <Section
+        title="Consistency & Progress"
+        subtitle="No run data available to show consistency insights."
+        level={3}
+        icon={Activity}
+        actions={
           <HelpIcon 
             content={runningTerminology.consistency.basic}
             size="md"
             position="top"
           />
-        </div>
-        <p className="text-gray-600">No run data available to show consistency insights.</p>
-      </div>
+        }
+      />
     );
   }
 
@@ -125,21 +128,24 @@ export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) 
   const lastMonth = monthlyData.length > 0 ? monthlyData[monthlyData.length -1] : null;
 
   return (
-    <div className="bg-white shadow rounded-lg p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-2">
-          <ChartTitle 
-            title="Running Consistency Analysis"
-            subtitle="Track your running frequency, volume trends, and consistency patterns over time"
-            dataCount={runs.length}
-          />
-          <HelpIcon 
-            content={runningTerminology.consistency.basic}
-            size="md"
-            position="top"
-          />
-        </div>
-      </div>
+    <Section
+      title="Running Consistency Analysis"
+      subtitle="Track your running frequency, volume trends, and consistency patterns over time"
+      level={3}
+      icon={Activity}
+      badge={{
+        text: `${runs.length} runs analyzed`,
+        color: 'blue'
+      }}
+      actions={
+        <HelpIcon 
+          content={runningTerminology.consistency.basic}
+          size="md"
+          position="top"
+        />
+      }
+      spacing="normal"
+    >
 
       {/* Progressive help for understanding consistency */}
       <ProgressiveHelp
@@ -151,25 +157,36 @@ export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) 
       />
 
       {/* Consistency Analysis */}
-      <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-        <h4 className="font-semibold text-purple-800 mb-3">Consistency Analysis</h4>
+      <EmphasisBox
+        variant="insight"
+        title="Consistency Analysis"
+        priority="high"
+      >
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">{consistencyAnalysis.consistencyScore.toFixed(0)}</div>
-            <div className="text-sm text-purple-700">Consistency Score</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{consistencyAnalysis.frequency.runsPerWeek.toFixed(1)}</div>
-            <div className="text-sm text-blue-700">Runs/Week</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{consistencyAnalysis.streaks.longest}</div>
-            <div className="text-sm text-green-700">Longest Streak</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{consistencyAnalysis.frequency.averageGapDays.toFixed(1)}</div>
-            <div className="text-sm text-orange-700">Avg Gap (days)</div>
-          </div>
+          <InfoScent
+            label="Consistency Score"
+            description="Overall consistency rating based on frequency and gaps"
+            value={consistencyAnalysis.consistencyScore.toFixed(0)}
+            confidence={0.9}
+          />
+          <InfoScent
+            label="Runs per Week"
+            description="Average weekly running frequency"
+            value={consistencyAnalysis.frequency.runsPerWeek.toFixed(1)}
+            unit="runs/week"
+          />
+          <InfoScent
+            label="Longest Streak"
+            description="Maximum consecutive days with runs"
+            value={consistencyAnalysis.streaks.longest}
+            unit="days"
+          />
+          <InfoScent
+            label="Average Gap"
+            description="Average days between runs"
+            value={consistencyAnalysis.frequency.averageGapDays.toFixed(1)}
+            unit="days"
+          />
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -191,18 +208,20 @@ export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) 
         
         {consistencyAnalysis.recommendations.length > 0 && (
           <div className="mt-4">
-            <span className="font-medium text-gray-700 block mb-2">Recommendations:</span>
-            <ul className="text-sm text-gray-600 space-y-1">
+            <Heading level={5} emphasis="secondary" className="mb-2">
+              Recommendations:
+            </Heading>
+            <ul className={`text-sm ${visualHierarchy.spacing.xs}`}>
               {consistencyAnalysis.recommendations.slice(0, 3).map((rec, index) => (
                 <li key={index} className="flex items-start">
-                  <span className="text-purple-500 mr-2">•</span>
+                  <CheckCircle className="w-4 h-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
                   <span>{rec}</span>
                 </li>
               ))}
             </ul>
           </div>
         )}
-      </div>
+      </EmphasisBox>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -226,10 +245,9 @@ export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) 
 
       {/* Weekly Trends - Line charts for time series data */}
       <div className="mb-6">
-        <h4 className="text-lg font-medium text-gray-700 mb-3 flex items-center">
-          <Calendar className="w-5 h-5 mr-2" />
+        <Heading level={4} icon={Calendar} className="mb-3">
           Weekly Trends
-        </h4>
+        </Heading>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {renderChart(
             "Weekly Distance",
@@ -260,10 +278,9 @@ export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) 
 
       {/* Monthly Trends - Line charts for time series data */}
       <div>
-        <h4 className="text-lg font-medium text-gray-700 mb-3 flex items-center">
-          <Calendar className="w-5 h-5 mr-2" />
+        <Heading level={4} icon={Calendar} className="mb-3">
           Monthly Trends
-        </h4>
+        </Heading>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {renderChart(
             "Monthly Distance",
@@ -291,6 +308,6 @@ export const ConsistencyInsight: React.FC<ConsistencyInsightProps> = ({ runs }) 
           )}
         </div>
       </div>
-    </div>
+    </Section>
   );
 };

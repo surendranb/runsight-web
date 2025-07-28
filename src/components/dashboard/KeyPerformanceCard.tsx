@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react';
 import { HelpIcon, ContextualExplanation } from '../common/ContextualHelp';
+import { Heading, InfoScent, visualHierarchy } from '../common/VisualHierarchy';
 
 interface KeyPerformanceCardProps {
   metric: string;
@@ -87,9 +88,13 @@ export const KeyPerformanceCard: React.FC<KeyPerformanceCardProps> = ({
       <div className="text-center">
         {/* Metric title with contextual help */}
         <div className="flex items-center justify-center space-x-2 mb-3">
-          <h3 className={`font-semibold ${priority === 'primary' ? 'text-xl text-gray-800' : 'text-lg text-gray-700'}`}>
+          <Heading 
+            level={priority === 'primary' ? 4 : 5}
+            emphasis={priority === 'primary' ? 'primary' : 'secondary'}
+            className="text-center"
+          >
             {metric}
-          </h3>
+          </Heading>
           <HelpIcon 
             content={contextTooltip}
             size={priority === 'primary' ? 'md' : 'sm'}

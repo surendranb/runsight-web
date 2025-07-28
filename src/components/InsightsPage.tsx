@@ -21,7 +21,8 @@ import {
   InsightFilter 
 } from '../lib/insights/actionableInsightsEngine';
 import { ProgressiveHelp, HelpIcon } from './common/ContextualHelp';
-import { Lightbulb, ChevronLeft, ChevronRight, Grid3X3, List, FileText } from 'lucide-react';
+import { Heading, Section, EmphasisBox, visualHierarchy } from './common/VisualHierarchy';
+import { Lightbulb, ChevronLeft, ChevronRight, Grid3X3, List, FileText, BarChart3 } from 'lucide-react';
 
 interface InsightsPageProps {
   user: User;
@@ -119,31 +120,45 @@ export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoadin
   // Main content of the InsightsPage, without its own distinct header
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white shadow rounded-lg p-6 mb-6">
-        <div className="flex items-center space-x-2 mb-2">
-          <h2 className="text-2xl font-semibold text-gray-800">Insights Hub</h2>
+      <Section
+        title="Insights Hub"
+        subtitle={`Welcome, ${user.name}! Analyzing ${runs.length} runs to provide actionable insights for your training.`}
+        level={1}
+        icon={BarChart3}
+        badge={{
+          text: `${runs.length} runs`,
+          color: 'blue'
+        }}
+        actions={
           <HelpIcon 
             content="Insights are automatically generated from your running data to help you understand patterns and improve your training."
             size="md"
           />
-        </div>
-        <p className="text-gray-600">Welcome, {user.name}! Analyzing {runs.length} runs.</p>
-      </div>
+        }
+        background="white"
+        className="mb-8"
+      />
 
       {/* Actionable Insights Section */}
       {displayedInsights.length > 0 && (
-        <div className="mb-8">
-          <div className="bg-white shadow rounded-lg p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-2">
-                <Lightbulb className="w-6 h-6 text-yellow-500" />
-                <h3 className="text-xl font-semibold text-gray-800">Actionable Insights</h3>
-                <HelpIcon 
-                  content="These insights are prioritized by potential impact, confidence, and actionability to help you make the biggest improvements to your running."
-                  size="md"
-                />
-              </div>
-            </div>
+        <Section
+          title="Actionable Insights"
+          subtitle="Prioritized by potential impact, confidence, and actionability to help you make the biggest improvements to your running."
+          level={2}
+          icon={Lightbulb}
+          badge={{
+            text: `${allInsights.length} total insights`,
+            color: 'yellow'
+          }}
+          actions={
+            <HelpIcon 
+              content="These insights are prioritized by potential impact, confidence, and actionability to help you make the biggest improvements to your running."
+              size="md"
+            />
+          }
+          className="mb-8"
+        >
+          <div className={visualHierarchy.spacing.md}>
 
             {/* View Mode and Display Controls */}
             <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
@@ -488,19 +503,23 @@ export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoadin
             )}
 
             {allInsights.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                <Lightbulb className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p>No insights match your current criteria.</p>
+              <EmphasisBox
+                variant="info"
+                title="No Insights Available"
+                icon={Lightbulb}
+                priority="low"
+              >
+                <p className="mb-2">No insights match your current criteria.</p>
                 <p className="text-sm">
                   {viewMode === 'filtered' 
                     ? 'Try adjusting your filters or switch to "All Insights" view.'
                     : 'More insights will appear as you add more running data.'
                   }
                 </p>
-              </div>
+              </EmphasisBox>
             )}
           </div>
-        </div>
+        </Section>
       )}
 
       <MonthlySummaryTable runs={runs} />

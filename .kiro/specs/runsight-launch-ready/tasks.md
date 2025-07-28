@@ -5,8 +5,10 @@ After completing each major task (not subtasks), follow the testing workflow:
 1. Run `npm run build` to verify local build
 2. Run `npx tsc --noEmit` to check TypeScript errors  
 3. Commit and push changes to trigger deployment
-4. Test deployed application and provide feedback
-5. See `.kiro/steering/testing-workflow.md` for detailed steps
+4. Wait 10 minutes for Netlify deployment to complete
+5. Use Playwright to test deployed application at https://resonant-pony-ea7953.netlify.app/
+6. Verify key functionality works as expected in production environment
+7. See `.kiro/steering/testing-workflow.md` for detailed Playwright testing steps
 
 ## Phase 1: Cognitive Load Optimization and Information Architecture
 
@@ -104,112 +106,100 @@ After completing each major task (not subtasks), follow the testing workflow:
   - Optimize dropdown menus and chart interactions for accurate selection
   - _Requirements: 7.1, 7.4, 7.5_
 
-- [ ] 6. Implement Visual Hierarchy and Information Architecture
+- [-] 6. Implement Visual Hierarchy and Information Architecture
   - Create clear visual hierarchy using size, color, and positioning for important information
   - Implement consistent heading structure (H1, H2, H3) throughout the application
   - Add visual emphasis (icons, colors, sizing) to highlight significant findings and recommendations
+  - **Testing**: Deploy to production and use Playwright to verify visual hierarchy, heading structure, and information scent
   - _Requirements: 8.1, 8.6, 1.3_
 
 ## Phase 4: Production Stack Testing and Security Validation
 
-- [ ] 7. Implement Production-First Testing Infrastructure
-  - Create automated testing suite that validates deployment on actual Netlify + Supabase stack
-  - Implement end-to-end tests that use real API integrations (Strava, OpenWeatherMap)
-  - Create fresh account testing protocol to simulate new user deployment experience
-  - _Requirements: 5.6, 4.6, 5.1_
+- [ ] 7. Implement Production Stack Testing and Security Validation
+  - Create comprehensive testing suite for deployed Netlify + Supabase stack with security audit
+  - Implement end-to-end tests using real API integrations (Strava, OpenWeatherMap) with security validation
+  - Validate RLS policies, OAuth flows, and API key security in production environment
+  - Test deployment process with fresh accounts and verify no credential exposure
+  - **Testing**: Use Supabase MCP to validate database security, then Playwright to test complete user flows
+  - _Requirements: 5.6, 4.6, 5.1, 4.1, 4.7, 4.3_
 
-- [ ] 7.1 Create Netlify Deployment Validation System
-  - Implement automated tests that verify "Deploy to Netlify" button functionality
-  - Create validation for build settings, environment variables, and function configuration
-  - Test redirect rules and function routing in deployed environment
-  - _Requirements: 5.1, 5.7, 4.1_
+- [ ] 7.1 Create Netlify Deployment and Security Validation
+  - Implement automated tests for "Deploy to Netlify" functionality with build settings validation
+  - Create security scanning to verify no API keys exposed in built frontend assets
+  - Test redirect rules, function routing, and environment variable security in deployed environment
+  - Validate rate limiting and error handling against actual API responses
+  - _Requirements: 5.1, 5.7, 4.1, 4.4, 4.5_
 
-- [ ] 7.2 Implement Supabase Integration Testing
-  - Create automated tests for database migration execution in fresh Supabase projects
+- [ ] 7.2 Implement Supabase Integration and Security Testing
+  - Create automated tests for database migration execution with fresh Supabase projects
   - Implement RLS policy validation with actual user accounts and data isolation testing
-  - Test authentication flow integration between Netlify Functions and Supabase
-  - _Requirements: 4.2, 5.2, 4.6_
-
-- [ ] 8. Implement Production Security Audit System
-  - Create automated security scanning for deployed applications to verify no API key exposure
-  - Implement penetration testing suite for production environment validation
-  - Create security validation for OAuth token handling and session management
-  - _Requirements: 4.1, 4.7, 4.3_
-
-- [ ] 8.1 Create API Integration Security Testing
-  - Implement rate limiting validation against actual Strava and OpenWeatherMap APIs
-  - Create error handling tests for API failures, token expiration, and quota exceeded scenarios
-  - Test input validation and sanitization with real API data
-  - _Requirements: 4.4, 4.5, 4.6_
+  - Test authentication flow integration between Netlify Functions and Supabase with security audit
+  - Validate OAuth token handling, session management, and input sanitization with real data
+  - _Requirements: 4.2, 5.2, 4.6, 4.3, 4.5, 4.7_
 
 ## Phase 5: User Experience Polish and Error Handling
 
-- [ ] 9. Implement Cognitive Load Aware Error Handling
+- [ ] 8. Implement Cognitive Load Aware Error Handling
   - Create user-friendly error message system that uses plain language without technical jargon
   - Implement progressive error disclosure with basic message and "Show Details" option
   - Add contextual error recovery options based on user's current task
+  - **Testing**: Deploy and use Playwright to trigger error scenarios and verify user-friendly messages
   - _Requirements: 1.7, 3.7, 4.5_
 
-- [ ] 9.1 Create Production Environment Error Handling
+- [ ] 8.1 Create Production Environment Error Handling
   - Implement specific error handling for Netlify Function failures with clear recovery steps
   - Create user-friendly messages for Supabase connection issues and RLS policy problems
   - Add intelligent error handling for API rate limiting and quota exceeded scenarios
   - _Requirements: 4.4, 4.5, 5.7_
 
-- [ ] 10. Implement Performance Optimization for Cognitive Load
+- [ ] 9. Implement Performance Optimization for Cognitive Load
   - Optimize initial page load to show primary value within 5 seconds
   - Implement efficient data loading with appropriate loading states and progress indicators
   - Create responsive design that maintains functionality across all screen sizes
+  - **Testing**: Deploy and use Playwright to measure load times and test responsive design across screen sizes
   - _Requirements: 7.1, 3.5, 7.4_
 
-- [ ] 10.1 Create Loading State and Progress Indication System
+- [ ] 9.1 Create Loading State and Progress Indication System
   - Implement meaningful loading messages that explain what's happening during sync
   - Create progress indicators that show actual progress rather than generic spinners
   - Add data freshness indicators and offline capability with cached data
   - _Requirements: 3.5, 1.6, 7.7_
 
-## Phase 6: Documentation and Community Readiness
+## Phase 5: Documentation and Community Readiness
 
-- [ ] 11. Create Progressive Disclosure Documentation System
+- [ ] 10. Create Progressive Disclosure Documentation System
   - Implement README structure that follows progressive disclosure with essential info first
   - Create step-by-step setup guide with clear success criteria for each step
   - Add visual guides and screenshots for complex configuration steps
+  - **Testing**: Follow documentation with fresh accounts to verify setup process works end-to-end
   - _Requirements: 9.1, 9.2, 5.3_
 
-- [ ] 11.1 Implement Production Stack Setup Guide
+- [ ] 10.1 Implement Production Stack Setup Guide
   - Create comprehensive guide for Netlify + Supabase + API setup with realistic time estimates
   - Implement one-click setup scripts where possible to reduce manual configuration
   - Add troubleshooting section with solutions for common deployment issues
   - _Requirements: 5.1, 5.2, 5.7_
 
-- [ ] 11.2 Create Contribution and Community Guidelines
+- [ ] 10.2 Create Contribution and Community Guidelines
   - Implement coding standards documentation with examples and rationale
   - Create issue templates that guide users through logical problem reporting flow
   - Add architecture documentation that builds from simple concepts to complex ones
   - _Requirements: 9.3, 9.4, 9.6_
 
-## Phase 7: Final Testing and Launch Preparation
+## Phase 6: Final Testing and Launch Preparation
 
-- [ ] 12. Conduct Comprehensive Cognitive Load Testing
+- [ ] 11. Conduct Comprehensive Cognitive Load Testing and Launch Preparation
   - Implement 5-second test validation to ensure users understand primary value quickly
-  - Create task completion testing for all primary user workflows
-  - Conduct usability testing with actual runners to validate insights usefulness
-  - _Requirements: 1.5, 6.1, 6.2_
+  - Create task completion testing for all primary user workflows using Playwright
+  - Execute complete deployment testing with fresh accounts on all services
+  - Validate security measures and test performance under realistic data loads
+  - **Testing**: Comprehensive Playwright testing of all user flows on production site
+  - _Requirements: 1.5, 6.1, 6.2, 5.6, 4.7, 7.1_
 
-- [ ] 12.1 Execute Production Stack End-to-End Validation
-  - Conduct complete deployment testing with fresh accounts on all services
-  - Validate security measures through penetration testing on deployed application
-  - Test performance under realistic data loads and user scenarios
-  - _Requirements: 5.6, 4.7, 7.1_
-
-- [ ] 13. Implement Analytics and Monitoring for Launch
+- [ ] 11.1 Implement Analytics, Monitoring and Final Polish
   - Create user experience analytics to track cognitive load metrics (time to value, task completion)
   - Implement error tracking and performance monitoring for production environment
-  - Add user feedback collection system to identify post-launch improvement areas
-  - _Requirements: 5.7, 4.6, 6.7_
-
-- [ ] 13.1 Create Launch Readiness Checklist and Final Polish
   - Implement final accessibility audit to ensure WCAG AA compliance
   - Create launch checklist that validates all cognitive load and production requirements
   - Add final performance optimization and code cleanup for open source release
-  - _Requirements: 7.5, 9.7, 1.1_
+  - _Requirements: 5.7, 4.6, 6.7, 7.5, 9.7, 1.1_

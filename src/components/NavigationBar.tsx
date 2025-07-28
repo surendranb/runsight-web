@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Menu, X, Activity, BarChart3, Target, Settings as SettingsIcon, RefreshCw, HelpCircle } from 'lucide-react';
 import { StandardDropdown } from './common/StandardButton';
+import { Heading } from './common/VisualHierarchy';
 
 type View = 'dashboard' | 'insights' | 'goals' | 'settings' | string;
 
@@ -92,7 +93,9 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
           <div className="flex items-center">
             <div className="flex items-center space-x-2">
               <Activity className="w-8 h-8 text-blue-600" />
-              <span className="text-xl font-bold text-blue-600">RunSight</span>
+              <Heading level={3} emphasis="accent" className="text-blue-600">
+                RunSight
+              </Heading>
             </div>
             
             {/* Clean Desktop Navigation - Gmail/LinkedIn Style with Fitts's Law compliance */}
