@@ -4,7 +4,7 @@ import { useSecureAuth } from './hooks/useSecureAuth';
 import SecureStravaCallback from './components/SecureStravaCallback';
 // Duplicate imports for React, useSecureAuth, SecureStravaCallback removed
 import { NavigationBar, SyncPeriod } from './components/NavigationBar';
-import { SimpleDashboard } from './components/SimpleDashboard';
+
 import { ModernDashboard } from './components/ModernDashboard';
 import { InsightsPage } from './components/InsightsPage';
 import { GoalsPage } from './components/GoalsPage';

@@ -9,7 +9,8 @@
     "build:skip-check": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "check-env": "node scripts/check-env.js"
+    "check-env": "node scripts/check-env.js",
+    "setup": "node scripts/setup.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

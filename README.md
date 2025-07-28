@@ -1,79 +1,223 @@
-# RunSight Web 🏃‍♂️ 
+# RunSight Web 🏃‍♂️
 
-A beautiful, open-source running analytics app that connects with Strava and OpenWeatherMap to provide comprehensive insights about your runs.
+**Open-source running analytics dashboard that transforms your Strava data into actionable insights.**
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/surendranb/runsight-web)
 
-## ✨ Features
+![RunSight Dashboard](https://via.placeholder.com/800x400/4F46E5/FFFFFF?text=RunSight+Dashboard+Screenshot)
 
-- 🏃‍♂️ **Strava Integration**: Secure OAuth authentication and automatic run data sync
-- 🌤️ **Weather Data**: Historical weather conditions for each run via OpenWeatherMap
-- 📊 **Analytics Dashboard**: Beautiful charts and statistics about your running performance
-- 🔒 **Secure**: Only authenticated users can access their own data
-- 📱 **Responsive**: Optimized for desktop, tablet, and mobile devices
-- 🚀 **Easy Deployment**: One-click deployment to Netlify + Supabase
+---
 
-## 🚀 Quick Deploy to Netlify
+## 🎯 What is RunSight Web?
 
-1. Click the "Deploy to Netlify" button above
-2. Connect your GitHub account
-3. Set up your environment variables (see below)
-4. Deploy!
+RunSight Web connects to your Strava account and provides **10+ specialized insights** about your running performance, including:
 
-## 🔧 Environment Variables Setup
+- 📈 **Performance Trends** - Track pace, distance, and consistency over time
+- 🌤️ **Weather Impact** - See how temperature, humidity, and wind affect your runs
+- 🏔️ **Elevation Analysis** - Understand how hills impact your effort and pace
+- 📍 **Location Intelligence** - Discover your best running routes and locations
+- 🎯 **Personal Records** - Track PRs across different distances and conditions
 
-## Quick Setup
+**Perfect for:** Recreational runners, competitive athletes, and data enthusiasts who want deeper insights than Strava provides.
 
-### 1. Clone and Install
+---
+
+## 🚀 Quick Start (5 minutes)
+
+### Option 1: One-Click Deploy
+1. **Click the "Deploy to Netlify" button above**
+2. **Connect your GitHub account** and fork the repository
+3. **Follow the setup wizard** - it will guide you through API configuration
+4. **Connect your Strava account** and start analyzing your runs!
+
+### Option 2: Self-Host
 ```bash
-git clone <your-repo-url>
-cd strava-running-analytics
+# 1. Clone and setup
+git clone https://github.com/surendranb/runsight-web.git
+cd runsight-web
 npm install
+npm run setup  # Validates your environment
+
+# 2. Follow the detailed setup guide
+# See docs/DEPLOYMENT.md for complete instructions
 ```
 
-### 2. Set up Supabase
-1. Create a new project at [supabase.com](https://supabase.com)
-2. Click the "Connect to Supabase" button in the app (top right)
-3. The database schema will be created automatically
+**⏱️ Total setup time:** 30-45 minutes  
+**💰 Cost:** Free (using free tiers of all services)
 
-### 3. Configure Environment Variables
-1. Copy `.env.example` to `.env`
-2. Fill in your API keys:
-   - **Supabase**: Get from your Supabase project settings
-   - **Strava**: Register your app at [developers.strava.com](https://developers.strava.com)
-   - **OpenWeatherMap**: Get a free key at [openweathermap.org](https://openweathermap.org/api)
+---
 
-### 4. Development
+## ✨ Key Features
+
+### 🔒 Privacy & Security First
+- **Your data stays yours** - Self-hosted on your own Netlify/Supabase accounts
+- **Zero credential exposure** - All API keys stored securely server-side
+- **Row-level security** - Users can only access their own data
+
+### 📊 Advanced Analytics
+- **10+ Specialized Insights** - Go beyond basic Strava statistics
+- **Weather Integration** - Historical weather data for every run
+- **Outlier Detection** - Filters GPS errors and unrealistic data
+- **Smart Highlighting** - Automatically identifies interesting patterns
+
+### 🎨 Modern User Experience
+- **Cognitive Load Aware** - Shows essential info first, details on demand
+- **Mobile Responsive** - Works perfectly on all devices
+- **Fast & Reliable** - Optimized for performance with large datasets
+
+---
+
+## 📸 Screenshots
+
+<details>
+<summary>🖼️ View Dashboard Screenshots</summary>
+
+### Main Dashboard
+![Dashboard Overview](https://via.placeholder.com/600x400/4F46E5/FFFFFF?text=Dashboard+Overview)
+
+### Insights Hub
+![Insights Page](https://via.placeholder.com/600x400/059669/FFFFFF?text=Insights+Hub)
+
+### Weather Analysis
+![Weather Insights](https://via.placeholder.com/600x400/DC2626/FFFFFF?text=Weather+Analysis)
+
+</details>
+
+---
+
+## 🏗️ Architecture
+
+RunSight Web uses a **secure, serverless architecture**:
+
+```
+React Frontend → Netlify Functions → Supabase Database
+                      ↓
+              External APIs (Strava, Weather)
+```
+
+**Tech Stack:**
+- **Frontend:** React 18 + TypeScript + Tailwind CSS
+- **Backend:** Netlify Functions (Node.js)
+- **Database:** Supabase (PostgreSQL with RLS)
+- **APIs:** Strava, OpenWeatherMap, Google AI (optional)
+
+---
+
+## 📚 Documentation
+
+### 🚀 Getting Started
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Complete setup instructions (30-45 min)
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Solutions for common issues
+- **[Setup Script](scripts/setup.js)** - Automated validation and setup help
+
+### 🛠️ For Developers
+- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
+- **[Architecture Overview](docs/ARCHITECTURE.md)** - Technical deep dive
+- **[Issue Templates](.github/ISSUE_TEMPLATE/)** - Bug reports and feature requests
+
+### 📋 Quick Reference
+<details>
+<summary>📖 Essential Commands</summary>
+
 ```bash
-npm run dev
+# Development
+npm run dev          # Start development server
+npm run build        # Production build
+npm run setup        # Validate setup and create checklists
+
+# Deployment
+npm run check-env    # Validate environment variables
+npm run lint         # Check code quality
 ```
 
-### 5. Deploy to Netlify
-1. Connect your GitHub repo to Netlify
-2. Set the environment variables in Netlify's dashboard
-3. Deploy!
+</details>
 
-## API Setup
+<details>
+<summary>🔧 Required Environment Variables</summary>
 
-### Strava API
-1. Go to [developers.strava.com](https://developers.strava.com)
-2. Create a new app
-3. Set Authorization Callback Domain to your domain (e.g., `yourdomain.netlify.app`)
-4. Copy Client ID and Client Secret to your `.env`
+```bash
+# Strava API (get from developers.strava.com)
+STRAVA_CLIENT_ID=your_client_id
+STRAVA_CLIENT_SECRET=your_client_secret
+STRAVA_REDIRECT_URI=https://your-site.netlify.app/auth/callback
 
-### OpenWeatherMap API
-1. Sign up at [openweathermap.org](https://openweathermap.org/api)
-2. Subscribe to the free tier
-3. Copy your API key to your `.env`
+# Supabase (get from your Supabase project)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your_service_role_key
 
-## Contributing
+# OpenWeatherMap (get from openweathermap.org)
+OPENWEATHER_API_KEY=your_api_key
+```
 
-This is an open-source project! Feel free to:
-- Report bugs
-- Suggest features
-- Submit pull requests
-- Fork for your own use
+</details>
 
-## License
+---
 
-MIT License - feel free to use this for your own running analytics!
+## 🤝 Contributing
+
+We welcome contributions! RunSight Web is built by runners, for runners.
+
+### 🐛 Found a Bug?
+- [Report it here](https://github.com/surendranb/runsight-web/issues/new?template=bug_report.md)
+- Include steps to reproduce and your environment details
+
+### 💡 Have an Idea?
+- [Suggest a feature](https://github.com/surendranb/runsight-web/issues/new?template=feature_request.md)
+- Check existing issues to avoid duplicates
+
+### 👩‍💻 Want to Code?
+- Read our [Contributing Guide](CONTRIBUTING.md)
+- Look for issues labeled `good first issue`
+- Join discussions in [GitHub Discussions](https://github.com/surendranb/runsight-web/discussions)
+
+---
+
+## 🌟 Community
+
+### 📊 Project Stats
+- **🏃‍♂️ Built for runners** - Created by active runners who understand the data
+- **🔒 Privacy focused** - Your data never leaves your control
+- **🚀 Production ready** - Used by real runners with years of Strava data
+- **📱 Mobile optimized** - Works great on phones and tablets
+
+### 🙏 Contributors
+Thanks to all the amazing people who have contributed to RunSight Web!
+
+<!-- Contributors will be automatically added here -->
+
+### 💬 Get Help
+- **[GitHub Discussions](https://github.com/surendranb/runsight-web/discussions)** - Ask questions and share experiences
+- **[GitHub Issues](https://github.com/surendranb/runsight-web/issues)** - Report bugs and request features
+- **[Documentation](docs/)** - Comprehensive guides and troubleshooting
+
+---
+
+## 📄 License
+
+MIT License - feel free to use RunSight Web for personal or commercial projects.
+
+**What this means:**
+- ✅ Use it for personal running analytics
+- ✅ Deploy it for your running club or team
+- ✅ Modify it to fit your needs
+- ✅ Contribute improvements back to the community
+
+---
+
+## 🎉 Ready to Get Started?
+
+1. **[Deploy to Netlify](https://app.netlify.com/start/deploy?repository=https://github.com/surendranb/runsight-web)** - One-click deployment
+2. **[Read the Setup Guide](docs/DEPLOYMENT.md)** - Detailed instructions
+3. **[Join the Community](https://github.com/surendranb/runsight-web/discussions)** - Connect with other users
+
+**Happy running and analyzing! 🏃‍♂️📊**
+
+---
+
+<div align="center">
+
+**⭐ Star this repo if RunSight Web helps improve your running! ⭐**
+
+Made with ❤️ by runners, for runners
+
+</div>
