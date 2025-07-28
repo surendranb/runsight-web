@@ -9,8 +9,11 @@ import { ModernDashboard } from './components/ModernDashboard';
 import { InsightsPage } from './components/InsightsPage';
 import { GoalsPage } from './components/GoalsPage';
 import { DebugConsole } from './components/DebugConsole';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ToastProvider, useToast } from './components/common/ErrorToast';
 import { User, EnrichedRun, RunStats } from './types';
 import { apiClient } from './lib/secure-api-client';
+import { productionErrorHandler } from './lib/production-error-handler';
 
 // View type consistent with NavigationBar and App.tsx's previous definition
 type View = 'dashboard' | 'insights' | 'welcome' | 'callback' | 'loading' | 'goals' | 'settings';
@@ -25,6 +28,9 @@ const SecureApp: React.FC = () => {
     clearError: clearAuthError,
     handleStravaCallback // Make sure useSecureAuth exports this
   } = useSecureAuth();
+
+  // Toast hook for error notifications
+  const { showError } = useToast();
 
   // Adapt user object from useSecureAuth if its structure is different, primarily for display name
   // For now, assume components will adapt to use `authUser.name`
@@ -84,7 +90,23 @@ const SecureApp: React.FC = () => {
       setStats(fetchedStats);
     } catch (err: any) {
       console.error("SecureApp: Error fetching data via apiClient:", err);
-      if (!isInitialLoad) setDataError(err.message || 'Failed to load activity data via apiClient.');
+      
+      // Use production error handler for data fetching errors
+      const productionError = productionErrorHandler.handleNetlifyFunctionError(
+        err,
+        'get-runs',
+        { 
+          operation: 'fetch-data',
+          userId: String(user.id)
+        }
+      );
+      
+      if (!isInitialLoad) {
+        setDataError(productionError.message);
+        // Show error toast for non-initial loads
+        showError(productionError);
+      }
+      
       setRuns([]); // Clear data on error too
       setStats(null);
     } finally {
@@ -188,7 +210,7 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
   return { after: afterEpochSec, before: beforeEpochSec };
 };
 
-  // NEW: Simplified sync using the robust sync orchestrator
+  // NEW: Simplified sync using the robust sync orchestrator with production error handling
   const handleSyncData = async (period: SyncPeriod) => {
       if (!user || !user.id) {
           setSyncProgressMessage("❌ Please log in to sync data.");
@@ -240,18 +262,21 @@ const getTimestamps = (period: SyncPeriod): { after: number; before: number } =>
 
       } catch (error: any) {
           console.error('Sync failed:', error);
-          let errorMessage = error.message || 'Sync failed with unknown error';
           
-          // Handle specific error cases for simplified approach
-          if (errorMessage.includes('AUTH_REQUIRED')) {
-              errorMessage = 'Please re-authenticate with Strava to sync your data.';
-          } else if (errorMessage.includes('TOKEN_MISSING')) {
-              errorMessage = 'Strava authentication expired. Please re-authenticate.';
-          } else if (errorMessage.includes('CONFIG_ERROR')) {
-              errorMessage = 'Server configuration issue. Please try again later.';
-          } else if (errorMessage.includes('Database error')) {
-              errorMessage = 'Database error occurred. The sync was aborted to prevent data corruption. Please try again or contact support if the issue persists.';
-          }
+          // Use production error handler to create user-friendly error
+          const productionError = productionErrorHandler.handleNetlifyFunctionError(
+            error,
+            'sync-data',
+            { 
+              operation: 'sync-data',
+              userId: String(user.id)
+            }
+          );
+          
+          // Show error toast with recovery options
+          showError(productionError);
+          
+          let errorMessage = productionError.message;
           
           setDataError(errorMessage);
           setSyncProgressMessage(`❌ Sync failed: ${errorMessage}`);

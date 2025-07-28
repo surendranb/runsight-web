@@ -22,6 +22,7 @@ import {
 } from '../lib/insights/actionableInsightsEngine';
 import { ProgressiveHelp, HelpIcon } from './common/ContextualHelp';
 import { Heading, Section, EmphasisBox, visualHierarchy } from './common/VisualHierarchy';
+import { ErrorDisplay, useErrorTranslation } from './common/ErrorDisplay';
 import { Lightbulb, ChevronLeft, ChevronRight, Grid3X3, List, FileText, BarChart3 } from 'lucide-react';
 
 interface InsightsPageProps {
@@ -105,13 +106,51 @@ export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoadin
     );
   }
 
+  // Use error translation hook
+  const { translateError } = useErrorTranslation();
+
   if (error) {
+    const translatedError = translateError(error, 'Insights loading failed');
+    
+    // Add insights-specific recovery options
+    const errorWithRecovery = {
+      ...translatedError,
+      recoveryOptions: [
+        {
+          label: 'Retry Loading',
+          description: 'Try loading the insights again',
+          action: () => window.location.reload(),
+          primary: true
+        },
+        {
+          label: 'Go to Dashboard',
+          description: 'Return to the main dashboard',
+          action: () => {
+            // Navigate to dashboard - this would be handled by the parent component
+            window.location.hash = '#dashboard';
+            window.location.reload();
+          }
+        },
+        ...(translatedError.recoveryOptions || [])
+      ]
+    };
+
     return (
-      <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center"> {/* Adjust height for navbar */}
-        <div className="bg-red-100 p-4 rounded-lg shadow-md text-center">
-          <h2 className="text-xl font-bold text-red-700 mb-2">Error Loading Insights</h2>
-          <p className="text-red-600 mb-4">{error}</p>
-          {/* Removed Back to Dashboard button, navigation is via NavigationBar */}
+      <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <div className="text-center mb-6">
+            <div className="bg-blue-100 p-3 rounded-full inline-block mb-4">
+              <BarChart3 className="w-8 h-8 text-blue-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Insights Hub
+            </h1>
+          </div>
+          
+          <ErrorDisplay 
+            error={errorWithRecovery}
+            className="shadow-lg"
+          />
         </div>
       </div>
     );

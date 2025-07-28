@@ -8,6 +8,7 @@ import { InsightCard } from './dashboard/InsightCard';
 import { TimePeriodSelector, TimePeriod, Breadcrumb, SectionIndicator } from './common/TimePeriodSelector';
 import { StandardButton } from './common/StandardButton';
 import { Heading, Section, EmphasisBox, visualHierarchy } from './common/VisualHierarchy';
+import { ErrorDisplay, useErrorTranslation } from './common/ErrorDisplay';
 import { standardTimePeriods } from '../lib/chartTheme';
 import { Activity, MapPin, Clock, Settings, RefreshCw, TrendingUp, TrendingDown, ChevronDown, ChevronUp, Lightbulb, TrendingUp as TrendingUpIcon } from 'lucide-react';
 import { filterOutliers, getOutlierStats } from '../lib/outlierDetection';
@@ -342,22 +343,47 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
     );
   }
 
+  // Use error translation hook
+  const { translateError } = useErrorTranslation();
+
   if (error) {
+    const translatedError = translateError(error, 'Dashboard loading failed');
+    
+    // Add dashboard-specific recovery options
+    const errorWithRecovery = {
+      ...translatedError,
+      recoveryOptions: [
+        {
+          label: 'Retry Loading',
+          description: 'Try loading the dashboard again',
+          action: () => window.location.reload(),
+          primary: true
+        },
+        {
+          label: 'Sync Data',
+          description: 'Sync your running data from Strava',
+          action: onSync || (() => window.location.reload())
+        },
+        ...(translatedError.recoveryOptions || [])
+      ]
+    };
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
-        <div className="bg-white p-8 rounded-lg shadow-xl text-center max-w-md">
-          <div className="bg-red-100 p-3 rounded-full inline-block mb-4">
-            <Activity className="w-8 h-8 text-red-600" />
+        <div className="max-w-md w-full">
+          <div className="text-center mb-6">
+            <div className="bg-red-100 p-3 rounded-full inline-block mb-4">
+              <Activity className="w-8 h-8 text-red-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              RunSight Dashboard
+            </h1>
           </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Error Loading Dashboard</h2>
-          <p className="text-red-600 mb-3 text-sm">{error}</p>
-          <StandardButton
-            onClick={() => window.location.reload()}
-            variant="primary"
-            size="md"
-          >
-            Retry
-          </StandardButton>
+          
+          <ErrorDisplay 
+            error={errorWithRecovery}
+            className="shadow-lg"
+          />
         </div>
       </div>
     );

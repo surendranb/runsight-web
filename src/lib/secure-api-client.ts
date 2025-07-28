@@ -1,4 +1,5 @@
 // Simple API Client - Uses simplified single-user functions
+import { productionErrorHandler } from './production-error-handler';
 
 export interface User {
   id: string | number; // Can be Strava user ID (number) or string
@@ -89,37 +90,70 @@ class SecureApiClient {
   async getStravaAuthUrl(): Promise<string> {
     console.log('🔗 Getting Strava authorization URL...');
     
-    const response = await fetch(`${this.baseUrl}/auth-strava`, {
-      method: 'GET',
-    });
+    try {
+      const response = await fetch(`${this.baseUrl}/auth-strava`, {
+        method: 'GET',
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to get authorization URL');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to get authorization URL' }));
+        const error = productionErrorHandler.handleNetlifyFunctionError(
+          { ...errorData, statusCode: response.status },
+          'auth-strava',
+          { operation: 'get-auth-url' }
+        );
+        throw new Error(error.message);
+      }
+
+      const data = await response.json();
+      return data.authUrl;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('fetch')) {
+        const networkError = productionErrorHandler.handleNetworkError(error, {
+          operation: 'get-auth-url',
+          endpoint: `${this.baseUrl}/auth-strava`
+        });
+        throw new Error(networkError.message);
+      }
+      throw error;
     }
-
-    const data = await response.json();
-    return data.authUrl;
   }
 
   async authenticateWithStrava(code: string): Promise<{ user: User; sessionUrl: string }> {
     console.log('🔐 Authenticating with Strava...');
     
-    const response = await fetch(`${this.baseUrl}/auth-strava`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code }),
-    });
+    try {
+      const response = await fetch(`${this.baseUrl}/auth-strava`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Authentication failed');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Authentication failed' }));
+        const error = productionErrorHandler.handleNetlifyFunctionError(
+          { ...errorData, statusCode: response.status },
+          'auth-strava',
+          { operation: 'authenticate' }
+        );
+        throw new Error(error.message);
+      }
+
+      const data = await response.json();
+      return {
+        user: data.user,
+        sessionUrl: data.session_url
+      };
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('fetch')) {
+        const networkError = productionErrorHandler.handleNetworkError(error, {
+          operation: 'authenticate',
+          endpoint: `${this.baseUrl}/auth-strava`
+        });
+        throw new Error(networkError.message);
+      }
+      throw error;
     }
-
-    const data = await response.json();
-    return {
-      user: data.user,
-      sessionUrl: data.session_url
-    };
   }
 
   // NEW: Start a sync using the simplified sync-data function with chunked processing
@@ -139,6 +173,7 @@ class SecureApiClient {
     syncRequest: SyncRequest = {}, 
     onProgress?: (message: string, progress?: number) => void
   ): Promise<SyncResponse> {
+    try {
     let chunkIndex = 0;
     let hasMoreChunks = true;
     let totalResults = {
@@ -174,8 +209,31 @@ class SecureApiClient {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || `Failed to sync chunk ${chunkIndex + 1}`);
+        const errorData = await response.json().catch(() => ({ message: `Failed to sync chunk ${chunkIndex + 1}` }));
+        
+        // Handle specific sync errors with appropriate recovery options
+        if (response.status === 429) {
+          const error = productionErrorHandler.handleAPIRateLimitError(
+            { ...errorData, statusCode: response.status },
+            'strava',
+            { operation: 'sync-data', userId: String(userId) }
+          );
+          throw new Error(error.message);
+        } else if (errorData.error === 'AUTH_REQUIRED' || errorData.error === 'TOKEN_REFRESH_FAILED') {
+          const error = productionErrorHandler.handleNetlifyFunctionError(
+            { ...errorData, statusCode: response.status },
+            'sync-data',
+            { operation: 'sync-chunk', userId: String(userId) }
+          );
+          throw new Error(error.message);
+        } else {
+          const error = productionErrorHandler.handleNetlifyFunctionError(
+            { ...errorData, statusCode: response.status },
+            'sync-data',
+            { operation: 'sync-chunk', userId: String(userId) }
+          );
+          throw new Error(error.message);
+        }
       }
 
       const data = await response.json();
@@ -226,27 +284,67 @@ class SecureApiClient {
       status: 'completed',
       results: totalResults
     };
+    } catch (error) {
+      // Handle network errors during chunked sync
+      if (error instanceof Error && error.message.includes('fetch')) {
+        const networkError = productionErrorHandler.handleNetworkError(error, {
+          operation: 'chunked-sync',
+          endpoint: `${this.baseUrl}/sync-data`,
+          userId: String(userId)
+        });
+        throw new Error(networkError.message);
+      }
+      throw error;
+    }
   }
 
   // Get user runs using simplified get-runs function
   async getUserRuns(userId: string | number): Promise<{ runs: Run[]; stats: RunStats; count?: number }> {
     console.log(`📖 Fetching runs and stats for user ${userId}...`);
     
-    const response = await fetch(`${this.baseUrl}/get-runs?userId=${userId}`, {
-      method: 'GET',
-    });
+    try {
+      const response = await fetch(`${this.baseUrl}/get-runs?userId=${userId}`, {
+        method: 'GET',
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch user runs and stats');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to fetch user runs and stats' }));
+        
+        // Handle database-specific errors
+        if (errorData.error === 'DB_ERROR' || errorData.error === 'CONFIG_ERROR') {
+          const error = productionErrorHandler.handleSupabaseError(
+            { ...errorData, statusCode: response.status },
+            'get-runs',
+            { operation: 'fetch-runs', userId: String(userId) }
+          );
+          throw new Error(error.message);
+        } else {
+          const error = productionErrorHandler.handleNetlifyFunctionError(
+            { ...errorData, statusCode: response.status },
+            'get-runs',
+            { operation: 'fetch-runs', userId: String(userId) }
+          );
+          throw new Error(error.message);
+        }
+      }
+
+      const data = await response.json();
+      return {
+        runs: data.runs || [],
+        stats: data.stats,
+        count: data.count
+      };
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('fetch')) {
+        const networkError = productionErrorHandler.handleNetworkError(error, {
+          operation: 'fetch-runs',
+          endpoint: `${this.baseUrl}/get-runs`,
+          userId: String(userId)
+        });
+        throw new Error(networkError.message);
+      }
+      throw error;
     }
-
-    const data = await response.json();
-    return {
-      runs: data.runs || [],
-      stats: data.stats,
-      count: data.count
-    };
   }
 
   // Simplified cleanup method (no complex session management needed)
