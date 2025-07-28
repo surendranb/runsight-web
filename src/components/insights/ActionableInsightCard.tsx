@@ -225,16 +225,20 @@ export const ActionableInsightCard: React.FC<ActionableInsightCardProps> = ({
             </div>
           </div>
 
-          {/* Toggle details button */}
+          {/* Toggle details button - Fitts's Law compliant */}
           <button
             onClick={() => setShowDetails(!showDetails)}
-            className="flex items-center space-x-1 text-gray-600 hover:text-gray-800 transition-colors"
+            className="flex items-center justify-center min-h-[44px] min-w-[44px] px-4 py-3 space-x-1 text-gray-600 hover:text-gray-800 active:text-gray-900 transition-all duration-200 rounded-lg hover:bg-gray-100 active:bg-gray-200 select-none md:min-h-[32px] md:min-w-[32px] md:px-3 md:py-2"
+            style={{ 
+              WebkitTapHighlightColor: 'transparent',
+              touchAction: 'manipulation'
+            }}
           >
-            <span>{showDetails ? 'Hide' : 'Show'} Details</span>
+            <span className="text-sm whitespace-nowrap">{showDetails ? 'Hide' : 'Show'} Details</span>
             {showDetails ? (
-              <ChevronUp className="w-4 h-4" />
+              <ChevronUp className="w-4 h-4 flex-shrink-0" />
             ) : (
-              <ChevronDown className="w-4 h-4" />
+              <ChevronDown className="w-4 h-4 flex-shrink-0" />
             )}
           </button>
         </div>
@@ -309,26 +313,38 @@ export const ActionableInsightCard: React.FC<ActionableInsightCardProps> = ({
             </div>
           </div>
 
-          {/* Action buttons */}
+          {/* Action buttons - Fitts's Law compliant */}
           {insight.actionable && !isActedUpon && (
-            <div className="flex items-center space-x-2 pt-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-2 pt-2">
               <button
                 onClick={() => handleAction('accept')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                className="min-h-[44px] min-w-[44px] px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 text-sm font-medium select-none md:min-h-[36px] md:min-w-[36px] md:px-3 md:py-2"
+                style={{ 
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation'
+                }}
               >
-                I'll try this
+                <span className="whitespace-nowrap">I'll try this</span>
               </button>
               <button
                 onClick={() => handleAction('dismiss')}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
+                className="min-h-[44px] min-w-[44px] px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 active:bg-gray-400 transition-all duration-200 text-sm font-medium select-none md:min-h-[36px] md:min-w-[36px] md:px-3 md:py-2"
+                style={{ 
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation'
+                }}
               >
-                Not relevant
+                <span className="whitespace-nowrap">Not relevant</span>
               </button>
               <button
                 onClick={() => handleAction('remind')}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
+                className="min-h-[44px] min-w-[44px] px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 active:bg-gray-400 transition-all duration-200 text-sm font-medium select-none md:min-h-[36px] md:min-w-[36px] md:px-3 md:py-2"
+                style={{ 
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation'
+                }}
               >
-                Remind me later
+                <span className="whitespace-nowrap">Remind me later</span>
               </button>
             </div>
           )}

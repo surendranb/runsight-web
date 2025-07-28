@@ -24,11 +24,14 @@ export const TimePeriodSelector: React.FC<TimePeriodSelectorProps> = ({
   showIcon = true,
   size = 'md'
 }) => {
+  // Fitts's Law compliant sizing
   const sizeClasses = {
-    sm: 'px-2 py-1 text-xs',
-    md: 'px-3 py-2 text-sm',
-    lg: 'px-4 py-3 text-base'
+    sm: 'min-h-[44px] px-4 py-3 text-sm md:min-h-[32px] md:px-3 md:py-2 md:text-xs',
+    md: 'min-h-[44px] px-4 py-3 text-sm md:min-h-[36px] md:px-3 md:py-2',
+    lg: 'min-h-[48px] px-5 py-3 text-base md:min-h-[40px] md:px-4 md:py-2.5'
   };
+
+  const iconSize = size === 'lg' ? 'w-5 h-5' : 'w-4 h-4';
 
   return (
     <div className={`relative inline-block ${className}`}>
@@ -37,15 +40,20 @@ export const TimePeriodSelector: React.FC<TimePeriodSelectorProps> = ({
         onChange={(e) => onPeriodChange(e.target.value as TimePeriod)}
         className={`
           ${sizeClasses[size]}
-          ${showIcon ? 'pl-8' : ''}
-          pr-8
+          ${showIcon ? 'pl-12 md:pl-8' : ''}
+          pr-12 md:pr-8
           border border-gray-300 rounded-lg bg-white
-          focus:ring-2 focus:ring-blue-500 focus:border-transparent
-          hover:border-gray-400 transition-colors
+          focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:outline-none
+          hover:border-gray-400 transition-all duration-200
           appearance-none cursor-pointer
           font-medium text-gray-700
+          select-none touch-manipulation
         `}
         aria-label="Select time period"
+        style={{ 
+          WebkitTapHighlightColor: 'transparent',
+          touchAction: 'manipulation'
+        }}
       >
         {availablePeriods.map((period) => (
           <option key={period} value={period}>
@@ -54,12 +62,12 @@ export const TimePeriodSelector: React.FC<TimePeriodSelectorProps> = ({
         ))}
       </select>
       
-      {/* Icon and chevron */}
+      {/* Icon and chevron with improved touch targets */}
       <div className="absolute inset-y-0 left-0 right-0 flex items-center pointer-events-none">
         {showIcon && (
-          <Calendar className="w-4 h-4 text-gray-400 ml-2" />
+          <Calendar className={`${iconSize} text-gray-400 ml-4 md:ml-2`} />
         )}
-        <ChevronDown className="w-4 h-4 text-gray-400 ml-auto mr-2" />
+        <ChevronDown className={`${iconSize} text-gray-400 ml-auto mr-4 md:mr-2`} />
       </div>
     </div>
   );

@@ -147,76 +147,100 @@ export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoadin
 
             {/* View Mode and Display Controls */}
             <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-              {/* View Mode Selector */}
+              {/* View Mode Selector - Fitts's Law compliant */}
               <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
                 <button
                   onClick={() => setViewMode('most-important')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`min-h-[44px] min-w-[44px] px-4 py-3 rounded-md text-sm font-medium transition-all duration-200 select-none md:min-h-[36px] md:min-w-[36px] md:px-3 md:py-2 ${
                     viewMode === 'most-important'
                       ? 'bg-white text-blue-700 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-800'
+                      : 'text-gray-600 hover:text-gray-800 active:text-gray-900 hover:bg-gray-50 active:bg-gray-100'
                   }`}
+                  style={{ 
+                    WebkitTapHighlightColor: 'transparent',
+                    touchAction: 'manipulation'
+                  }}
                 >
-                  Most Important
+                  <span className="whitespace-nowrap">Most Important</span>
                 </button>
                 <button
                   onClick={() => setViewMode('all')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`min-h-[44px] min-w-[44px] px-4 py-3 rounded-md text-sm font-medium transition-all duration-200 select-none md:min-h-[36px] md:min-w-[36px] md:px-3 md:py-2 ${
                     viewMode === 'all'
                       ? 'bg-white text-blue-700 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-800'
+                      : 'text-gray-600 hover:text-gray-800 active:text-gray-900 hover:bg-gray-50 active:bg-gray-100'
                   }`}
+                  style={{ 
+                    WebkitTapHighlightColor: 'transparent',
+                    touchAction: 'manipulation'
+                  }}
                 >
-                  All Insights
+                  <span className="whitespace-nowrap">All Insights</span>
                 </button>
                 <button
                   onClick={() => setViewMode('filtered')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`min-h-[44px] min-w-[44px] px-4 py-3 rounded-md text-sm font-medium transition-all duration-200 select-none md:min-h-[36px] md:min-w-[36px] md:px-3 md:py-2 ${
                     viewMode === 'filtered'
                       ? 'bg-white text-blue-700 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-800'
+                      : 'text-gray-600 hover:text-gray-800 active:text-gray-900 hover:bg-gray-50 active:bg-gray-100'
                   }`}
+                  style={{ 
+                    WebkitTapHighlightColor: 'transparent',
+                    touchAction: 'manipulation'
+                  }}
                 >
-                  Custom Filter
+                  <span className="whitespace-nowrap">Custom Filter</span>
                 </button>
               </div>
 
-              {/* Display Mode Selector */}
+              {/* Display Mode Selector - Fitts's Law compliant */}
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-gray-600">Display:</span>
                 <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
                   <button
                     onClick={() => setDisplayMode('summary')}
-                    className={`p-2 rounded-md transition-colors ${
+                    className={`min-h-[44px] min-w-[44px] p-3 rounded-md transition-all duration-200 select-none md:min-h-[36px] md:min-w-[36px] md:p-2 ${
                       displayMode === 'summary'
                         ? 'bg-white text-blue-700 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-800'
+                        : 'text-gray-600 hover:text-gray-800 active:text-gray-900 hover:bg-gray-50 active:bg-gray-100'
                     }`}
                     title="Summary cards with progressive disclosure"
+                    style={{ 
+                      WebkitTapHighlightColor: 'transparent',
+                      touchAction: 'manipulation'
+                    }}
                   >
-                    <FileText className="w-4 h-4" />
+                    <FileText className="w-5 h-5 md:w-4 md:h-4" />
                   </button>
                   <button
                     onClick={() => setDisplayMode('cards')}
-                    className={`p-2 rounded-md transition-colors ${
+                    className={`min-h-[44px] min-w-[44px] p-3 rounded-md transition-all duration-200 select-none md:min-h-[36px] md:min-w-[36px] md:p-2 ${
                       displayMode === 'cards'
                         ? 'bg-white text-blue-700 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-800'
+                        : 'text-gray-600 hover:text-gray-800 active:text-gray-900 hover:bg-gray-50 active:bg-gray-100'
                     }`}
                     title="Full card view"
+                    style={{ 
+                      WebkitTapHighlightColor: 'transparent',
+                      touchAction: 'manipulation'
+                    }}
                   >
-                    <Grid3X3 className="w-4 h-4" />
+                    <Grid3X3 className="w-5 h-5 md:w-4 md:h-4" />
                   </button>
                   <button
                     onClick={() => setDisplayMode('grouped')}
-                    className={`p-2 rounded-md transition-colors ${
+                    className={`min-h-[44px] min-w-[44px] p-3 rounded-md transition-all duration-200 select-none md:min-h-[36px] md:min-w-[36px] md:p-2 ${
                       displayMode === 'grouped'
                         ? 'bg-white text-blue-700 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-800'
+                        : 'text-gray-600 hover:text-gray-800 active:text-gray-900 hover:bg-gray-50 active:bg-gray-100'
                     }`}
                     title="Grouped by category"
+                    style={{ 
+                      WebkitTapHighlightColor: 'transparent',
+                      touchAction: 'manipulation'
+                    }}
                   >
-                    <List className="w-4 h-4" />
+                    <List className="w-5 h-5 md:w-4 md:h-4" />
                   </button>
                 </div>
               </div>
@@ -234,7 +258,11 @@ export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoadin
                     <select
                       value={selectedCategory}
                       onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="w-full text-sm border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full min-h-[44px] text-sm border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200 cursor-pointer select-none md:min-h-[36px] md:px-3 md:py-2"
+                      style={{ 
+                        WebkitTapHighlightColor: 'transparent',
+                        touchAction: 'manipulation'
+                      }}
                     >
                       <option value="all">All Categories</option>
                       {insightCategories.map(category => (
@@ -253,7 +281,11 @@ export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoadin
                     <select
                       value={selectedPriority}
                       onChange={(e) => setSelectedPriority(e.target.value)}
-                      className="w-full text-sm border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full min-h-[44px] text-sm border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-all duration-200 cursor-pointer select-none md:min-h-[36px] md:px-3 md:py-2"
+                      style={{ 
+                        WebkitTapHighlightColor: 'transparent',
+                        touchAction: 'manipulation'
+                      }}
                     >
                       <option value="all">All Priorities</option>
                       <option value="high">High Priority</option>
@@ -274,7 +306,11 @@ export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoadin
                       step="0.1"
                       value={minConfidence}
                       onChange={(e) => setMinConfidence(parseFloat(e.target.value))}
-                      className="w-full"
+                      className="w-full h-6 cursor-pointer appearance-none bg-gray-200 rounded-lg outline-none slider-thumb:appearance-none slider-thumb:w-6 slider-thumb:h-6 slider-thumb:bg-blue-600 slider-thumb:rounded-full slider-thumb:cursor-pointer"
+                      style={{ 
+                        WebkitTapHighlightColor: 'transparent',
+                        touchAction: 'manipulation'
+                      }}
                     />
                   </div>
 
@@ -285,7 +321,11 @@ export const InsightsPage: React.FC<InsightsPageProps> = ({ user, runs, isLoadin
                         type="checkbox"
                         checked={onlyActionable}
                         onChange={(e) => setOnlyActionable(e.target.checked)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                        style={{ 
+                          WebkitTapHighlightColor: 'transparent',
+                          touchAction: 'manipulation'
+                        }}
                       />
                       <span>Only Actionable</span>
                     </label>

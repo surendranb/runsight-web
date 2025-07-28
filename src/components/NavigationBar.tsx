@@ -95,8 +95,8 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
               <span className="text-xl font-bold text-blue-600">RunSight</span>
             </div>
             
-            {/* Clean Desktop Navigation - Gmail/LinkedIn Style */}
-            <div className="hidden md:flex items-center ml-8 space-x-2">
+            {/* Clean Desktop Navigation - Gmail/LinkedIn Style with Fitts's Law compliance */}
+            <div className="hidden md:flex items-center ml-8 space-x-1">
               {navItems.map((item) => {
                 const IconComponent = item.icon;
                 const isActive = currentView === item.viewName;
@@ -105,18 +105,22 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                     key={item.viewName}
                     onClick={() => !item.isDisabled && onNavigate(item.viewName)}
                     disabled={item.isDisabled}
-                    className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    className={`flex items-center min-h-[36px] min-w-[36px] px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 select-none ${
                       item.isDisabled
                         ? 'text-gray-400 cursor-not-allowed opacity-50'
                         : isActive
                         ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                        : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 active:bg-gray-200'
                     }`}
                     aria-current={isActive ? 'page' : undefined}
                     title={item.isDisabled ? 'Coming soon' : `Go to ${item.label}`}
+                    style={{ 
+                      WebkitTapHighlightColor: 'transparent',
+                      touchAction: 'manipulation'
+                    }}
                   >
-                    <IconComponent className="w-4 h-4 mr-2" />
-                    <span>{item.label}</span>
+                    <IconComponent className="w-4 h-4 mr-2 flex-shrink-0" />
+                    <span className="whitespace-nowrap">{item.label}</span>
                   </button>
                 );
               })}
@@ -140,15 +144,19 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                 <button
                   onClick={handleSyncClick}
                   disabled={isSyncing}
-                  className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`flex items-center min-h-[36px] min-w-[36px] px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 select-none ${
                     isSyncing
                       ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+                      : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-sm'
                   }`}
                   title={isSyncing ? 'Syncing...' : 'Sync from Strava'}
+                  style={{ 
+                    WebkitTapHighlightColor: 'transparent',
+                    touchAction: 'manipulation'
+                  }}
                 >
-                  <RefreshCw className={`w-4 h-4 mr-1.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  {isSyncing ? 'Syncing' : 'Sync'}
+                  <RefreshCw className={`w-4 h-4 mr-2 flex-shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span className="whitespace-nowrap">{isSyncing ? 'Syncing' : 'Sync'}</span>
                 </button>
               </div>
             )}
@@ -159,17 +167,25 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
             {onLogout && (
               <button
                 onClick={onLogout}
-                className="hidden sm:flex items-center px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-200"
+                className="hidden sm:flex items-center min-h-[36px] min-w-[36px] px-4 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 active:bg-red-100 transition-all duration-200 select-none"
+                style={{ 
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation'
+                }}
               >
-                Logout
+                <span className="whitespace-nowrap">Logout</span>
               </button>
             )}
 
-            {/* Mobile Menu Button */}
+            {/* Mobile Menu Button - Fitts's Law compliant */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors duration-200"
+              className="md:hidden min-h-[44px] min-w-[44px] p-3 rounded-lg text-gray-600 hover:bg-gray-100 active:bg-gray-200 transition-all duration-200 select-none flex items-center justify-center"
               aria-label="Toggle mobile menu"
+              style={{ 
+                WebkitTapHighlightColor: 'transparent',
+                touchAction: 'manipulation'
+              }}
             >
               {isMobileMenuOpen ? (
                 <X className="w-6 h-6" />
@@ -197,16 +213,20 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                       }
                     }}
                     disabled={item.isDisabled}
-                    className={`flex items-center w-full px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    className={`flex items-center w-full min-h-[48px] px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 select-none ${
                       item.isDisabled
                         ? 'text-gray-400 cursor-not-allowed opacity-50'
                         : isActive
                         ? 'bg-blue-600 text-white'
-                        : 'text-gray-700 hover:bg-gray-100'
+                        : 'text-gray-700 hover:bg-gray-100 active:bg-gray-200'
                     }`}
+                    style={{ 
+                      WebkitTapHighlightColor: 'transparent',
+                      touchAction: 'manipulation'
+                    }}
                   >
-                    <IconComponent className="w-5 h-5 mr-3" />
-                    <span>{item.label}</span>
+                    <IconComponent className="w-5 h-5 mr-3 flex-shrink-0" />
+                    <span className="flex-1 text-left">{item.label}</span>
                     {item.isDisabled && (
                       <span className="ml-auto text-xs text-gray-400">Soon</span>
                     )}
@@ -233,14 +253,18 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                           setIsMobileMenuOpen(false);
                         }}
                         disabled={isSyncing}
-                        className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        className={`flex items-center min-h-[44px] px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 select-none ${
                           isSyncing
                             ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
-                            : 'bg-blue-600 hover:bg-blue-700 text-white'
+                            : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white'
                         }`}
+                        style={{ 
+                          WebkitTapHighlightColor: 'transparent',
+                          touchAction: 'manipulation'
+                        }}
                       >
-                        <RefreshCw className={`w-4 h-4 mr-1 ${isSyncing ? 'animate-spin' : ''}`} />
-                        {isSyncing ? 'Syncing' : 'Sync'}
+                        <RefreshCw className={`w-4 h-4 mr-2 flex-shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
+                        <span>{isSyncing ? 'Syncing' : 'Sync'}</span>
                       </button>
                     </div>
                   </div>
@@ -260,9 +284,13 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                       onLogout();
                       setIsMobileMenuOpen(false);
                     }}
-                    className="w-full flex items-center px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-200"
+                    className="w-full flex items-center min-h-[48px] px-4 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 active:bg-red-100 transition-all duration-200 select-none"
+                    style={{ 
+                      WebkitTapHighlightColor: 'transparent',
+                      touchAction: 'manipulation'
+                    }}
                   >
-                    Logout
+                    <span className="text-left">Logout</span>
                   </button>
                 )}
               </div>

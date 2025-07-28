@@ -121,11 +121,20 @@ export const HelpIcon: React.FC<HelpIconProps> = ({
     lg: 'w-6 h-6'
   };
 
+  // Ensure minimum click target size for desktop
+  const containerClasses = {
+    sm: 'min-h-[32px] min-w-[32px] p-1',
+    md: 'min-h-[36px] min-w-[36px] p-1.5',
+    lg: 'min-h-[40px] min-w-[40px] p-2'
+  };
+
   return (
     <Tooltip content={content} position={position}>
-      <HelpCircle 
-        className={`${sizeClasses[size]} text-gray-400 hover:text-gray-600 transition-colors cursor-help ${className}`}
-      />
+      <div className={`inline-flex items-center justify-center rounded-full hover:bg-gray-100 active:bg-gray-200 transition-all duration-200 cursor-help ${containerClasses[size]}`}>
+        <HelpCircle 
+          className={`${sizeClasses[size]} text-gray-400 hover:text-gray-600 transition-colors ${className}`}
+        />
+      </div>
     </Tooltip>
   );
 };
@@ -161,13 +170,17 @@ export const ProgressiveHelp: React.FC<ProgressiveHelpProps> = ({
             <>
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                className="inline-flex items-center justify-center min-h-[32px] min-w-[32px] px-3 py-2 text-sm text-blue-600 hover:text-blue-700 active:text-blue-800 font-medium transition-all duration-200 rounded-lg hover:bg-blue-50 active:bg-blue-100 select-none"
+                style={{ 
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation'
+                }}
               >
-                <span>{isExpanded ? 'Show Less' : 'Learn More'}</span>
+                <span className="whitespace-nowrap">{isExpanded ? 'Show Less' : 'Learn More'}</span>
                 {isExpanded ? (
-                  <ChevronUp className="w-4 h-4 ml-1" />
+                  <ChevronUp className="w-4 h-4 ml-1 flex-shrink-0" />
                 ) : (
-                  <ChevronDown className="w-4 h-4 ml-1" />
+                  <ChevronDown className="w-4 h-4 ml-1 flex-shrink-0" />
                 )}
               </button>
               
@@ -196,10 +209,14 @@ export const ProgressiveHelp: React.FC<ProgressiveHelpProps> = ({
                       href={learnMoreUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                      className="inline-flex items-center justify-center min-h-[32px] min-w-[32px] px-3 py-2 text-sm text-blue-600 hover:text-blue-700 active:text-blue-800 font-medium transition-all duration-200 rounded-lg hover:bg-blue-50 active:bg-blue-100 select-none"
+                      style={{ 
+                        WebkitTapHighlightColor: 'transparent',
+                        touchAction: 'manipulation'
+                      }}
                     >
-                      <span>Read More</span>
-                      <ExternalLink className="w-4 h-4 ml-1" />
+                      <span className="whitespace-nowrap">Read More</span>
+                      <ExternalLink className="w-4 h-4 ml-1 flex-shrink-0" />
                     </a>
                   )}
                 </div>

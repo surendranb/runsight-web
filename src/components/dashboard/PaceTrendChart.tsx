@@ -110,7 +110,7 @@ export const PaceTrendChart: React.FC<PaceTrendChartProps> = ({
   }, [chartData]);
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+    <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 hover:scale-[1.01] cursor-default">
       <ChartTitle 
         title={`Pace Trend Analysis - ${period}`}
         subtitle="Track your pace improvements over time with moving averages and personal records"
@@ -169,11 +169,17 @@ export const PaceTrendChart: React.FC<PaceTrendChartProps> = ({
               dot={(props: any) => {
                 const { cx, cy, payload } = props;
                 if (payload.isPR) {
-                  return <circle cx={cx} cy={cy} r={4} fill={chartTheme.colors.success} stroke="#ffffff" strokeWidth={2} />;
+                  return <circle cx={cx} cy={cy} r={4} fill={chartTheme.colors.success} stroke="#ffffff" strokeWidth={2} className="hover:r-6 transition-all cursor-pointer" />;
                 }
-                return <circle cx={cx} cy={cy} r={2} fill={chartTheme.colors.primary} />;
+                return <circle cx={cx} cy={cy} r={2} fill={chartTheme.colors.primary} className="hover:r-4 transition-all cursor-pointer" />;
               }}
-              activeDot={{ r: 4, fill: chartTheme.colors.primary }}
+              activeDot={{ 
+                r: 6, 
+                fill: chartTheme.colors.primary, 
+                stroke: '#ffffff', 
+                strokeWidth: 2,
+                style: { cursor: 'pointer' }
+              }}
               name="Pace"
             />
             {showMovingAverage && (

@@ -128,12 +128,16 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
           return (
             <div
               key={run.id}
-              className={`p-4 rounded-lg border-2 transition-all hover:shadow-md hover:scale-[1.02] cursor-pointer ${getPerformanceColor(run)}`}
+              className={`p-4 rounded-lg border-2 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:border-opacity-80 cursor-pointer group ${getPerformanceColor(run)}`}
+              style={{ 
+                WebkitTapHighlightColor: 'transparent',
+                touchAction: 'manipulation'
+              }}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2 mb-1">
-                    <h4 className="font-medium text-gray-900 truncate">{run.name}</h4>
+                    <h4 className="font-medium text-gray-900 truncate group-hover:text-gray-700 transition-colors">{run.name}</h4>
                     {getPerformanceIndicator(run) && (
                       <div className="flex items-center space-x-1">
                         <span className="text-lg" title={getPerformanceIndicator(run)?.label}>

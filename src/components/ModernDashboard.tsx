@@ -463,9 +463,13 @@ export const ModernDashboard: React.FC<ModernDashboardProps> = ({
                     {significantChanges.length > 3 && (
                       <button 
                         onClick={() => {/* TODO: Show all patterns */}}
-                        className="text-sm text-blue-600 hover:text-blue-800 mt-3 font-medium"
+                        className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-4 py-3 mt-3 text-sm text-blue-600 hover:text-blue-800 active:text-blue-900 font-medium rounded-lg hover:bg-blue-50 active:bg-blue-100 transition-all duration-200 select-none md:min-h-[32px] md:min-w-[32px] md:px-3 md:py-2"
+                        style={{ 
+                          WebkitTapHighlightColor: 'transparent',
+                          touchAction: 'manipulation'
+                        }}
                       >
-                        View {significantChanges.length - 3} more insights →
+                        <span className="whitespace-nowrap">View {significantChanges.length - 3} more insights →</span>
                       </button>
                     )}
                   </div>

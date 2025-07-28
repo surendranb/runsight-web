@@ -134,20 +134,28 @@ export const KeyPerformanceCard: React.FC<KeyPerformanceCardProps> = ({
           {(interpretation || actionableAdvice) && (
             <button
               onClick={() => setShowDetailedHelp(!showDetailedHelp)}
-              className="inline-flex items-center space-x-1 text-sm text-green-600 hover:text-green-700 font-medium transition-colors group"
+              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-4 py-3 space-x-1 text-sm text-green-600 hover:text-green-700 active:text-green-800 font-medium transition-all duration-200 rounded-lg hover:bg-green-50 active:bg-green-100 group select-none md:min-h-[32px] md:min-w-[32px] md:px-3 md:py-2"
+              style={{ 
+                WebkitTapHighlightColor: 'transparent',
+                touchAction: 'manipulation'
+              }}
             >
-              <span>{showDetailedHelp ? 'Hide' : 'Show'} Context</span>
-              <ChevronRight className={`w-4 h-4 transition-transform ${showDetailedHelp ? 'rotate-90' : 'group-hover:translate-x-1'}`} />
+              <span className="whitespace-nowrap">{showDetailedHelp ? 'Hide' : 'Show'} Context</span>
+              <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-transform ${showDetailedHelp ? 'rotate-90' : 'group-hover:translate-x-1'}`} />
             </button>
           )}
           
           {onViewDetails && (
             <button
               onClick={onViewDetails}
-              className="inline-flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors group"
+              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-4 py-3 space-x-1 text-sm text-blue-600 hover:text-blue-700 active:text-blue-800 font-medium transition-all duration-200 rounded-lg hover:bg-blue-50 active:bg-blue-100 group select-none md:min-h-[32px] md:min-w-[32px] md:px-3 md:py-2"
+              style={{ 
+                WebkitTapHighlightColor: 'transparent',
+                touchAction: 'manipulation'
+              }}
             >
-              <span>View Details</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <span className="whitespace-nowrap">View Details</span>
+              <ChevronRight className="w-4 h-4 flex-shrink-0 group-hover:translate-x-1 transition-transform" />
             </button>
           )}
         </div>
