@@ -4,6 +4,32 @@
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/surendranb/runsight-web)
 
+<!-- Project Status & Quality Badges -->
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
+[![GitHub issues](https://img.shields.io/github/issues/surendranb/runsight-web)](https://github.com/surendranb/runsight-web/issues)
+[![GitHub stars](https://img.shields.io/github/stars/surendranb/runsight-web)](https://github.com/surendranb/runsight-web/stargazers)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-success?logo=netlify&logoColor=white)](https://resonant-pony-ea7953.netlify.app/)
+
+<!-- Tech Stack Badges -->
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Netlify](https://img.shields.io/badge/Netlify-Serverless-00C7B7?logo=netlify&logoColor=white)](https://www.netlify.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-Database-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
+
+<!-- Running & Data Badges -->
+[![Strava API](https://img.shields.io/badge/Strava-API_v3-FC4C02?logo=strava&logoColor=white)](https://developers.strava.com/)
+[![Weather Data](https://img.shields.io/badge/Weather-OpenWeatherMap-FFA500?logo=openweathermap&logoColor=white)](https://openweathermap.org/)
+[![Privacy First](https://img.shields.io/badge/Privacy-First-4CAF50?logo=shield&logoColor=white)](#-privacy--security-first)
+[![Mobile Ready](https://img.shields.io/badge/Mobile-Ready-2196F3?logo=mobile&logoColor=white)](#-modern-user-experience)
+
+<!-- Running Community Badges -->
+[![Built by Runners](https://img.shields.io/badge/Built_by-Runners-E91E63?logo=run&logoColor=white)](#-community)
+[![10+ Insights](https://img.shields.io/badge/Insights-10+-FF9800?logo=analytics&logoColor=white)](#-what-is-runsight-web)
+[![Weather Analysis](https://img.shields.io/badge/Weather-Analysis-87CEEB?logo=cloud&logoColor=white)](#-key-features)
+[![Personal Records](https://img.shields.io/badge/Track-PRs-FFD700?logo=trophy&logoColor=white)](#-key-features)
+
 ![RunSight Dashboard](https://via.placeholder.com/800x400/4F46E5/FFFFFF?text=RunSight+Dashboard+Screenshot)
 
 ---
