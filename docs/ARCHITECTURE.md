@@ -88,9 +88,11 @@ src/
 │   │   ├── PaceTrendChart.tsx  # Pace trend visualization
 │   │   └── ActivityTimeline.tsx # Activity timeline
 │   ├── insights/              # Insights page components
-│   │   ├── ConsistencyInsight.tsx # Running consistency analysis
-│   │   ├── WeatherInsight.tsx     # Weather correlation analysis
-│   │   └── [10+ other insights]   # Specialized insight components
+│   │   ├── InsightsTabNavigation.tsx # Tabbed navigation for insights
+│   │   ├── InsightsTabContent.tsx    # Tab content organization
+│   │   ├── ConsistencyInsight.tsx    # Running consistency analysis
+│   │   ├── WeatherInsight.tsx        # Weather correlation analysis
+│   │   └── [10+ other insights]      # Specialized insight components
 │   ├── ModernDashboard.tsx    # Main dashboard component
 │   ├── InsightsPage.tsx       # Insights hub
 │   └── GoalsPage.tsx          # Goals tracking (future)
@@ -223,9 +225,14 @@ SecureAppWrapper
     │   ├── PaceTrendChart
     │   └── ActivityTimeline
     ├── InsightsPage
-    │   ├── ConsistencyInsight
-    │   ├── WeatherInsight
-    │   └── [other insights]
+    │   ├── InsightsTabNavigation
+    │   ├── InsightsTabContent
+    │   │   ├── OverviewTab (Actionable Insights, Monthly Summary)
+    │   │   ├── PerformanceTab (Personal Records, Advanced Metrics)
+    │   │   ├── TrainingTab (Consistency Analysis)
+    │   │   ├── EnvironmentTab (Weather, Location, Time, Elevation, Wind)
+    │   │   └── AnalysisTab (Workout Types, Advanced Analytics)
+    │   └── [individual insight components]
     └── GoalsPage
 ```
 

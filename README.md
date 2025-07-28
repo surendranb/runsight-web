@@ -56,13 +56,15 @@ npm run setup  # Validates your environment
 
 ### 📊 Advanced Analytics
 - **10+ Specialized Insights** - Go beyond basic Strava statistics
+- **Tabbed Navigation** - Organized insights by Overview, Performance, Training, Environment, and Analysis
 - **Weather Integration** - Historical weather data for every run
 - **Outlier Detection** - Filters GPS errors and unrealistic data
 - **Smart Highlighting** - Automatically identifies interesting patterns
 
 ### 🎨 Modern User Experience
 - **Cognitive Load Aware** - Shows essential info first, details on demand
-- **Mobile Responsive** - Works perfectly on all devices
+- **Tabbed Organization** - Insights grouped by runner intent and training goals
+- **Mobile Responsive** - Works perfectly on all devices with touch-friendly navigation
 - **Fast & Reliable** - Optimized for performance with large datasets
 
 ---
@@ -76,7 +78,7 @@ npm run setup  # Validates your environment
 ![Dashboard Overview](https://via.placeholder.com/600x400/4F46E5/FFFFFF?text=Dashboard+Overview)
 
 ### Insights Hub
-![Insights Page](https://via.placeholder.com/600x400/059669/FFFFFF?text=Insights+Hub)
+![Insights Page](https://via.placeholder.com/600x400/059669/FFFFFF?text=Insights+Hub+with+Tabbed+Navigation)
 
 ### Weather Analysis
 ![Weather Insights](https://via.placeholder.com/600x400/DC2626/FFFFFF?text=Weather+Analysis)
